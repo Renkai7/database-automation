@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/modernist-0c208813-c83e-4bbd-ab62-e70d3e2809b9/styles.css">
+<script src="_ds/modernist-0c208813-c83e-4bbd-ab62-e70d3e2809b9/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#f7e2dd}
+a{color:#d85433}a:hover{color:#b9421f}
+[data-hide-sb]{scrollbar-width:none}[data-hide-sb]::-webkit-scrollbar{display:none}
+input::placeholder,textarea::placeholder{color:#bda79f}
+input:focus,textarea:focus,select:focus{outline:none;box-shadow:0 0 0 2px #eeb9a6}
+</style>
+</helmet>
+
+<div style="padding:48px 56px 72px;display:flex;flex-direction:column;gap:56px;font-family:var(--font-body);color:#2a2320">
+
+ <div style="display:flex;gap:52px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#c04a26">Phone · 402 pt · New recipe</span>
+    <div data-hide-sb style="width:402px;height:844px;border-radius:38px;overflow:hidden;background:{{ accent }};position:relative;box-shadow:0 30px 70px rgba(150,60,35,.24);display:flex;flex-direction:column">
+
+      <div style="flex:none;padding:20px 22px 0;display:flex;align-items:center;gap:12px">
+        <button style="border:0;background:transparent;font:inherit;font-size:13.5px;color:rgba(255,255,255,.85);padding:6px 0;cursor:pointer" style-hover="color:#fff">Cancel</button>
+        <span style="font-family:var(--font-heading);font-weight:700;font-size:14px;color:#fffaf6;margin:0 auto">New recipe</span>
+        <button onClick="{{ onSave }}" style="border:0;background:transparent;font-family:var(--font-heading);font-weight:700;font-size:13.5px;color:{{ topSaveColor }};padding:6px 0;cursor:pointer">Save</button>
+      </div>
+
+      <div data-hide-sb style="flex:1;min-height:0;overflow:auto;background:#fffaf6;border-radius:34px 34px 0 0;padding:26px 22px 0;margin-top:18px">
+
+        <input value="{{ name }}" onChange="{{ onName }}" placeholder="Recipe name" style="width:100%;box-sizing:border-box;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:24px;line-height:1.15;letter-spacing:-.01em;color:#2a2320">
+        <input value="{{ subtitle }}" onChange="{{ onSubtitle }}" placeholder="Short note — when you'd cook it" style="width:100%;box-sizing:border-box;border:0;background:transparent;padding:6px 0 0;font-size:12.5px;color:#8d7d76">
+
+        <div style="height:1px;background:#f0ddd4;margin:18px 0 20px"></div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <label style="display:flex;flex-direction:column;gap:7px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Time</span>
+              <div style="display:flex;align-items:center;gap:8px;background:#fdf1ea;border-radius:16px;padding:12px 14px">
+                <input value="{{ timeMin }}" onChange="{{ onTime }}" inputMode="numeric" placeholder="20" style="width:100%;min-width:0;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:14px;color:#2a2320;font-variant-numeric:tabular-nums">
+                <span style="font-size:12.5px;color:#8d7d76">min</span>
+              </div>
+            </label>
+            <sc-if value="{{ showMacros }}" hint-placeholder-val="{{ true }}">
+              <label style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Per serving</span>
+                <div style="display:flex;align-items:center;gap:8px;background:#fdf1ea;border-radius:16px;padding:12px 14px">
+                  <input value="{{ kcal }}" onChange="{{ onKcal }}" inputMode="numeric" placeholder="620" style="width:100%;min-width:0;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:14px;color:#2a2320;font-variant-numeric:tabular-nums">
+                  <span style="font-size:12.5px;color:#8d7d76">kcal</span>
+                </div>
+              </label>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Effort</span>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:#f7e7e0;border-radius:999px">
+              <sc-for list="{{ effortOpts }}" as="e" hint-placeholder-count="3">
+                <button onClick="{{ e.onPick }}" style="border:0;border-radius:999px;padding:11px 0;font-family:var(--font-heading);font-weight:700;font-size:13px;cursor:pointer;background:{{ e.fill }};color:{{ e.color }};box-shadow:{{ e.shadow }};transition:background .18s ease">{{ e.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Servings</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:4px;background:#f7e7e0;border-radius:999px;padding:3px">
+              <button onClick="{{ dec }}" style="width:28px;height:28px;border:0;border-radius:999px;background:#fffaf6;color:#2a2320;font-family:var(--font-heading);font-weight:700;font-size:15px;line-height:1;cursor:pointer">−</button>
+              <span style="min-width:22px;text-align:center;font-family:var(--font-heading);font-weight:700;font-size:13.5px">{{ servings }}</span>
+              <button onClick="{{ inc }}" style="width:28px;height:28px;border:0;border-radius:999px;background:#fffaf6;color:#2a2320;font-family:var(--font-heading);font-weight:700;font-size:15px;line-height:1;cursor:pointer">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:baseline;gap:8px;padding:26px 0 12px">
+          <span style="font-family:var(--font-heading);font-weight:700;font-size:15px">Ingredients</span>
+          <span style="margin-left:auto;font-size:11.5px;color:#8d7d76">{{ ingCount }}</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ ingredients }}" as="ing" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:1fr 68px 76px 30px;gap:6px;align-items:center">
+              <input value="{{ ing.name }}" onChange="{{ ing.onName }}" placeholder="Ingredient" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 14px;font-family:var(--font-body);font-size:13.5px;color:#2a2320">
+              <input value="{{ ing.qty }}" onChange="{{ ing.onQty }}" inputMode="decimal" placeholder="0" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 10px;font-family:var(--font-body);font-size:13.5px;color:#2a2320;text-align:center;font-variant-numeric:tabular-nums">
+              <select value="{{ ing.unit }}" onChange="{{ ing.onUnit }}" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 8px;font-family:var(--font-body);font-size:13px;color:#8d7d76;cursor:pointer;appearance:none;text-align:center">
+                <sc-for list="{{ unitOpts }}" as="u" hint-placeholder-count="4">
+                  <option value="{{ u.value }}">{{ u.label }}</option>
+                </sc-for>
+              </select>
+              <button onClick="{{ ing.onRemove }}" style="width:30px;height:30px;border:0;border-radius:999px;background:transparent;color:#c9b3aa;display:grid;place-items:center;cursor:pointer" style-hover="background:#fdeee8;color:#c04a26">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+
+        <button onClick="{{ addIng }}" style="margin-top:10px;width:100%;border:1.5px dashed #edd6cc;border-radius:16px;background:transparent;padding:12px 0;font-family:var(--font-heading);font-weight:700;font-size:13px;color:#c04a26;cursor:pointer" style-hover="background:#fdf1ea;border-color:#e3bdae">+ Add ingredient</button>
+
+        <div style="display:flex;align-items:baseline;gap:8px;padding:26px 0 12px">
+          <span style="font-family:var(--font-heading);font-weight:700;font-size:15px">Instructions</span>
+          <span style="margin-left:auto;font-size:11.5px;color:#8d7d76">{{ stepCount }}</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ steps }}" as="s" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:30px 1fr 30px;gap:10px;align-items:start">
+              <div style="width:30px;height:30px;border-radius:11px;background:#fdf1ea;color:#c04a26;display:grid;place-items:center;font-family:var(--font-heading);font-weight:800;font-size:13px">{{ s.n }}</div>
+              <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+                <textarea value="{{ s.text }}" onChange="{{ s.onText }}" rows="2" placeholder="What happens at this step" style="width:100%;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:12px 14px;font-family:var(--font-body);font-size:13.5px;line-height:1.5;color:#2a2320;resize:vertical"></textarea>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11.5px;color:#8d7d76">Timer</span>
+                  <input value="{{ s.timer }}" onChange="{{ s.onTimer }}" placeholder="optional — e.g. 8 min" style="flex:1;min-width:0;box-sizing:border-box;border:0;border-radius:999px;background:#fdf1ea;padding:8px 12px;font-family:var(--font-body);font-size:11.5px;color:#c04a26">
+                </div>
+              </div>
+              <button onClick="{{ s.onRemove }}" style="width:30px;height:30px;border:0;border-radius:999px;background:transparent;color:#c9b3aa;display:grid;place-items:center;cursor:pointer" style-hover="background:#fdeee8;color:#c04a26">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+
+        <button onClick="{{ addStep }}" style="margin-top:10px;width:100%;border:1.5px dashed #edd6cc;border-radius:16px;background:transparent;padding:12px 0;font-family:var(--font-heading);font-weight:700;font-size:13px;color:#c04a26;cursor:pointer" style-hover="background:#fdf1ea;border-color:#e3bdae">+ Add step</button>
+
+        <div style="padding:26px 0 12px;font-family:var(--font-heading);font-weight:700;font-size:15px">Tags</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px">
+          <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+            <button onClick="{{ t.onPick }}" style="border:1.5px solid {{ t.border }};border-radius:999px;background:{{ t.fill }};color:{{ t.color }};font-family:var(--font-body);font-size:12.5px;padding:7px 13px;cursor:pointer;transition:background .16s ease">{{ t.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="position:sticky;bottom:0;background:linear-gradient(to bottom, rgba(255,250,246,0), #fffaf6 34%);padding:26px 0 26px;margin-top:16px">
+          <sc-if value="{{ showHint }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11.5px;color:#a8938a;padding-bottom:10px">{{ hint }}</div>
+          </sc-if>
+          <button onClick="{{ onSave }}" style="width:100%;border:0;border-radius:999px;padding:16px 0;background:{{ saveBg }};color:{{ saveColor }};font-family:var(--font-heading);font-weight:700;font-size:14.5px;cursor:{{ saveCursor }};transition:background .18s ease">{{ saveLabel }}</button>
+          <div style="height:5px;width:130px;border-radius:999px;background:#e6d5cd;margin:18px auto 0"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div style="width:300px;display:flex;flex-direction:column;gap:16px;padding-top:34px">
+    <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8d7d76">Notes</div>
+    <div style="display:flex;flex-direction:column;gap:12px;font-size:12.5px;line-height:1.55">
+      <div style="padding-top:11px;border-top:1px solid #e6d5cd"><b>Everything types.</b> Name, ingredient rows, steps and timers are live fields; rows add and delete.</div>
+      <div style="padding-top:11px;border-top:1px solid #e6d5cd"><b>Save stays quiet</b> until there's a name, one ingredient and one step — the line above it says what's missing.</div>
+      <div style="padding-top:11px;border-top:1px solid #e6d5cd"><b>Desktop</b> puts the same form beside a live preview of the recipe page it will produce.</div>
+      <div style="padding-top:11px;border-top:1px solid #e6d5cd">Units follow the app's measurement setting — switch it in the tweaks panel to see imperial.</div>
+      <div style="padding-top:11px;border-top:1px solid #e6d5cd;color:#8d7d76">Both frames share one draft, so typing on the phone fills the desktop preview too.</div>
+    </div>
+  </div>
+ </div>
+
+ <div style="display:flex;flex-direction:column;gap:12px">
+  <span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#c04a26">Desktop web · 1440 px</span>
+  <div data-hide-sb style="width:1440px;height:900px;border-radius:20px;overflow:hidden;background:#fffaf6;box-shadow:0 30px 70px rgba(150,60,35,.24);display:flex;flex-direction:column">
+
+    <div style="flex:none;background:{{ accent }};padding:0 44px">
+      <div style="height:70px;display:flex;align-items:center;gap:38px">
+        <span style="font-family:var(--font-heading);font-weight:800;font-size:17px;color:#fffaf6;letter-spacing:-.01em">Kitchen</span>
+        <div style="display:flex;gap:28px;font-size:14px">
+          <span style="color:rgba(255,255,255,.7)">This week</span>
+          <span style="color:#fffaf6;font-family:var(--font-heading);font-weight:700">Recipes</span>
+          <span style="color:rgba(255,255,255,.7)">Shopping</span>
+          <span style="color:rgba(255,255,255,.7)">Settings</span>
+        </div>
+        <div style="margin-left:auto;width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.22)"></div>
+      </div>
+      <div style="height:56px;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.8)">
+        <span>Recipes</span><span style="opacity:.55">/</span><span style="color:#fffaf6">New recipe</span>
+      </div>
+    </div>
+
+    <div data-hide-sb style="flex:1;min-height:0;overflow:auto;background:#fffaf6;border-radius:34px 34px 0 0;margin-top:-16px;padding:40px 56px 0">
+      <div style="display:grid;grid-template-columns:1fr 420px;gap:56px;align-items:start">
+
+        <div style="display:flex;flex-direction:column">
+          <input value="{{ name }}" onChange="{{ onName }}" placeholder="Recipe name" style="width:100%;box-sizing:border-box;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:36px;line-height:1.08;letter-spacing:-.02em;color:#2a2320">
+          <input value="{{ subtitle }}" onChange="{{ onSubtitle }}" placeholder="Short note — when you'd cook it" style="width:100%;box-sizing:border-box;border:0;background:transparent;padding:10px 0 0;font-size:14px;color:#8d7d76">
+
+          <div style="height:1px;background:#f0ddd4;margin:22px 0 24px"></div>
+
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:end">
+            <label style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Time</span>
+              <div style="display:flex;align-items:center;gap:8px;background:#fdf1ea;border-radius:16px;padding:13px 15px">
+                <input value="{{ timeMin }}" onChange="{{ onTime }}" inputMode="numeric" placeholder="20" style="width:100%;min-width:0;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:14px;color:#2a2320;font-variant-numeric:tabular-nums">
+                <span style="font-size:13px;color:#8d7d76">min</span>
+              </div>
+            </label>
+            <sc-if value="{{ showMacros }}" hint-placeholder-val="{{ true }}">
+              <label style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Per serving</span>
+                <div style="display:flex;align-items:center;gap:8px;background:#fdf1ea;border-radius:16px;padding:13px 15px">
+                  <input value="{{ kcal }}" onChange="{{ onKcal }}" inputMode="numeric" placeholder="620" style="width:100%;min-width:0;border:0;background:transparent;padding:0;font-family:var(--font-heading);font-weight:700;font-size:14px;color:#2a2320;font-variant-numeric:tabular-nums">
+                  <span style="font-size:13px;color:#8d7d76">kcal</span>
+                </div>
+              </label>
+            </sc-if>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Effort</span>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:#f7e7e0;border-radius:999px">
+                <sc-for list="{{ effortOpts }}" as="e" hint-placeholder-count="3">
+                  <button onClick="{{ e.onPick }}" style="border:0;border-radius:999px;padding:10px 0;font-family:var(--font-heading);font-weight:700;font-size:12.5px;cursor:pointer;background:{{ e.fill }};color:{{ e.color }};box-shadow:{{ e.shadow }};transition:background .18s ease">{{ e.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8d7d76">Servings</span>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;background:#f7e7e0;border-radius:999px;padding:4px">
+                <button onClick="{{ dec }}" style="width:30px;height:30px;border:0;border-radius:999px;background:#fffaf6;color:#2a2320;font-family:var(--font-heading);font-weight:700;font-size:16px;line-height:1;cursor:pointer">−</button>
+                <span style="font-family:var(--font-heading);font-weight:700;font-size:14px">{{ servings }}</span>
+                <button onClick="{{ inc }}" style="width:30px;height:30px;border:0;border-radius:999px;background:#fffaf6;color:#2a2320;font-family:var(--font-heading);font-weight:700;font-size:16px;line-height:1;cursor:pointer">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:8px;padding:34px 0 14px">
+            <span style="font-family:var(--font-heading);font-weight:700;font-size:17px">Ingredients</span>
+            <span style="margin-left:auto;font-size:12.5px;color:#8d7d76">{{ ingCount }}</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <sc-for list="{{ ingredients }}" as="ing" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:1fr 70px 82px 30px;gap:6px;align-items:center">
+                <input value="{{ ing.name }}" onChange="{{ ing.onName }}" placeholder="Ingredient" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 15px;font-family:var(--font-body);font-size:14px;color:#2a2320">
+                <input value="{{ ing.qty }}" onChange="{{ ing.onQty }}" inputMode="decimal" placeholder="0" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 10px;font-family:var(--font-body);font-size:14px;color:#2a2320;text-align:center;font-variant-numeric:tabular-nums">
+                <select value="{{ ing.unit }}" onChange="{{ ing.onUnit }}" style="min-width:0;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:13px 8px;font-family:var(--font-body);font-size:13px;color:#8d7d76;cursor:pointer;appearance:none;text-align:center">
+                  <sc-for list="{{ unitOpts }}" as="u" hint-placeholder-count="4">
+                    <option value="{{ u.value }}">{{ u.label }}</option>
+                  </sc-for>
+                </select>
+                <button onClick="{{ ing.onRemove }}" style="width:30px;height:30px;border:0;border-radius:999px;background:transparent;color:#c9b3aa;display:grid;place-items:center;cursor:pointer" style-hover="background:#fdeee8;color:#c04a26">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                </button>
+              </div>
+            </sc-for>
+          </div>
+
+          <button onClick="{{ addIng }}" style="margin-top:12px;width:260px;border:1.5px dashed #edd6cc;border-radius:16px;background:transparent;padding:12px 0;font-family:var(--font-heading);font-weight:700;font-size:13px;color:#c04a26;cursor:pointer" style-hover="background:#fdf1ea;border-color:#e3bdae">+ Add ingredient</button>
+
+          <div style="display:flex;align-items:baseline;gap:8px;padding:34px 0 14px">
+            <span style="font-family:var(--font-heading);font-weight:700;font-size:17px">Instructions</span>
+            <span style="margin-left:auto;font-size:12.5px;color:#8d7d76">{{ stepCount }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:34px 1fr 180px 30px;gap:12px;align-items:start">
+                <div style="width:34px;height:34px;border-radius:12px;background:#fdf1ea;color:#c04a26;display:grid;place-items:center;font-family:var(--font-heading);font-weight:800;font-size:14px">{{ s.n }}</div>
+                <textarea value="{{ s.text }}" onChange="{{ s.onText }}" rows="2" placeholder="What happens at this step" style="width:100%;box-sizing:border-box;border:0;border-radius:16px;background:#fdf1ea;padding:12px 15px;font-family:var(--font-body);font-size:14px;line-height:1.5;color:#2a2320;resize:vertical"></textarea>
+                <input value="{{ s.timer }}" onChange="{{ s.onTimer }}" placeholder="Timer — optional" style="min-width:0;box-sizing:border-box;border:0;border-radius:999px;background:#fdf1ea;padding:12px 15px;font-family:var(--font-body);font-size:12.5px;color:#c04a26">
+                <button onClick="{{ s.onRemove }}" style="width:30px;height:30px;margin-top:2px;border:0;border-radius:999px;background:transparent;color:#c9b3aa;display:grid;place-items:center;cursor:pointer" style-hover="background:#fdeee8;color:#c04a26">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                </button>
+              </div>
+            </sc-for>
+          </div>
+
+          <button onClick="{{ addStep }}" style="margin-top:12px;width:260px;border:1.5px dashed #edd6cc;border-radius:16px;background:transparent;padding:12px 0;font-family:var(--font-heading);font-weight:700;font-size:13px;color:#c04a26;cursor:pointer" style-hover="background:#fdf1ea;border-color:#e3bdae">+ Add step</button>
+
+          <div style="padding:34px 0 14px;font-family:var(--font-heading);font-weight:700;font-size:17px">Tags</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;padding-bottom:48px">
+            <sc-for list="{{ tagChips }}" as="t" hint-placeholder-count="6">
+              <button onClick="{{ t.onPick }}" style="border:1.5px solid {{ t.border }};border-radius:999px;background:{{ t.fill }};color:{{ t.color }};font-family:var(--font-body);font-size:13px;padding:8px 15px;cursor:pointer;transition:background .16s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="position:sticky;top:0;display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8d7d76">Preview</div>
+          <div style="background:#fdf1ea;border-radius:26px;padding:24px 24px 26px;display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;line-height:1.15;letter-spacing:-.01em;color:{{ previewTitleColor }}">{{ previewTitle }}</div>
+              <div style="font-size:12.5px;color:#8d7d76;margin-top:5px">{{ previewMeta }}</div>
+            </div>
+            <div style="height:1px;background:#f0ddd4"></div>
+            <sc-if value="{{ hasIngredients }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <sc-for list="{{ previewIng }}" as="p" hint-placeholder-count="4">
+                  <div style="background:#fffaf6;border-radius:18px;padding:12px 13px 13px;display:flex;flex-direction:column;gap:2px">
+                    <div style="width:24px;height:24px;border-radius:8px;background:#fbe1d8;color:{{ accent }};display:grid;place-items:center;font-family:var(--font-heading);font-weight:800;font-size:11px;margin-bottom:5px">{{ p.initial }}</div>
+                    <div style="font-family:var(--font-heading);font-weight:700;font-size:13px;line-height:1.2">{{ p.name }}</div>
+                    <div style="font-size:11.5px;color:#8d7d76;font-variant-numeric:tabular-nums">{{ p.qty }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noIngredients }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12.5px;color:#a8938a">Ingredients appear here as you fill the rows.</div>
+            </sc-if>
+            <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:12px;padding-top:4px">
+                <sc-for list="{{ previewSteps }}" as="p" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:26px 1fr;gap:11px;align-items:start">
+                    <div style="width:26px;height:26px;border-radius:9px;background:{{ p.numBg }};color:{{ p.numColor }};display:grid;place-items:center;font-family:var(--font-heading);font-weight:800;font-size:12px">{{ p.n }}</div>
+                    <div style="padding-top:3px">
+                      <div style="font-size:13px;line-height:1.5;text-wrap:pretty">{{ p.text }}</div>
+                      <sc-if value="{{ p.hasTimer }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:inline-flex;margin-top:7px;background:#fffaf6;color:#c04a26;border-radius:999px;padding:5px 11px;font-size:11px;font-family:var(--font-heading);font-weight:700">{{ p.timer }}</div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ showHint }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12px;color:#a8938a">{{ hint }}</div>
+          </sc-if>
+          <button onClick="{{ onSave }}" style="width:100%;border:0;border-radius:999px;padding:17px 0;background:{{ saveBg }};color:{{ saveColor }};font-family:var(--font-heading);font-weight:700;font-size:15px;cursor:{{ saveCursor }};transition:background .18s ease">{{ saveLabel }}</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+ </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:840,&quot;height&quot;:980},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#e8623c&quot;,&quot;#e0452c&quot;,&quot;#d97757&quot;,&quot;#c2543f&quot;],&quot;default&quot;:&quot;#e8623c&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showMacroFields&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;unitSystem&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;metric&quot;,&quot;imperial&quot;],&quot;default&quot;:&quot;metric&quot;,&quot;tsType&quot;:&quot;'metric'|'imperial'&quot;}}">
+const TAGS = ['Quick', 'High protein', 'Vegetarian', 'Fish', 'Meal prep', 'Breakfast', 'Snack', 'Batch'];
+const UNITS = {
+  metric: ['g', 'ml', 'pcs', 'cloves', 'tbsp', 'tsp'],
+  imperial: ['oz', 'fl oz', 'pcs', 'cloves', 'tbsp', 'tsp']
+};
+
+class Component extends DCLogic {
+  state = {
+    name: '', subtitle: '', timeMin: '', kcal: '', effort: 'Easy', servings: 2,
+    ingredients: [
+      { id: 1, name: '', qty: '', unit: 'g' },
+      { id: 2, name: '', qty: '', unit: 'g' },
+      { id: 3, name: '', qty: '', unit: 'g' }
+    ],
+    steps: [{ id: 1, text: '', timer: '' }, { id: 2, text: '', timer: '' }],
+    tags: ['Quick'], saved: false, nextId: 10
+  };
+
+  patch(list, id, key, value) {
+    this.setState(s => ({
+      saved: false,
+      [list]: s[list].map(r => r.id === id ? { ...r, [key]: value } : r)
+    }));
+  }
+
+  remove(list, id) {
+    this.setState(s => ({ saved: false, [list]: s[list].filter(r => r.id !== id) }));
+  }
+
+  field(key) {
+    return (e) => this.setState({ [key]: e.target.value, saved: false });
+  }
+
+  renderVals() {
+    const accent = this.props.accentColor || '#e8623c';
+    const s = this.state;
+    const units = UNITS[this.props.unitSystem === 'imperial' ? 'imperial' : 'metric'];
+    const showMacros = this.props.showMacroFields !== false;
+
+    const filledIng = s.ingredients.filter(i => i.name.trim());
+    const filledSteps = s.steps.filter(t => t.text.trim());
+    const missing = [];
+    if (!s.name.trim()) missing.push('a name');
+    if (!filledIng.length) missing.push('one ingredient');
+    if (!filledSteps.length) missing.push('one step');
+    const canSave = missing.length === 0;
+
+    const pill = (on) => ({
+      fill: on ? accent : 'transparent',
+      color: on ? '#fffaf6' : '#8d7d76',
+      shadow: on ? '0 4px 12px rgba(200,80,45,.28)' : 'none'
+    });
+
+    const metaBits = [];
+    metaBits.push(s.timeMin.trim() ? s.timeMin.trim() + ' min' : 'Time not set');
+    metaBits.push(s.effort);
+    if (showMacros && s.kcal.trim()) metaBits.push(s.kcal.trim() + ' kcal');
+    metaBits.push('Serves ' + s.servings);
+
+    return {
+      accent,
+      showMacros,
+      name: s.name, onName: this.field('name'),
+      subtitle: s.subtitle, onSubtitle: this.field('subtitle'),
+      timeMin: s.timeMin, onTime: this.field('timeMin'),
+      kcal: s.kcal, onKcal: this.field('kcal'),
+
+      effortOpts: ['Easy', 'Medium', 'Hard'].map(l => {
+        const p = pill(s.effort === l);
+        return { label: l, fill: p.fill, color: p.color, shadow: p.shadow, onPick: () => this.setState({ effort: l, saved: false }) };
+      }),
+
+      servings: s.servings,
+      inc: () => this.setState(x => ({ servings: Math.min(12, x.servings + 1), saved: false })),
+      dec: () => this.setState(x => ({ servings: Math.max(1, x.servings - 1), saved: false })),
+
+      unitOpts: units.map(u => ({ value: u, label: u })),
+      ingredients: s.ingredients.map(i => ({
+        name: i.name, qty: i.qty, unit: i.unit,
+        onName: (e) => this.patch('ingredients', i.id, 'name', e.target.value),
+        onQty: (e) => this.patch('ingredients', i.id, 'qty', e.target.value),
+        onUnit: (e) => this.patch('ingredients', i.id, 'unit', e.target.value),
+        onRemove: () => this.remove('ingredients', i.id)
+      })),
+      ingCount: filledIng.length + ' of ' + s.ingredients.length + ' filled',
+      addIng: () => this.setState(x => ({
+        saved: false, nextId: x.nextId + 1,
+        ingredients: x.ingredients.concat([{ id: x.nextId, name: '', qty: '', unit: units[0] }])
+      })),
+
+      steps: s.steps.map((t, i) => ({
+        n: i + 1, text: t.text, timer: t.timer,
+        onText: (e) => this.patch('steps', t.id, 'text', e.target.value),
+        onTimer: (e) => this.patch('steps', t.id, 'timer', e.target.value),
+        onRemove: () => this.remove('steps', t.id)
+      })),
+      stepCount: filledSteps.length + ' written',
+      addStep: () => this.setState(x => ({
+        saved: false, nextId: x.nextId + 1,
+        steps: x.steps.concat([{ id: x.nextId, text: '', timer: '' }])
+      })),
+
+      tagChips: TAGS.map(t => {
+        const on = s.tags.indexOf(t) >= 0;
+        return {
+          label: t,
+          fill: on ? '#fdeee8' : 'transparent',
+          color: on ? '#c04a26' : '#8d7d76',
+          border: on ? '#f0c6b6' : '#eddcd4',
+          onPick: () => this.setState(x => ({
+            saved: false,
+            tags: on ? x.tags.filter(v => v !== t) : x.tags.concat([t])
+          }))
+        };
+      }),
+
+      previewTitle: s.name.trim() || 'Untitled recipe',
+      previewTitleColor: s.name.trim() ? '#2a2320' : '#c9b3aa',
+      previewMeta: s.subtitle.trim() ? s.subtitle.trim() + ' · ' + metaBits.join(' · ') : metaBits.join(' · '),
+      hasIngredients: filledIng.length > 0,
+      noIngredients: filledIng.length === 0,
+      previewIng: filledIng.map(i => ({
+        name: i.name.trim(),
+        initial: i.name.trim().charAt(0).toUpperCase(),
+        qty: i.qty.trim() ? i.qty.trim() + (i.unit === 'pcs' ? '' : ' ' + i.unit) : '—'
+      })),
+      hasSteps: filledSteps.length > 0,
+      previewSteps: filledSteps.map((t, i) => ({
+        n: i + 1, text: t.text.trim(),
+        hasTimer: !!t.timer.trim(), timer: t.timer.trim(),
+        numBg: i === 0 ? accent : '#fffaf6',
+        numColor: i === 0 ? '#fffaf6' : '#c04a26'
+      })),
+
+      showHint: !canSave,
+      hint: 'Still needs ' + missing.join(', ') + '.',
+      saveLabel: s.saved ? 'Saved to recipes ✓' : 'Save recipe',
+      saveBg: s.saved ? '#fdeee8' : (canSave ? accent : '#f2e2da'),
+      saveColor: s.saved ? '#c04a26' : (canSave ? '#fffaf6' : '#bda79f'),
+      saveCursor: canSave ? 'pointer' : 'default',
+      topSaveColor: canSave ? '#fffaf6' : 'rgba(255,255,255,.45)',
+      onSave: () => { if (canSave) this.setState({ saved: true }); }
+    };
+  }
+}
+
+</script>
+</body>
+</html>
