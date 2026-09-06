@@ -119,25 +119,25 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 … ENV-05 | TBD | Pending |
-| BKP-01 … BKP-08 | TBD | Pending |
-| ANLZ-01 … ANLZ-07 | TBD | Pending |
-| RUN-01 … RUN-08 | TBD | Pending |
-| CI-01 … CI-06 | TBD | Pending |
-| CONN-01 … CONN-05 | TBD | Pending |
-| PROD-01 … PROD-06 | TBD | Pending |
-| AUD-01 … AUD-04 | TBD | Pending |
-| APP-01 … APP-03 | TBD | Pending |
+| ENV-01 … ENV-05 | Phase 1 | Pending |
+| APP-01 | Phase 1 | Pending |
+| BKP-01 … BKP-08 | Phase 2 | Pending |
+| ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
+| RUN-01 … RUN-08 | Phase 4 | Pending |
+| APP-02 | Phase 4 | Pending |
+| CI-01 … CI-06 | Phase 5 | Pending |
+| CONN-01 … CONN-05 | Phase 6 | Pending |
+| PROD-01 … PROD-06 | Phase 7 | Pending |
+| AUD-01 … AUD-04 | Phase 7 | Pending |
+| APP-03 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 52 total
-- Mapped to phases: 0 ⚠️
-- Unmapped: 52 ⚠️
+- Mapped to phases: 52 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-06 after initial definition*
+*Last updated: 2026-09-06 after roadmap revision (Phase 1 split into Phase 1 + Phase 2; downstream phases renumbered 3-7; 100% coverage preserved)*
