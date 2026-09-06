@@ -139,7 +139,7 @@ Overall confidence: MEDIUM-HIGH. The core technical decision (parse, do not rege
 
 ### Gaps to Address
 
-- PostgreSQL major version unresolved -- flagged by STACK.md, FEATURES.md, and PITFALLS.md independently. Must be confirmed in Phase 0 before pinning libpg-query dist-tag and implementing version-conditional rules (PG11 ADD COLUMN defaults, PG12 SET NOT NULL optimization).
+- ~~PostgreSQL major version unresolved~~ **RESOLVED after synthesis (decision D9): PostgreSQL 17 pinned across dev, staging, and production**, with the client tooling image (postgres:17-alpine) pinned to match the server major to eliminate pg_dump/pg_restore version drift. Version-conditional rules may assume PG17 semantics -- both the PG11 ADD COLUMN default behaviour and the PG12 SET NOT NULL optimization are available. This unblocks the libpg-query dist-tag and the Phase 2 rule catalogue.
 - GitHub plan tier vs. environment-protection bypass -- needs direct verification before Phase 6 production gate can be called genuinely non-bypassable rather than conditionally real.
 - Coolify volume/cleanup behavior is community-sourced, not verified against this specific instance -- check the actual configuration before Phase 5, not just GitHub issue reports.
 - Root cause of the original redeploys-needed-too-often problem is still unidentified per PROJECT.md -- does not block the roadmap since D8 is a direct architectural fix regardless of cause, but worth a brief early investigation.

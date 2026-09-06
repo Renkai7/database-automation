@@ -115,3 +115,69 @@ migrates itself on boot.
 way to migrate is to restart the app, and the only way to restart is to redeploy — with
 no gate between "migration generated" and "migration runs against user data". Decoupled,
 deploys become boring because the schema is already correct when the new container starts.
+
+---
+
+## D9 — PostgreSQL 17 pinned across all environments
+**Status:** ACCEPTED · 2026-09-06
+
+Dev, staging, and production all run PostgreSQL 17. The client tooling image
+(postgres:17-alpine) is pinned to match.
+
+**Why:** Several migration safety rules are version-conditional, so the pinned version is
+a dependency of the analyzer's rule catalogue rather than merely a container tag. PG11 made
+non-volatile ADD COLUMN defaults near-instant while volatile defaults still rewrite the
+table; PG12 allows SET NOT NULL to skip its table scan when a validated NOT VALID check
+constraint already proves non-nullability. Pinning one version everywhere removes a class
+of "safe in dev, locking in production" surprises.
+
+Pinning the client image to the server major also removes the pg_dump/pg_restore version
+drift that produces restores which appear to succeed but are incomplete.
+
+**Consequence:** analyzer rules may assume PG17 semantics. Revisit if any environment
+must run an older major.
+
+---
+
+## D10 — Safety analyzer parses SQL; it does not pattern-match
+**Status:** ACCEPTED · 2026-09-06
+
+The classifier is built on libpg-query (the real PostgreSQL parser compiled to WASM,
+Windows-viable with no native build step), operating on the parsed AST. squawk-cli is used
+as an independent second opinion and rule-catalogue reference.
+
+**Why:** Regex-based SQL analysis fails in both directions — comments, dollar-quoted
+strings, DO blocks and function bodies produce both false passes and false blocks. An
+analyzer that can be fooled by a comment is worse than no analyzer, because it manufactures
+confidence. Atlas was rejected: its PostgreSQL destructive-change analyzers moved behind a
+paid tier in late 2025, which is precisely the capability we would adopt it for.
+
+---
+
+## D11 — Drizzle pinned to the stable line, not v1.0.0-rc
+**Status:** ACCEPTED · 2026-09-06
+
+drizzle-orm 0.45.2 and drizzle-kit 0.31.10.
+
+**Why:** The v1.0.0 line is at rc.4 and is not recommended for production by its
+maintainers. More decisively, it removes _journal.json entirely — the mechanism the
+audit-trail requirement depends on.
+
+---
+
+## D12 — Classification is re-derived at execution time
+**Status:** ACCEPTED · 2026-09-06
+
+The migration runner parses and classifies the actual SQL immediately before executing it.
+It never trusts a classification computed by an earlier pipeline stage and passed downstream.
+
+**Why:** This is the only enforcement point that cannot be bypassed from inside the system.
+Pre-commit hooks are advisory (--no-verify). Classic branch protection is admin-bypassable
+by default, which for a solo founder means self-bypassable. GitHub rulesets with an empty
+bypass list are non-bypassable at PR time, but a gate that classifies upstream and passes a
+verdict downstream still lets anything that alters the SQL after classification through.
+
+**Known limitation, recorded honestly:** GitHub environment "required reviewers" permits
+self-approval. For a team of one, the REVIEW REQUIRED gate buys deliberation with assembled
+context — the diff, the reason, staging results — not independent review. The system must
+not imply a guarantee it cannot provide.
