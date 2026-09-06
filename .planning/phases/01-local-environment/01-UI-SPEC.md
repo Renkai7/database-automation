@@ -1,7 +1,7 @@
 ---
 phase: "1"
 slug: "local-environment"
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: "2026-09-06"
@@ -37,6 +37,18 @@ someone else's primitives, which is exactly the normalization D-06 forbids. The 
 initialization gate is therefore skipped for this phase, not merely declined.
 
 > Component Inventory section intentionally omitted — `Tool: none`.
+
+---
+
+## Visual Hierarchy
+
+**Focal point:** the recipe title (`h2`, 800 weight, 24/34/36px) is the primary visual anchor
+of the screen. `Recipe Page.dc.html` has **no hero image** — line 127 of the source records
+"Photo removed. The cream sheet starts just under the nav row and runs the full height." Do not
+reintroduce one. Reading order after the title: subtitle → meta row (clock/effort/macro) → tab
+track → active panel content → "Mark as cooked" CTA. The accent fill on the header strip and on
+the CTA are the only two accent-weight draws above the fold; they bracket the content rather
+than competing with the title.
 
 ---
 
@@ -95,6 +107,13 @@ Do not invent intermediate sizes; use the exact value at each breakpoint from th
 | Body (step text, meta-row labels, servings caption) | 12.5–14.5px | 400 | 1.55 (step text is explicit; elsewhere the `styles.css` default of 1.55 applies) |
 | Label (subtitle, ingredient quantity, eyebrow captions) | 10.5–14px | 400; eyebrow captions ("Phone · 402pt" style) additionally carry `letter-spacing:.12em` + uppercase | default (not explicit in source) |
 
+**Accepted exception — three weights, not two.** The general guidance is a maximum of two font
+weights. This screen carries three (800 inherited for headings, 700 inline override, 400 body),
+because that is the source file's own encoding and CONTEXT.md D-06 locks the port "without
+design changes." Normalizing to two weights would violate D-06. This is a deliberate, recorded
+exception — **not** a defect for an executor to "fix," exactly as with the non-4px spacing
+values above.
+
 Base default (from `styles.css`, applies to any net-new text this phase introduces outside the
 ported screen): `font-size: 15px; line-height: 1.55; font-weight: 400;` on `--font-body`
 (Archivo).
@@ -149,18 +168,51 @@ binding on the port):
 
 ## UI Considerations
 
-Applicable state considerations resolved: 4 covered, 0 backstop, 4 unresolved.
+Shape-rooted state coverage over the ported `Recipe Page` surfaces, produced by the
+ui-consideration-probe against 7 confirmed element classifications and resolved with the
+owner on 2026-09-06. Empty-state and error-state **copy** stays in `## Copywriting Contract`
+above — this section covers state *shape*, and references those rows rather than restating them.
+
+**Coverage:** 40 applicable · 39 closed (18 explicit, 0 backstop, 21 dismissed) · 1 unresolved.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | ingredients-grid, steps-list | dismissed | D-23's seed is deterministic with fixed, non-zero row counts, and Phase 1 has no create/delete path that could produce an empty recipe. Cannot occur under this phase's scope. |
-| loading | ingredients-grid, steps-list, favorite-toggle, tab-switch, servings-stepper, cooked-cta | dismissed | The recipe route is a Next.js Server Component querying Drizzle directly (D-05) — content is fully present on first paint, no client fetch/loading boundary exists. Tab switch, stepper, favorite, and cooked-toggle are synchronous local state changes with no network round-trip in Phase 1. |
-| error | ingredients-grid, steps-list | ⚠ unresolved | No error or recipe-not-found state is designed anywhere in `Recipe Page.dc.html`. Planner must decide the treatment (Next.js `notFound()` / error boundary / inline message) before wiring the dynamic route. |
-| populated | ingredients-grid, steps-list | ✅ covered | The source's hardcoded 8-ingredient / 5-step render *is* the happy-path reference; D-23's seed reproduces this exact content so the wired page matches the design 1:1. |
-| partial | steps-list | ✅ covered | `hasTimer` is already a per-step conditional in the source binding (some steps show a timer chip, some don't) — this is the partial-data case and it is already handled. |
-| overflow | recipe-header (title/subtitle), steps-list (step text) | ✅ covered | No truncation/ellipsis rule exists anywhere in source for these elements; text wraps by default block flow, and step text additionally carries `text-wrap:pretty`. |
-| zero-one-many | ingredients-grid, steps-list | ⚠ unresolved | Source only demonstrates "many" (8 ingredients / 5 steps). Grid/list layout at exactly one item is untested by the design — flag before shipping a recipe with a single ingredient or step. |
-| long-text | ingredients-grid (`ing.name`), recipe-header (title) | ⚠ unresolved | The ingredient card is a fixed-width tile with no overflow rule defined; an unusually long ingredient name's wrap/clip behavior is undefined by the source file. |
+| Empty / no data | `recipe-header` | ✅ resolved (explicit) | The header renders from the recipes row itself; a missing recipe never reaches render because the dynamic route calls notFound() first. An unknown recipe id calls Next.js notFound(); a failed Drizzle query hits a route-level error boundary rendering plain text plus a retry affordance. This markup is net-new (not part of the ported screen), so it uses the standard 8pt spacing scale and the base 15px/1.55 Archivo body style, NOT the Recipe Page exception values. |
+| Empty / no data | `ingredients-grid`, `steps-list` | ⊘ dismissed | D-23 locks a deterministic, committed seed with fixed non-zero row counts, and Phase 1 has no create or delete path (D-11 reserves churn material for later phases). A zero- or one-item recipe cannot arise in this phase's scope. |
+| Empty / no data | `favorite-toggle` | ⊘ dismissed | Favorite and cooked are ephemeral client-only React state (owner decision, 2026-09-06): no backing column in D-09's schema, no persistence, no network round-trip — so there is no in-flight or failure state to render. The control always has a value — it defaults to inactive. |
+| Loading / in-flight | `recipe-header`, `ingredients-grid`, `steps-list` | ⊘ dismissed | The recipe route is a Next.js Server Component querying Drizzle directly (CONTEXT.md D-05) — content is fully present on first paint, so no client-side loading boundary exists for this surface. |
+| Loading / in-flight | `tab-switch` | ⊘ dismissed | The recipe route is a Next.js Server Component querying Drizzle directly (CONTEXT.md D-05) — content is fully present on first paint, so no client-side loading boundary exists for this surface. Switching tabs is a synchronous local state change between two already-rendered panels. |
+| Loading / in-flight | `servings-stepper` | ⊘ dismissed | The recipe route is a Next.js Server Component querying Drizzle directly (CONTEXT.md D-05) — content is fully present on first paint, so no client-side loading boundary exists for this surface. Increment and decrement are synchronous local state changes with no network round-trip. |
+| Loading / in-flight | `cooked-cta`, `favorite-toggle` | ⊘ dismissed | Favorite and cooked are ephemeral client-only React state (owner decision, 2026-09-06): no backing column in D-09's schema, no persistence, no network round-trip — so there is no in-flight or failure state to render. |
+| Error / failure | `recipe-header`, `ingredients-grid`, `steps-list` | ✅ resolved (explicit) | An unknown recipe id calls Next.js notFound(); a failed Drizzle query hits a route-level error boundary rendering plain text plus a retry affordance. This markup is net-new (not part of the ported screen), so it uses the standard 8pt spacing scale and the base 15px/1.55 Archivo body style, NOT the Recipe Page exception values. |
+| Error / failure | `tab-switch` | ✅ resolved (explicit) | An unknown recipe id calls Next.js notFound(); a failed Drizzle query hits a route-level error boundary rendering plain text plus a retry affordance. This markup is net-new (not part of the ported screen), so it uses the standard 8pt spacing scale and the base 15px/1.55 Archivo body style, NOT the Recipe Page exception values. The tab track itself cannot fail independently — it renders inside the boundary. |
+| Error / failure | `servings-stepper` | ✅ resolved (explicit) | An unknown recipe id calls Next.js notFound(); a failed Drizzle query hits a route-level error boundary rendering plain text plus a retry affordance. This markup is net-new (not part of the ported screen), so it uses the standard 8pt spacing scale and the base 15px/1.55 Archivo body style, NOT the Recipe Page exception values. The stepper renders inside the boundary and has no independent failure path. |
+| Error / failure | `cooked-cta`, `favorite-toggle` | ⊘ dismissed | Favorite and cooked are ephemeral client-only React state (owner decision, 2026-09-06): no backing column in D-09's schema, no persistence, no network round-trip — so there is no in-flight or failure state to render. |
+| Populated / happy path | `recipe-header` | ✅ resolved (explicit) | The source's hardcoded header — title, subtitle, back/save icon buttons, and the clock/effort/macro meta row — is the happy-path reference. D-23's seed reproduces this exact recipe content so the wired header matches the design 1:1. Note the source has NO hero image (Recipe Page.dc.html:127, 'Photo removed'); the visual focal point is the title. |
+| Populated / happy path | `ingredients-grid` | ✅ resolved (explicit) | The source's hardcoded 8-ingredient render is the happy-path reference; D-23's seed reproduces that exact content, so the wired grid matches the design 1:1 at 20/22/22px card radius. |
+| Populated / happy path | `steps-list` | ✅ resolved (explicit) | The source's hardcoded 5-step render is the happy-path reference; D-23's seed reproduces that exact content, so the wired list matches the design 1:1. |
+| Populated / happy path | `favorite-toggle` | ✅ resolved (explicit) | Two-tone heart state, hardcoded and independent of the swappable accent prop: active #e0362b, inactive #c9b3aa. A change to the accent swatch must NOT change favorite-state color. |
+| Partial / incomplete | `recipe-header` | ⚠ unresolved | **Planner must treat as an assumption.** Partial / incomplete for this surface is undecided — see Open Questions. |
+| Partial / incomplete | `ingredients-grid` | ✅ resolved (explicit) | Every seeded ingredient row carries both a name and a quantity (D-23's seed is deterministic and committed), and the card has no optional field — so there is no partially-populated card variant to design. |
+| Partial / incomplete | `steps-list` | ✅ resolved (explicit) | hasTimer is already a per-step conditional in the source binding — some steps show a timer chip, some do not. That IS the partial-data case for this surface and the source already handles it; port the conditional as written. |
+| Overflow / truncation | `recipe-header`, `ingredients-grid` | ✅ resolved (explicit) | Text wraps within its container and is never truncated or clipped — no ellipsis rule. The ingredient card grows in height to fit a long name; the recipe title wraps to additional lines at its per-breakpoint size. Consistent with the source's existing text-wrap:pretty on step text. |
+| Overflow / truncation | `steps-list` | ✅ resolved (explicit) | Text wraps within its container and is never truncated or clipped — no ellipsis rule. The ingredient card grows in height to fit a long name; the recipe title wraps to additional lines at its per-breakpoint size. Consistent with the source's existing text-wrap:pretty on step text. Step body text already carries text-wrap:pretty in the source. |
+| Overflow / truncation | `tab-switch` | ⊘ dismissed | The tab track holds exactly two fixed tabs ('Ingredients' / 'Instructions'), neither data-bound. The pill track (border-radius 999px) cannot overflow. |
+| Overflow / truncation | `servings-stepper` | ⊘ dismissed | The stepper track holds a small integer count and a fixed caption; the pill track (border-radius 999px) has no data-bound content that can exceed it. |
+| Zero / one / many | `recipe-header`, `ingredients-grid`, `steps-list` | ⊘ dismissed | D-23 locks a deterministic, committed seed with fixed non-zero row counts, and Phase 1 has no create or delete path (D-11 reserves churn material for later phases). A zero- or one-item recipe cannot arise in this phase's scope. |
+| Long text | `recipe-header`, `ingredients-grid` | ✅ resolved (explicit) | Text wraps within its container and is never truncated or clipped — no ellipsis rule. The ingredient card grows in height to fit a long name; the recipe title wraps to additional lines at its per-breakpoint size. Consistent with the source's existing text-wrap:pretty on step text. |
+| Long text | `steps-list` | ✅ resolved (explicit) | Text wraps within its container and is never truncated or clipped — no ellipsis rule. The ingredient card grows in height to fit a long name; the recipe title wraps to additional lines at its per-breakpoint size. Consistent with the source's existing text-wrap:pretty on step text. Step body text already carries text-wrap:pretty in the source. |
+| Long text | `tab-switch` | ⊘ dismissed | Both tab labels are fixed literal strings from the source, not data-bound — no long-text case exists. |
+| Long text | `servings-stepper` | ⊘ dismissed | The caption is the fixed source pattern 'Scaled for one' / 'Scaled for {n}' — the singular/plural distinction is already handled by the source logic. No unbounded text. |
+| Long text | `cooked-cta` | ⊘ dismissed | The CTA label is a fixed two-state literal from the source ('Mark as cooked' / 'Cooked ✓'), not data-bound. |
+| Long text | `favorite-toggle` | ⊘ dismissed | Icon-only control with no text label. |
+
+**The one unresolved row.** `recipe-header` / *Partial / incomplete*: the source subtitle is
+the literal `"Wednesday lunch · from this week's plan"`, which references the not-yet-built meal
+planner. Meal-plan days and slots are reserved churn material (D-10) and are not in D-09's
+Phase 1 schema, so this string **cannot be data-bound in this phase**. Whether it is hardcoded,
+dropped, or replaced is a planner decision — it is recorded here as an open assumption, not
+silently resolved. See Open Questions.
 
 ---
 
@@ -173,10 +225,16 @@ phase.
 
 ## Open Questions (flagged per CLAUDE.md — mark unverified as UNKNOWN, do not guess)
 
-1. **Recipe-not-found / DB-error handling.** No design or copy exists for this state (see UI
-   Considerations, `error` row). Planner must choose a treatment before wiring the dynamic
-   route — this is new work, not a port.
-2. **Favorite (heart) and "Mark as cooked" persistence.** D-09's schema (`recipes` +
+1. ~~**Recipe-not-found / DB-error handling.**~~ **RESOLVED (owner, 2026-09-06):** an unknown
+   recipe id calls Next.js `notFound()`; a failed Drizzle query hits a route-level error
+   boundary rendering plain text plus a retry affordance. This is net-new markup, so it uses the
+   standard 8pt scale and the base 15px/1.55 Archivo body style — **not** the Recipe Page
+   exception values. Error-state *copy* remains UNKNOWN in the Copywriting Contract and is the
+   planner's to write.
+2. ~~**Favorite (heart) and "Mark as cooked" persistence.**~~ **RESOLVED (owner, 2026-09-06):
+   both are ephemeral client-only React state — no backing column, no persistence, resets on
+   reload.** A column must NOT be added for either toggle in Phase 1. Original reasoning kept
+   below for the record. D-09's schema (`recipes` +
    `ingredients` + `steps`) has no column backing either toggle, and neither is named in
    D-11's reserved-churn table. Recommend treating both as **ephemeral client-only UI state**
    in Phase 1 (resets on reload) unless the planner deliberately adds a column — flagging this
@@ -209,12 +267,16 @@ phase.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS (N/A — `Tool: none`, no design-system package to enumerate)
+Verified by `gsd-ui-checker` on 2026-09-06 — **APPROVED**, 0 blocking issues.
+
+- [x] Dimension 1 Copywriting: **PASS**
+- [x] Dimension 2 Visuals: **FLAG** — no focal point named. *Addressed:* `## Visual Hierarchy` added above.
+- [x] Dimension 3 Color: **PASS**
+- [x] Dimension 4 Typography: **FLAG** — 3 weights exceeds the 2-weight guideline. *Addressed:* recorded as an accepted exception under `## Typography`, traceable to D-06.
+- [x] Dimension 5 Spacing: **FLAG** — ported values are not 4px multiples. *Accepted:* justified and traceable to D-06/D13; the exception framing must survive implementation so no one "rounds" these.
+- [x] Dimension 6 Registry Safety: **PASS**
+- [x] Dimension 7 Inventory Provenance: **PASS** (N/A — `Tool: none`, no design-system package to enumerate)
+
+All three FLAGs are non-blocking recommendations, not defects.
 
 **Approval:** pending
