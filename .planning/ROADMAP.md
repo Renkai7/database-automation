@@ -37,7 +37,14 @@ expand-and-contract migration — it is test material, not a deliverable in its 
   1. `docker compose up` brings up a PostgreSQL 17 container matching production's extensions; every environment (local/staging/production) has its own distinctly-named connection variable so no generic variable can silently point at the wrong one; and Claude Code queries the local database directly, with no command relayed through a Coolify terminal.
   2. A schema edit to the recipe app's Drizzle schema, run through the documented loop, produces a migration, applies locally, and the app boots against the resulting schema.
   3. The destroy-and-rebuild command tears down and recreates the local database in one step, leaving a clean, freshly-migrated schema with no manual cleanup.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Workspace, PostgreSQL 17 container, connection-variable template, and the timeboxed redeploy investigation
+- [ ] 01-02-PLAN.md — Tracer: one seeded recipe reaches an HTTP response, plus the environment-safety module
+- [ ] 01-03-PLAN.md — Full recipe core schema, deterministic seed, and the blocking schema apply
+- [ ] 01-04-PLAN.md — Direct database access (`db:query`), one-command destroy and rebuild (`db:reset`), and the guardrail suite
+- [ ] 01-05-PLAN.md — Port the Recipe Page to real rows, plus not-found and error paths
 
 ### Phase 2: Backup & Restore Drill
 **Goal**: The owner has personally proven — by destroying and restoring real data — that backups actually work, timed the procedure, and written the runbook from what actually happened. An automated restore test asserts real content against a genuinely fresh instance, not just an exit code.
@@ -113,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Local Environment | 0/TBD | Not started | - |
+| 1. Local Environment | 0/5 | Planned | - |
 | 2. Backup & Restore Drill | 0/TBD | Not started | - |
 | 3. Safety Analyzer | 0/TBD | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
