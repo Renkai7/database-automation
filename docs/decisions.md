@@ -181,3 +181,23 @@ verdict downstream still lets anything that alters the SQL after classification 
 self-approval. For a team of one, the REVIEW REQUIRED gate buys deliberation with assembled
 context — the diff, the reason, staging results — not independent review. The system must
 not imply a guarantee it cannot provide.
+
+---
+
+## D13 — UI imported as-is; backend stays thin
+**Status:** ACCEPTED · 2026-09-06
+
+The recipe app's UI comes from a Claude Design hand-off and is brought over without design
+changes. Backend functionality remains minimal — enough to boot, hold a real schema, and
+generate the schema churn the pipeline needs.
+
+**Why:** A real designed UI gives the schema something concrete to model, which is better
+test material than invented tables. The fixture constraint (D6) was always about backend
+and feature depth displacing pipeline work, not about the UI looking unfinished.
+
+**Boundary:** importing screens and styling is in scope. Building out the application
+features those screens imply is not, unless the fixture scope is explicitly revisited.
+
+**Blocked on:** Claude Design authorization. The claude_design MCP server is registered at
+user scope but returns HTTP 403 until /design-login is run from an interactive session;
+the built-in DesignSync tool reports the same. Import is pending that step.

@@ -47,7 +47,9 @@ remembered to be careful.
 - **Production access from the local machine** — architecturally excluded, not deferred.
   Visibility comes from committed schema snapshots; changes come from CI.
 - **Prisma** — Drizzle ORM is the chosen ORM.
-- **A polished recipe application** — it is a thin test fixture. Depth was explicitly
+- **Recipe app backend depth** — the app is a thin test fixture. The UI is imported from
+  Claude Design as-is and may be fully designed, but backend functionality stays minimal:
+  enough to boot, hold a real schema, and generate schema churn. Depth was explicitly
   scoped down so pipeline work is not displaced by app work.
 - **Automatic database rollback** — DB rollback is often more dangerous than app rollback.
   The strategy is backwards-compatible migrations, backups, and forward fixes.
