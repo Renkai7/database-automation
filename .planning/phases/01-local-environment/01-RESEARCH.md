@@ -432,22 +432,45 @@ See Architecture Patterns 1–6 above — each is sourced with `[CITED: ...]` in
 | A3 | The recipe app's Drizzle config and app code live under `apps/recipe-app/` with root-level scripts passing `--config` flags, rather than the app owning its own `db:*` scripts that root scripts merely proxy | Recommended Project Structure | D-03 only fixes that the scripts are root-level; exact wiring (direct `--config` flag vs. `pnpm --filter`) is an implementation detail the planner can choose either way without contradicting any locked decision. |
 | A4 | `docker compose up -d --wait` is supported by the Docker Compose version bundled with the confirmed-installed Docker 29.6.1 | Pattern 1, Don't Hand-Roll | If the bundled Compose version predates the `--wait` flag (unlikely given how recent Docker 29.6.1 is, but not directly checked against a Compose version number), the fallback is a trivial hand-rolled `pg_isready` loop — low-severity, easily detected the first time `db:reset` is run. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Redeploy root-cause investigation (D-25/D-26) needs the existing SaaS repos' actual locations.**
+All three questions below are closed as of phase planning. Each carries an explicit **Status** line:
+`RESOLVED` means an artifact now answers it and the line points at that artifact; `DEFERRED` means it
+is deliberately left open, with the decision that authorised leaving it open. Per this project's
+`CLAUDE.md`, a deferred question stays marked UNKNOWN — it is not closed by guessing an answer.
+
+1. **Redeploy root-cause investigation (D-25/D-26) needs the existing SaaS repos' actual locations.** — **DEFERRED (D-25)**
    - What we know: the investigation's most decisive evidence source is reading those repos' Dockerfile/entrypoint/start command directly (D-26 #1), and this research session has no access to any SaaS repo other than this one and the Unreal/WarAge game-dev directories listed as additional working directories — neither of which is the "existing SaaS applications" referenced in `docs/00-current-state.md` §5.
    - What's unclear: where those repos live (this machine, another machine, GitHub only) is not recorded anywhere in `.planning/` or `docs/`.
    - Recommendation: the first task of Phase 1 execution (per D-25, timeboxed) should start by asking the owner for the repo path(s)/URLs, then grep their Dockerfile/entrypoint/`package.json` `start`/`postinstall` scripts for migration-related commands (`drizzle-kit migrate`, `prisma migrate deploy`, raw `psql`/`knex migrate` invocations) as the concrete first check — a "still UNKNOWN" outcome (D-25's explicitly acceptable result) is correct if the repos are unavailable within the timebox.
+   - **Status: DEFERRED (D-25) — deliberately not answerable at research time.** The question is
+     carried into execution rather than left dangling: plan `01-01-PLAN.md` Task 1 ("Timeboxed
+     redeploy root-cause investigation, written back to current-state section 7") runs the D-26
+     evidence ladder under a hard timebox and writes a dated entry naming the tier reached. Per D-25,
+     "still UNKNOWN" is an accepted outcome of that task, and in that case the answer stays marked
+     UNKNOWN in `docs/00-current-state.md` §7 rather than being guessed. Nothing in Phase 1 blocks on
+     the answer.
 
-2. **Exact seed content and base-servings value (UI-SPEC Open Questions 3–4) are unresolved planner decisions, not research gaps.**
+2. **Exact seed content and base-servings value (UI-SPEC Open Questions 3–4) are unresolved planner decisions, not research gaps.** — **RESOLVED**
    - What we know: D-23 requires seed content derived from the design's own recipe data; the design hardcodes `mult = servings / 2` (base servings = 2) and a subtitle referencing the not-yet-built meal planner.
    - What's unclear: whether `recipes` gets a `subtitle` and a `base_servings` (or equivalent) column, and their exact seed values — the UI-SPEC already flags these as planner discretion within D-09's column-naming freedom.
    - Recommendation: resolve during planning, not research — no external unknown blocks this, it is a schema-shape decision already scoped to the planner by CONTEXT.md.
+   - **Status: RESOLVED during planning.** `01-02-PLAN.md` → "Planner decisions recorded here"
+     records the answers: `recipes.subtitle` is a text column seeded
+     `Weeknight dinner · ready in 20 minutes` (UI-SPEC Open Question 3), and `recipes.base_servings`
+     is an integer column seeded `2` (UI-SPEC Open Question 4), so the servings scaler's multiplier
+     derives from a real column. The same section fixes the seeded slug `chicken-rice-bowl` and the
+     rest of the deterministic seed values.
 
-3. **Coolify's actual Postgres extension list remains UNKNOWN and correctly stays that way (D-13).**
+3. **Coolify's actual Postgres extension list remains UNKNOWN and correctly stays that way (D-13).** — **DEFERRED (D-13)**
    - What we know: `docs/00-current-state.md` §4 lists it as unconfirmed; D-13 declares an empty baseline for Phase 1 rather than guessing.
    - What's unclear: whether production genuinely uses zero extensions or Phase 1's empty baseline will need to grow later.
    - Recommendation: do not attempt to resolve this in Phase 1 — D-13 already made the correct call (declare an honest baseline, not a guessed one). Revisit only when Coolify's actual configuration is confirmed (a Phase 6+ concern per the canonical refs).
+   - **Status: DEFERRED (D-13) — stays UNKNOWN on purpose, and that is the resolution.** This is not
+     an unanswered question awaiting work; declining to answer it is the decision. `docs/00-current-state.md`
+     §4 keeps it recorded as unconfirmed, and Phase 1 ships an empty extension baseline that is
+     honest rather than a guessed mirror of production. Do not close this by inferring an extension
+     list; it closes only when Coolify's actual configuration is read directly (Phase 6+).
 
 ## Environment Availability
 
