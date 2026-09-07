@@ -447,19 +447,25 @@ Not applicable — this is a new-feature phase (backup/restore tooling), not a r
 
 **If this table is empty:** N/A — see above; all three entries are low-risk recommendations/observations, not unverified factual claims load-bearing for correctness.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three were resolved during Phase 2 planning; each carries an inline `RESOLVED:` marker naming the plan that made the call.
 
 1. **Should the automated drill use `postgres:17-alpine` as a literal separate client-tooling container, per a strict reading of D-12, or reuse each server container's own bundled client binaries (the approach live-verified in this research)?**
    - What we know: D-12's text states "Both images are used in this phase, for different roles — do not collapse them," which STACK.md's original recommendation pairs with `postgres:17-alpine` running `pg_dump`/`pg_restore` against either server over the network (`host.docker.internal` or a Docker network). The approach actually tested in this research instead runs the client binaries *inside* whichever `postgres:17` server container already holds them (`docker compose exec` for the dev container, `container.exec()` for the Testcontainers instance) — functionally identical (same exact `17.11` binaries) but never spins up a distinct alpine container.
    - What's unclear: whether D-12's phrasing is a binding implementation mandate (spin up a real, separate `postgres:17-alpine` container) or a clarification that the *alpine recommendation from STACK.md refers to client tooling, not the server pin* (satisfied either way, since neither approach ever runs the server on alpine).
+   - **RESOLVED:** adopted the in-container-exec approach. Plan `02-01-PLAN.md` Task 1 runs the client binaries inside whichever `postgres:17` server container already holds them, and D-12's stated concern (never let the drill's *server* run on alpine) is satisfied either way.
    - Recommendation: the in-container-exec approach is simpler (no new image, no Windows `host.docker.internal` dependency, zero version-drift risk by construction) and satisfies D-12's actual stated concern (never let the drill's *server* run on alpine). If the discuss/plan step wants literal `postgres:17-alpine` usage for stack-recommendation fidelity, it is a small, isolable substitution in Pattern 1/2 above, not a different architecture.
 
 2. **Exact mechanism for the D-03/D-04 backup destination configuration.**
    - What we know: must not be a repo-relative path baked into the tools; must be expressible as "a destination," not a repo subdirectory.
    - What's unclear: whether this should be a new environment variable (matching `scripts/env.ts`'s existing `RECIPE_DEV_DATABASE_URL` hard-fail-on-missing pattern) or a small dedicated config file.
+   - **RESOLVED:** environment variable. Plan `02-01-PLAN.md` Task 1 adds `RECIPE_BACKUP_DESTINATION` to `scripts/env.ts` with `BACKUP_DESTINATION_ENV_VAR`, `assertBackupDestination` and `getBackupDestination`, hard-failing when unset — recorded under that plan's "Claude's-discretion choices made here".
    - Recommendation: an environment variable (e.g. `RECIPE_BACKUP_DESTINATION`, an absolute path), validated at startup the same way `RECIPE_DEV_DATABASE_URL` is — hard-fail if unset, matching D-20's established "no silent default" precedent — since this project already has exactly one config mechanism (`.env` + `scripts/env.ts`) and introducing a second (a config file) for one variable adds a discovery cost with no benefit.
 
-3. **Retention behavior at the backup destination** (Claude's Discretion, not discussed) — recommend overwrite-in-place for the "current" backup plus timestamped filenames that naturally accumulate unless pruned, with no automatic pruning built in this phase (pruning is storage-lifecycle policy, more naturally paired with the deferred off-server-storage work at Phase 6/7 than invented here). Low risk either way since this is explicitly open to the planner's judgment.
+3. **Retention behavior at the backup destination** (Claude's Discretion, not discussed)
+   - **RESOLVED:** accumulate, no pruning this phase. Plan `02-01-PLAN.md` uses timestamped filenames and `readLatestManifest` picks the newest; pruning is deferred to the off-server-storage work.
+   - Recommendation: recommend overwrite-in-place for the "current" backup plus timestamped filenames that naturally accumulate unless pruned, with no automatic pruning built in this phase (pruning is storage-lifecycle policy, more naturally paired with the deferred off-server-storage work at Phase 6/7 than invented here). Low risk either way since this is explicitly open to the planner's judgment.
 
 ## Environment Availability
 
