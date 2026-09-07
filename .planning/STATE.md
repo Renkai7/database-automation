@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Backup & Restore Drill
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-07T21:48:17.961Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-09-07T22:06:23.349Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 02 execution started
-state_head: dcdf5baa5e7c5d78dfde5cbfca0aa17868531c60
+state_head: 91644e90dff20d48e98e11782e40629ee4504ebc
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 02 (Backup & Restore Drill) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 02 execution started
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P01 | 55min | 2 tasks | 9 files |
 | Phase 02 P02 | 30min | 3 tasks | 6 files |
 | Phase 02 P03 | 20min | 3 tasks | 7 files |
+| Phase 02 P04 | 55min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 02]: [Phase 02] 02-03: restoreIntoDevContainer/verifyRestoredRowCounts exported from scripts/restore.ts and reused by scripts/restore-cluster.ts rather than duplicated -- single place the copy-in/pg_restore/cleanup and row-count-verification logic lives.
 - [Phase 02]: [Phase 02] 02-03: db:restore:cluster's pre-flight role check treats the pinned role already existing (this repo's normal docker compose rebuild outcome) as an honest NOT EXERCISED verdict, not an error -- pnpm db:drill is the command that exercises the globals-restore path on every run.
 - [Phase 02]: [Phase 02] 02-03: BKP-05 left Pending in REQUIREMENTS.md -- this plan builds the tooling half (argument-free, target-pinned restore commands); the human-performed destruction test is explicitly plan 02-05's job per this plan's own success_criteria.
+- [Phase 02]: [Phase 02] 02-04: recordAutomatedDrillResult accepts only the automated outcome -- the human half is read from disk or defaulted to its honest UNKNOWN starting state, never accepted as a parameter, so no code path can set the human fact.
+- [Phase 02]: [Phase 02] 02-04: Added an optional onStepTiming callback to scripts/restore.ts's restoreIntoContainer (Rule 3 deviation, outside this plan's own files_modified) to populate the required globalsRestore/dataRestore duration fields without forking the restore logic.
+- [Phase 02]: [Phase 02] 02-04: D-20's three-outcome boundary implemented as control flow -- the container-start step sits outside any try/catch leading to a status write, so a never-ran drill structurally cannot touch docs/restore-drill-status.json.
 
 ### Pending Todos
 
@@ -130,6 +134,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T21:48:17.928Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-07T22:06:23.315Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None

@@ -21,8 +21,8 @@
 - [x] **BKP-04**: Restore verification asserts content — row counts, spot-checked values, referential integrity, sequence state — and never treats an exit code as proof
 - [ ] **BKP-05**: A deliberate destruction test has been performed: drop a table, restore, confirm the data returned
 - [ ] **BKP-06**: A restore runbook exists, written from an actual performed restore rather than from documentation
-- [ ] **BKP-07**: An automated restore test runs against a disposable database and reports pass or fail
-- [ ] **BKP-08**: A skipped or failing restore drill is visible, not silent
+- [x] **BKP-07**: An automated restore test runs against a disposable database and reports pass or fail
+- [x] **BKP-08**: A skipped or failing restore drill is visible, not silent
 
 ### Safety Analyzer (ANLZ)
 
