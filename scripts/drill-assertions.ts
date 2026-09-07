@@ -89,3 +89,98 @@ export async function assertRowCounts(
     }
   }
 }
+
+export interface SchemaDumpPair {
+  sourceSql: string;
+  restoredSql: string;
+}
+
+// RESEARCH.md Pitfall 4 (live-verified): two consecutive `pg_dump --schema-only` dumps of the
+// identical, unchanged database differ ONLY on these two lines -- PostgreSQL 17's per-invocation
+// dump-integrity guard token pair, regenerated every single run. Stripping them is the confirmed,
+// minimal fix; this pattern removes nothing else that begins a line with a backslash because no
+// other `psql` meta-command appears in a schema-only dump.
+const SCHEMA_DUMP_GUARD_DIRECTIVE_PATTERN = /^\\(un)?restrict\b.*$/gm;
+// Comment-only lines carry dump metadata (timestamps, tool versions) rather than schema
+// semantics -- pg_dump always emits these as their own lines, never appended to a SQL statement.
+const COMMENT_ONLY_LINE_PATTERN = /^--.*$/gm;
+const BLANK_LINE_RUN_PATTERN = /\n{2,}/g;
+
+/**
+ * Tier 3 (schema equality) support: canonicalises a `pg_dump --schema-only` dump so two dumps of
+ * the identical, unchanged database compare equal despite PG17's per-invocation guard tokens.
+ * Never removes an actual SQL statement -- the dropped-foreign-key regression test in
+ * tests/drill-assertions.test.ts proves this directly. Pure and free of file/process I/O so it
+ * is unit-testable on plain string fixtures.
+ */
+export function canonicalizeSchemaDump(sql: string): string {
+  return sql
+    .replace(/\r\n/g, "\n")
+    .replace(SCHEMA_DUMP_GUARD_DIRECTIVE_PATTERN, "")
+    .replace(COMMENT_ONLY_LINE_PATTERN, "")
+    .replace(BLANK_LINE_RUN_PATTERN, "\n")
+    .trim();
+}
+
+const MAX_SCHEMA_DIFF_EXCERPT_LINES = 5;
+
+// Set-based (order-independent) line diff, deliberately simple rather than a full sequence-diff
+// algorithm: the acceptance criterion is "the first few lines present on one side and absent on
+// the other, capped so the message stays readable" -- not a minimal edit script.
+function buildSchemaDiffExcerpt(sourceCanonical: string, restoredCanonical: string): string {
+  const sourceLines = sourceCanonical.split("\n");
+  const restoredLines = restoredCanonical.split("\n");
+  const sourceLineSet = new Set(sourceLines);
+  const restoredLineSet = new Set(restoredLines);
+
+  const onlyInSource = sourceLines
+    .filter((line) => !restoredLineSet.has(line))
+    .slice(0, MAX_SCHEMA_DIFF_EXCERPT_LINES);
+  const onlyInRestored = restoredLines
+    .filter((line) => !sourceLineSet.has(line))
+    .slice(0, MAX_SCHEMA_DIFF_EXCERPT_LINES);
+
+  const sections: string[] = [];
+  if (onlyInSource.length > 0) {
+    sections.push(`Present in source only:\n${onlyInSource.join("\n")}`);
+  }
+  if (onlyInRestored.length > 0) {
+    sections.push(`Present in restored only:\n${onlyInRestored.join("\n")}`);
+  }
+  return sections.join("\n\n");
+}
+
+/**
+ * Tier 3 (schema equality): compares a canonicalised `pg_dump --schema-only` of the source
+ * database against the same dump of the restored database. This is the tier that notices what
+ * a row-count check and an orphan-row check both miss: after `DROP TABLE recipes CASCADE`, the
+ * rows come back on restore and no row is orphaned, but the foreign keys on
+ * `ingredients`/`steps` do not come back -- only a schema comparison sees the missing constraint
+ * (D-13). Rejects the vacuous case explicitly: an empty canonicalised side never resolves as
+ * equal to anything, including another empty side, because that is exactly how this tier could
+ * silently stop testing anything.
+ */
+export function assertSchemaEquality(pair: SchemaDumpPair): void {
+  const sourceCanonical = canonicalizeSchemaDump(pair.sourceSql);
+  const restoredCanonical = canonicalizeSchemaDump(pair.restoredSql);
+
+  if (sourceCanonical.length === 0) {
+    throw new Error(
+      "Schema equality check failed: the canonicalised SOURCE schema dump is empty -- refusing " +
+        "to treat an empty comparison as a pass.",
+    );
+  }
+  if (restoredCanonical.length === 0) {
+    throw new Error(
+      "Schema equality check failed: the canonicalised RESTORED schema dump is empty -- " +
+        "refusing to treat an empty comparison as a pass.",
+    );
+  }
+
+  if (sourceCanonical !== restoredCanonical) {
+    const excerpt = buildSchemaDiffExcerpt(sourceCanonical, restoredCanonical);
+    throw new Error(
+      `Schema equality check failed: the source and restored schemas differ.\n${excerpt}`,
+    );
+  }
+}

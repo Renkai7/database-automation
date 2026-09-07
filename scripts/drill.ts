@@ -7,9 +7,10 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { execa } from "execa";
 import { Client } from "pg";
 import { runBackup } from "./backup";
-import { assertArtifactIntegrity, assertRowCounts } from "./drill-assertions";
+import { assertArtifactIntegrity, assertRowCounts, assertSchemaEquality } from "./drill-assertions";
 import { EXPECTED_DEV_DATABASE_NAME, getBackupDestination } from "./env";
 import { safeErrorMessage } from "./log";
 import { restoreIntoContainer } from "./restore";
@@ -21,6 +22,19 @@ import { restoreIntoContainer } from "./restore";
 // BKP-02 untestable. Only the *database* name may match the source; the username must not.
 export const DRILL_CONTAINER_IMAGE = "postgres:17";
 export const DRILL_BOOTSTRAP_USERNAME = "drilluser";
+
+// D-13 tiers 1-4 (02-CONTEXT.md): which assertion tiers ran and passed on the most recent
+// runDrill() call. A tier that throws is recorded false here AND still rethrown by runTier
+// below, so the drill still exits non-zero naming the failing step through runStep's own
+// logging -- this record is additional structure layered on top of that failure, not a
+// replacement for it. Nothing in this plan persists this record to disk; that is plan 02-04's
+// job (D-17).
+export interface DrillTierResults {
+  artifactIntegrity: boolean;
+  rowCounts: boolean;
+  schemaEquality: boolean;
+  contentAndReferentialIntegrity: boolean;
+}
 
 function randomThrowawayPassword(): string {
   return randomBytes(24).toString("hex");
@@ -45,14 +59,80 @@ async function runStep<T>(name: string, action: () => Promise<T>): Promise<T> {
   }
 }
 
+// Records a tier's outcome in `results` before rethrowing, so a caught-and-reported failure
+// still leaves an accurate per-tier record behind -- a tier that threw is never recorded as
+// having passed.
+async function runTier(
+  results: DrillTierResults,
+  tier: keyof DrillTierResults,
+  action: () => Promise<void>,
+): Promise<void> {
+  try {
+    await action();
+    results[tier] = true;
+  } catch (error) {
+    results[tier] = false;
+    throw error;
+  }
+}
+
+// Tier 3 support: dumps the source database's schema over `docker compose exec`, using the
+// identical `--schema-only --no-owner --no-acl` flags the restored side uses below, so the only
+// expected difference is genuine schema drift, never ownership/grant noise from the two
+// clusters' different bootstrap roles (source: recipe_app, drill: DRILL_BOOTSTRAP_USERNAME).
+async function dumpSourceSchema(): Promise<string> {
+  const result = await execa("docker", [
+    "compose",
+    "exec",
+    "-T",
+    "db",
+    "pg_dump",
+    "-U",
+    "recipe_app",
+    "-d",
+    "recipe_dev",
+    "--schema-only",
+    "--no-owner",
+    "--no-acl",
+  ]);
+  return result.stdout;
+}
+
+// Tier 3 support: dumps the restored side's schema from *inside* the disposable container via
+// its own bundled pg_dump (no second image, no host networking -- RESEARCH.md Pattern 2/Open
+// Question #1) and inspects the exit code rather than trusting it implicitly.
+async function dumpRestoredSchema(container: StartedPostgreSqlContainer): Promise<string> {
+  const result = await container.exec([
+    "pg_dump",
+    "-U",
+    DRILL_BOOTSTRAP_USERNAME,
+    "-d",
+    EXPECTED_DEV_DATABASE_NAME,
+    "--schema-only",
+    "--no-owner",
+    "--no-acl",
+  ]);
+  if (result.exitCode !== 0) {
+    throw new Error(`Restored-side schema dump failed (exit ${result.exitCode}): ${result.stderr}`);
+  }
+  return result.stdout;
+}
+
 /**
  * The full hermetic drill: back up the live development database, start a fresh disposable
- * container, restore both dumps into it, and assert tier 1-2 content against the manifest just
+ * container, restore both dumps into it, and assert restored content against the manifest just
  * written. The container is always stopped afterward, success or failure.
  */
 export async function runDrill(): Promise<void> {
   const manifest = await runStep("back up the live development database", () => runBackup());
   const destination = getBackupDestination();
+
+  const tierResults: DrillTierResults = {
+    artifactIntegrity: false,
+    rowCounts: false,
+    schemaEquality: false,
+    contentAndReferentialIntegrity: false,
+  };
 
   let container: StartedPostgreSqlContainer | undefined;
   try {
@@ -75,7 +155,7 @@ export async function runDrill(): Promise<void> {
       ),
     );
 
-    await runStep("assert restored artifact integrity and row counts", async () => {
+    await runStep("assert restored content against the manifest", async () => {
       // Built from discrete host/port/user/password/database values the harness itself
       // obtained from the started container -- never getConnectionUri(), so nothing in this
       // path can ever be handed a connection string someone typed.
@@ -88,17 +168,29 @@ export async function runDrill(): Promise<void> {
       });
       await assertionClient.connect();
       try {
-        await assertArtifactIntegrity(manifest, destination);
-        await assertRowCounts(assertionClient, manifest);
+        await runTier(tierResults, "artifactIntegrity", () =>
+          assertArtifactIntegrity(manifest, destination),
+        );
+        await runTier(tierResults, "rowCounts", () => assertRowCounts(assertionClient, manifest));
+        await runTier(tierResults, "schemaEquality", async () => {
+          const sourceSql = await dumpSourceSchema();
+          const restoredSql = await dumpRestoredSchema(container!);
+          assertSchemaEquality({ sourceSql, restoredSql });
+        });
       } finally {
         await assertionClient.end();
       }
     });
+  } catch (error) {
+    console.error(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
+    throw error;
   } finally {
     if (container) {
       await runStep("stop the disposable container", () => container!.stop());
     }
   }
+
+  console.log(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
 }
 
 async function main(): Promise<void> {
