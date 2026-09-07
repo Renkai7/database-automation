@@ -16,8 +16,8 @@
 ### Backup and Restore (BKP)
 
 - [ ] **BKP-01**: The owner has personally performed and timed a full backup and restore at least once
-- [ ] **BKP-02**: The backup procedure captures roles and globals separately via `pg_dumpall --globals-only`, not only a database dump
-- [ ] **BKP-03**: Restore drills target a genuinely fresh instance matching the production image and extensions — never a pre-seeded container
+- [x] **BKP-02**: The backup procedure captures roles and globals separately via `pg_dumpall --globals-only`, not only a database dump
+- [x] **BKP-03**: Restore drills target a genuinely fresh instance matching the production image and extensions — never a pre-seeded container
 - [ ] **BKP-04**: Restore verification asserts content — row counts, spot-checked values, referential integrity, sequence state — and never treats an exit code as proof
 - [ ] **BKP-05**: A deliberate destruction test has been performed: drop a table, restore, confirm the data returned
 - [ ] **BKP-06**: A restore runbook exists, written from an actual performed restore rather than from documentation
