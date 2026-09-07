@@ -409,7 +409,7 @@ h4 {
     letter-spacing: -0.015em;
   }
   .rp-subtitle {
-    font-size: 14px;
+    font-size: 16px;
     margin-top: 7px;
   }
   .rp-fav-btn {
@@ -423,11 +423,14 @@ h4 {
   }
   .rp-meta-item {
     gap: 8px;
-    font-size: 14px;
+    font-size: 15.5px;
   }
   .rp-meta-icon {
     width: 18px;
     height: 18px;
+  }
+  .rp-servings-label {
+    font-size: 13.5px;
   }
   .rp-stepper {
     gap: 5px;
@@ -436,11 +439,11 @@ h4 {
   .rp-stepper-btn {
     width: 30px;
     height: 30px;
-    font-size: 16px;
+    font-size: 17px;
   }
   .rp-stepper-count {
     min-width: 24px;
-    font-size: 14px;
+    font-size: 15px;
   }
   .rp-tabs {
     gap: 5px;
@@ -449,7 +452,7 @@ h4 {
   }
   .rp-tab {
     padding: 13px 0;
-    font-size: 14px;
+    font-size: 15.5px;
   }
   .rp-ing-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -463,14 +466,14 @@ h4 {
     width: 30px;
     height: 30px;
     border-radius: 10px;
-    font-size: 13px;
+    font-size: 14px;
     margin-bottom: 7px;
   }
   .rp-ing-name {
-    font-size: 15px;
+    font-size: 16.5px;
   }
   .rp-ing-qty {
-    font-size: 13px;
+    font-size: 14px;
   }
   .rp-step {
     grid-template-columns: 34px 1fr;
@@ -481,18 +484,18 @@ h4 {
     width: 34px;
     height: 34px;
     border-radius: 12px;
-    font-size: 14px;
+    font-size: 15px;
   }
   .rp-step-body-wrap {
     padding-top: 5px;
   }
   .rp-step-text {
-    font-size: 14.5px;
+    font-size: 16.5px;
   }
   .rp-step-timer {
     margin-top: 9px;
     padding: 6px 12px;
-    font-size: 12.5px;
+    font-size: 13.5px;
   }
   .rp-cta-wrap {
     padding: 26px 0 30px;
@@ -501,6 +504,7 @@ h4 {
   }
   .rp-cta {
     width: 280px;
+    font-size: 16px;
   }
   .rp-home-bar {
     display: none;

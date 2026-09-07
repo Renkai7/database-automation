@@ -48,7 +48,9 @@ blocked: 0
 
 - gap_id: G-01-2
   truth: "The shipped responsive breakpoints (phone <834px, tablet 834–1439px, desktop ≥1440px) match the developer's intended breakpoints, or the developer supplies an override."
-  status: failed
+  status: resolved
+  resolved_by: 260907-ir1
+  resolved_at: 2026-09-07
   reason: "User reported: Breakpoints are there but I feel the text size could be bigger when we go to tablet view."
   severity: cosmetic
   test: 2
