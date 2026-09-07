@@ -1,7 +1,7 @@
 // ENV-05: the direct-query path Claude Code uses through the Bash tool. Hardcoded to the
 // local development database (D-15/D-16/D-17) — the SQL text is the only thing a caller can
-// influence. There is deliberately no --url/--env/--database flag and no environment
-// variable this file itself consults for a target: the connection string comes from the
+// influence. There is deliberately no url, env, or database flag of any kind, and no
+// environment variable this file itself consults for a target: the connection string comes from the
 // shared, validated env module (./env) and nowhere else, and that module's own bare-
 // DATABASE_URL hard failure (D-20) runs at import time, before any of this file's own code
 // executes — so a leaked DATABASE_URL aborts before any connection is opened.
