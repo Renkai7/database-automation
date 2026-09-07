@@ -3,7 +3,7 @@ status: complete
 phase: 01-local-environment
 source: [01-VERIFICATION.md]
 started: 2026-09-07T16:40:09Z
-updated: 2026-09-07T18:20:00Z
+updated: 2026-09-07T19:05:00Z
 ---
 
 ## Current Test
@@ -18,9 +18,13 @@ result: pass
 
 ### 2. Breakpoint confirmation
 expected: The shipped responsive breakpoints (phone <834px, tablet 834–1439px, desktop ≥1440px) match the developer's intended breakpoints, or the developer supplies an override. UI-SPEC Open Question 5 recorded these as a proposed default awaiting confirmation, not a locked decision.
-result: issue
-reported: "Breakpoints are there but I feel the text size could be bigger when we go to tablet view."
-severity: cosmetic
+result: pass
+retested: 2026-09-07
+prior_result: issue
+prior_reported: "Breakpoints are there but I feel the text size could be bigger when we go to tablet view."
+prior_severity: cosmetic
+retest_reason: "Gap G-01-2 closed by quick task 260907-ir1 (commit f598dea); awaiting developer re-confirmation."
+
 
 ### 3. Design-fidelity divergence — dropped desktop "Kitchen" app-shell nav
 expected: Developer confirms it is acceptable to use the same back/save icon nav row at all three breakpoints, instead of the desktop frame's app-shell top bar (brand + This week/Recipes/Shopping/Settings + breadcrumb), given that the app-shell chrome points at sections (meal planner, shopping) explicitly unbuilt in this phase (D-07).
@@ -38,8 +42,8 @@ note: "Resolved as shipped, ratified here. `subtitle` is a data-bound NOT NULL c
 ## Summary
 
 total: 5
-passed: 4
-issues: 1
+passed: 5
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
