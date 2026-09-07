@@ -45,17 +45,99 @@ if (process.env.DATABASE_URL) {
   );
 }
 
-const EnvSchema = z.object({
-  RECIPE_DEV_DATABASE_URL: z.string().url(),
-});
+// D-16: these three constants ARE the development target. Host, port, and database name are
+// no longer negotiable through `.env` — only the user and password components of
+// RECIPE_DEV_DATABASE_URL come from the environment. Changing any of these three values is a
+// safety-relevant source diff, not routine configuration: it widens (or narrows) exactly what
+// this workspace's tooling is permitted to reach. See 01-VERIFICATION.md's failed truth #6 and
+// 01-REVIEW.md CR-01 for why a hostname-only allowlist was rejected in favour of pinning all
+// three target-identifying components.
+export const DEV_DATABASE_HOST_ALLOWLIST = ["localhost", "127.0.0.1", "::1", "[::1]"] as const;
+export const EXPECTED_DEV_DATABASE_PORT = "5432";
+export const EXPECTED_DEV_DATABASE_NAME = "recipe_dev";
 
-export const env = EnvSchema.parse(process.env);
+// D-16: synchronous, pre-connect assertion that a connection string targets the pinned
+// development database and nothing else. Every rejection message names
+// RECIPE_DEV_DATABASE_URL and the pinned (allowed) value for the failing component, and never
+// interpolates anything taken from the supplied URL itself -- not the rejected host, port,
+// database name, or the URL as a whole. An operator who mistypes a value learns which
+// constraint failed and reads their own .env for what they actually set; the message never
+// echoes it back.
+export function assertLocalDevelopmentTarget(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL could not be parsed as a URL. The development target must be a " +
+        `loopback host, port ${EXPECTED_DEV_DATABASE_PORT}, and database "${EXPECTED_DEV_DATABASE_NAME}".`,
+    );
+  }
 
-export function getDevDatabaseUrl(): string {
-  return env.RECIPE_DEV_DATABASE_URL;
+  if (!(DEV_DATABASE_HOST_ALLOWLIST as readonly string[]).includes(parsed.hostname)) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL host is not in the pinned development loopback allowlist. " +
+        `Allowed hosts: ${DEV_DATABASE_HOST_ALLOWLIST.join(", ")}.`,
+    );
+  }
+
+  if (parsed.port !== EXPECTED_DEV_DATABASE_PORT) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL port does not match the pinned development port. " +
+        `Allowed port: ${EXPECTED_DEV_DATABASE_PORT}.`,
+    );
+  }
+
+  const databaseName = parsed.pathname.replace(/^\//, "");
+  if (databaseName !== EXPECTED_DEV_DATABASE_NAME) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL database name does not match the pinned development database " +
+        `name. Allowed database: ${EXPECTED_DEV_DATABASE_NAME}.`,
+    );
+  }
 }
 
-export const EXPECTED_DEV_DATABASE_NAME = "recipe_dev";
+const EnvSchema = z.object({
+  // zod 4 marks `z.string().url()` deprecated in favour of the top-level `z.url()` -- this is
+  // the non-deprecated form, chained with a refinement that delegates to
+  // assertLocalDevelopmentTarget so an out-of-pin value fails validation before any client is
+  // constructed.
+  RECIPE_DEV_DATABASE_URL: z.url().refine((value) => {
+    assertLocalDevelopmentTarget(value);
+    return true;
+  }),
+});
+
+// The module-level parse now fires validation against a real, credential-bearing value, so its
+// failure path is wrapped rather than left to a raw zod error whose serialised shape is not
+// something to assume about. When the caught error is one of the value-free Errors
+// assertLocalDevelopmentTarget threw (never a ZodError -- it always throws a plain Error), it is
+// forwarded unchanged. Otherwise (a genuine zod validation failure: missing variable, malformed
+// URL) a fixed, value-free message is thrown instead, still naming RECIPE_DEV_DATABASE_URL so
+// the three pre-existing missing/malformed-variable test cases keep passing.
+let parsedEnv: z.infer<typeof EnvSchema>;
+try {
+  parsedEnv = EnvSchema.parse(process.env);
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL is missing or malformed. Set it to a well-formed local " +
+        "development connection string in .env.",
+    );
+  }
+  throw error;
+}
+
+export const env = parsedEnv;
+
+export function getDevDatabaseUrl(): string {
+  // Redundant with the schema-level refinement above by design: the import-time refinement
+  // already makes a bad value unreachable through `env`, but this call means no consumer can
+  // ever obtain an unasserted URL through this accessor even if a future change loosens the
+  // schema. Do not delete this call as dead code.
+  assertLocalDevelopmentTarget(env.RECIPE_DEV_DATABASE_URL);
+  return env.RECIPE_DEV_DATABASE_URL;
+}
 
 /** The minimal shape assertDevelopmentDatabase needs from a database client. */
 export interface QueryableClient {
