@@ -88,7 +88,29 @@ Plans:
   1. The owner has personally dropped a real table, restored using a backup that included both the `pg_dumpall --globals-only` roles dump and the data dump, confirmed the table's data returned, and timed the whole procedure — writing the runbook from what actually happened, not from documentation written in advance.
   2. An automated restore test runs against a genuinely fresh (never pre-seeded) disposable database matching production's image and extensions, asserts row counts, referential integrity, and spot-checked values rather than trusting an exit code, and its pass/fail/skipped status is visibly reported — not silently swallowed.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Tracer: one backup of the live development database restored into a fresh disposable container and asserted
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Assertion tiers 3 and 4: schema equality, content fingerprints, orphan rows and sequence state
+
+**Wave 3** *(blocked on Wave 2 completion — the local development database is a shared mutable resource)*
+
+- [ ] 02-03-PLAN.md — The human-invoked restore commands for both acts, with the no-target property locked in by test
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-04-PLAN.md — The committed two-fact drill record, the 30-day staleness gate, and the slow/fast suite split
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-05-PLAN.md — The owner performs and times both acts, and the runbook is written from what actually happened
 
 ### Phase 3: Safety Analyzer
 
