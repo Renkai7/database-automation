@@ -88,7 +88,7 @@ Plans:
   1. The owner has personally dropped a real table, restored using a backup that included both the `pg_dumpall --globals-only` roles dump and the data dump, confirmed the table's data returned, and timed the whole procedure — writing the runbook from what actually happened, not from documentation written in advance.
   2. An automated restore test runs against a genuinely fresh (never pre-seeded) disposable database matching production's image and extensions, asserts row counts, referential integrity, and spot-checked values rather than trusting an exit code, and its pass/fail/skipped status is visibly reported — not silently swallowed.
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 
@@ -98,7 +98,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Assertion tiers 3 and 4: schema equality, content fingerprints, orphan rows and sequence state
+- [x] 02-02-PLAN.md — Assertion tiers 3 and 4: schema equality, content fingerprints, orphan rows and sequence state
 
 **Wave 3** *(blocked on Wave 2 completion — the local development database is a shared mutable resource)*
 
@@ -193,7 +193,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
-| 2. Backup & Restore Drill | 1/5 | In Progress|  |
+| 2. Backup & Restore Drill | 2/5 | In Progress|  |
 | 3. Safety Analyzer | 0/TBD | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |

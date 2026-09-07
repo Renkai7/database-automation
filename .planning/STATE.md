@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Backup & Restore Drill
 status: executing
-stopped_at: Completed 02-01-PLAN.md (Task 1+2); environment-template edit blocked by sandbox permissions, documented
-last_updated: "2026-09-07T21:09:36.291Z"
+stopped_at: Completed 02-02-PLAN.md (Task 1-3, all live-verified)
+last_updated: "2026-09-07T21:29:05.503Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 02 execution started
-state_head: 1fcb1d30ed904ea9bcb0b230382361147c830416
+state_head: 85f1f844ec1ddd00ef5a51f2a107a66535ed2f74
 progress:
   total_phases: 7
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 02 (Backup & Restore Drill) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 02 execution started
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P07 | 25min | 2 tasks | 6 files |
 | Phase 01-local-environment P08 | 20min | 2 tasks | 2 files |
 | Phase 02 P01 | 55min | 2 tasks | 9 files |
+| Phase 02 P02 | 30min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 02]: [Phase 02] 02-01: Used import.meta.main (not process.argv/pathToFileURL) to guard backup.ts/drill.ts CLI entry points -- avoids tripping the plan's own no-target-argument-ok gate while keeping drill.ts able to import and call runBackup() in-process without re-triggering the CLI path.
 - [Phase 02]: [Phase 02] 02-01: scripts/drill.ts's runStep logs-and-rethrows instead of process.exit(1) (unlike backup.ts's/db-reset.ts's) so the outer try/finally always stops the disposable Testcontainers container, even on a failed step.
 - [Phase 02]: [Phase 02] 02-01: Only BKP-02 and BKP-03 marked complete in REQUIREMENTS.md -- BKP-04 and BKP-07 stay Pending because this plan's own success_criteria frames both as explicitly partial (tiers 1-2 of 4; drill mechanics without the committed pass/fail record).
+- [Phase 02]: [Phase 02] 02-02: contentHashes/spotChecks compared via explicit field-order arrays (not raw JSON.stringify of query-result objects) so the comparison never depends on pg driver vs zod parser key-ordering incidentals.
+- [Phase 02]: [Phase 02] 02-02: tests/backup-manifest.test.ts updated (Rule 1 deviation, not in this plan's own files_modified) -- its fixture and key-set regression guard needed the three new required manifest fields or pnpm test would break.
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T21:09:36.249Z
-Stopped at: Completed 02-01-PLAN.md (Task 1+2); environment-template edit blocked by sandbox permissions, documented
+Last session: 2026-09-07T21:29:05.470Z
+Stopped at: Completed 02-02-PLAN.md (Task 1-3, all live-verified)
 Resume file: None
