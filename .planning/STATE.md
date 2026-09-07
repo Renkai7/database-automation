@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Local Environment
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-09-07T00:26:32.936Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-09-07T00:45:45.768Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 01 execution started
-state_head: 597103dcf24c13fdccd0e01550b3690d6f434308
+state_head: 311559ff0ed02b561f7ec93e6c4fa37a17411edd
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 01 (Local Environment) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 01 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01-local-environment P01 | 25min | 3 tasks | 10 files |
+| Phase 01 P02 | 20min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - D12 (ACCEPTED): The Migration Runner (Phase 4) re-derives classification from the actual SQL immediately before executing — the only architecturally non-bypassable enforcement point. Every earlier gate (pre-commit, even the Phase 5 CI check) sits on a bypassability spectrum and should be described honestly as such.
 - [Phase 01-local-environment]: Redeploy investigation confirmed migrate-on-boot in AI-Diagramming-Tool; D8 moved PROPOSED to ACCEPTED and D14 was opened.
 - [Phase 01-local-environment]: Pinned @types/node to 24.13.3 instead of the pnpm-resolved latest 26.4.1, to match the installed Node runtime (v24.19.0).
+- [Phase 01]: [Phase 01-02] apps/recipe-app ships without 'type: module' — Next 16.3.4's next.config.ts compiler emits CJS, which conflicted with the plan-specified ESM package type
+- [Phase 01]: [Phase 01-02] zod installed at the workspace root, not in apps/recipe-app, because scripts/env.ts resolves bare imports relative to its own root-level directory
+- [Phase 01]: [Phase 01-02] tests/smoke.test.ts kills its spawned server via taskkill /T /F on win32 to avoid orphaning the nested next-server process that plain execa .kill() left running
 
 ### Pending Todos
 
@@ -93,6 +97,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T00:26:32.921Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-09-07T00:45:45.753Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

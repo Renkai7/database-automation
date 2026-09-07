@@ -41,7 +41,7 @@ expand-and-contract migration — it is test material, not a deliverable in its 
   2. A schema edit to the recipe app's Drizzle schema, run through the documented loop, produces a migration, applies locally, and the app boots against the resulting schema.
   3. The destroy-and-rebuild command tears down and recreates the local database in one step, leaving a clean, freshly-migrated schema with no manual cleanup.
 
-**Plans**: 5 plans
+**Plans**: 2/5 plans executed
 
 Plans:
 **Wave 1**
@@ -50,7 +50,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Tracer: one seeded recipe reaches an HTTP response, plus the environment-safety module
+- [x] 01-02-PLAN.md — Tracer: one seeded recipe reaches an HTTP response, plus the environment-safety module
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -156,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Local Environment | 0/5 | Planned | - |
+| 1. Local Environment | 2/5 | In Progress|  |
 | 2. Backup & Restore Drill | 0/TBD | Not started | - |
 | 3. Safety Analyzer | 0/TBD | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
