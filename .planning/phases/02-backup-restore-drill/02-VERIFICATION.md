@@ -1,7 +1,9 @@
 ---
 phase: 02-backup-restore-drill
 verified: 2026-09-07T23:30:00Z
-status: gaps_found
+status: passed
+gap_disposition: accepted-by-owner
+gap_accepted_on: 2026-09-07
 score: 33/34 must-haves verified
 covered_files: [".planning/REQUIREMENTS.md",".planning/phases/02-backup-restore-drill/02-01-PLAN.md",".planning/phases/02-backup-restore-drill/02-01-SUMMARY.md",".planning/phases/02-backup-restore-drill/02-02-PLAN.md",".planning/phases/02-backup-restore-drill/02-02-SUMMARY.md",".planning/phases/02-backup-restore-drill/02-03-PLAN.md",".planning/phases/02-backup-restore-drill/02-03-SUMMARY.md",".planning/phases/02-backup-restore-drill/02-04-PLAN.md",".planning/phases/02-backup-restore-drill/02-04-SUMMARY.md",".planning/phases/02-backup-restore-drill/02-05-PLAN.md",".planning/phases/02-backup-restore-drill/02-05-SUMMARY.md",".planning/phases/02-backup-restore-drill/02-REVIEW.md","docs/00-current-state.md","docs/20-restore-runbook.md","docs/README.md","docs/decisions.md","docs/restore-drill-status.json","package.json","scripts/backup-manifest.ts","scripts/backup.ts","scripts/drill-assertions.ts","scripts/drill-status.ts","scripts/drill.ts","scripts/env.ts","scripts/restore-cluster.ts","scripts/restore.ts","tests/backup-manifest.test.ts","tests/drill-assertions.test.ts","tests/drill-status.test.ts","tests/drill/restore-drill.test.ts","tests/guardrails.test.ts","tests/restore-cli.test.ts","vitest.config.ts","vitest.drill.config.ts"]
 covered_digest: "v1:sha256:6c01173a401c4b7851b89ff1b8327abe5fffac71f2e7698c9577ff3bd45e4e69"
@@ -9,13 +11,21 @@ behavior_unverified: 0
 overrides_applied: 0
 gaps:
   - truth: "The runbook records per-step timings for backup, drop, restore and verify, and separately the human time spent reading and deciding (02-05-PLAN.md must_have, D-09)."
-    status: partial
+    status: accepted
     reason: "docs/20-restore-runbook.md explicitly and honestly states per-step timings were NOT SEPARATELY MEASURED during the drill — only two aggregate ranges exist (3-4 min first-run, 1-2 min copy-paste-only). The human reading-and-deciding time is not a measured figure either; the document itself labels it 'inferred... not measured' from the gap between the two aggregate ranges. This is a real, disclosed shortfall against the plan's own stated must-have, not a fabrication — the executor chose honesty over inventing numbers, consistent with this project's 'mark unverified UNKNOWN' rule. The roadmap-level success criterion ('timed the whole procedure') is still satisfied by the aggregate figures; only the plan's stricter, self-imposed per-step requirement is unmet."
     artifacts:
       - path: "docs/20-restore-runbook.md"
         issue: "No per-step timing breakdown (backup/drop/restore/verify) exists for either act; human decision time is inferred, not separately clocked."
     missing:
       - "Nothing further can be added retroactively without re-performing the drill with a stopwatch per step — this is a one-time human action, not a code fix. Options for a human decision: (a) accept as-is (the aggregate timing plus honest disclosure satisfies the roadmap's actual success criterion), or (b) schedule a follow-up drill with per-step timing capture before treating BKP-01/D-09 as fully discharged in the stricter sense the plan intended."
+
+    owner_decision: |
+      Accepted 2026-09-07. The roadmap Success Criterion ("timed the whole procedure")
+      is met by the aggregate figures; only 02-05-PLAN.md's stricter self-imposed
+      per-step requirement is unmet, and the runbook discloses that plainly rather than
+      inventing a breakdown. Re-running a destroy/restore cycle to stopwatch each step
+      of a fixture-scale drill was judged not worth the cost. Phase marked complete on
+      this basis; if per-step granularity is ever needed, it requires a fresh drill.
 ---
 
 # Phase 2: Backup and Restore Drill Verification Report

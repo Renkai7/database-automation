@@ -123,7 +123,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 |-------------|-------|--------|
 | ENV-01 … ENV-05 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | APP-01 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
-| BKP-01 … BKP-08 | Phase 2 | All 8 requirements checked complete 2026-09-07 (see `docs/20-restore-runbook.md`); phase-level UAT/security verification not yet run |
+| BKP-01 … BKP-08 | Phase 2 | All 8 complete 2026-09-07. Runbook `docs/20-restore-runbook.md` written from the owner's performed drill. Verification passed 33/34 — the one gap (per-step timings not separately measured) accepted by the owner. Security audit SECURED, 26/26 threats closed, 0 open. Open follow-up: WR-03 (restore target pinned by call-site convention, not internal contract) — see `02-SECURITY.md`. |
 | ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
