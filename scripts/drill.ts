@@ -252,21 +252,42 @@ export async function runDrill(): Promise<void> {
   } catch (error) {
     drillError = error;
     console.error(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
-  } finally {
-    // Always stops the container before either status-write branch below runs -- a write
-    // failure can then never leave a container running.
+  }
+
+  // CR-01 (02-REVIEW.md): the container stop runs in its OWN try/catch, never in a `finally`
+  // attached to the block above. A `finally` that throws replaces the outcome of the whole
+  // try/catch/finally statement, which would propagate the stop failure out of runDrill() and
+  // skip the status write below entirely -- leaving whatever the last run wrote (very possibly
+  // a stale PASS) standing, still "fresh" to assertDrillStatusFresh, so `pnpm test` reports
+  // green on a drill that genuinely failed. That is the exact failure BKP-08 and T-02-17 exist
+  // to close. The stop still happens before either status-write branch, so a write failure
+  // cannot leave a container running; a stop failure can no longer suppress the write.
+  let stopError: unknown;
+  try {
     await runStep("stop the disposable container", () => container.stop());
+  } catch (error) {
+    stopError = error;
+    console.error(
+      `[db:drill] Failed to stop the disposable container: ${safeErrorMessage(error)}`,
+    );
   }
 
   if (drillError) {
     const outcome: AutomatedDrillOutcome = { outcome: "FAIL", tiers: tierResults, durationMs };
     await recordAutomatedDrillResult(outcome);
+    // The assertion failure is the real finding; a stop failure alongside it is noise already
+    // logged above. Rethrowing drillError keeps the reported cause honest.
     throw drillError;
   }
 
   const outcome: AutomatedDrillOutcome = { outcome: "PASS", tiers: tierResults, durationMs };
   await recordAutomatedDrillResult(outcome);
   console.log(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
+  // The drill itself passed, so PASS is the honest record and is written first. But a container
+  // that would not stop is a real problem: surface it non-zero rather than exiting 0 on a leak.
+  if (stopError) {
+    throw stopError;
+  }
 }
 
 async function main(): Promise<void> {
