@@ -67,6 +67,29 @@ afterAll(async () => {
   }
 });
 
+// The design's own ING/STEPS content (Recipe Page.dc.html, transcribed into
+// apps/recipe-app/src/db/seed.ts) — asserted against the HTTP response body, never by
+// importing and rendering the components in-process, so this file stays a real boot proof
+// reusable verbatim by Phase 4's RUN-07 and Phase 5's CI-01.
+const SEEDED_INGREDIENT_NAMES = [
+  "Chicken breast",
+  "Basmati rice",
+  "Broccoli",
+  "Spring onions",
+  "Garlic",
+  "Ginger",
+  "Soy sauce",
+  "Sesame oil",
+];
+
+const SEEDED_STEP_BODIES = [
+  "Rinse the rice until the water runs clear, then set it on with a lid down.",
+  "Butterfly the chicken so it cooks evenly, and salt it while the pan comes up to heat.",
+  "Sear hard on both sides until the crust is deep gold, then rest it off the heat.",
+  "Steam the broccoli over the rice for the last few minutes so it stays bright.",
+  "Slice the chicken, build the bowl, and dress it with the soy, sesame, garlic and ginger.",
+];
+
 describe("recipe app smoke test", () => {
   it("returns 200 with database-sourced content for the seeded slug", async () => {
     const response = await fetch(SEEDED_URL);
@@ -79,8 +102,34 @@ describe("recipe app smoke test", () => {
     expect(body).toContain("Weeknight dinner");
   });
 
-  it("returns 404 for an unseeded slug", async () => {
+  it("renders all eight seeded ingredients, all five seeded steps, both tabs, the CTA label and the two-servings caption", async () => {
+    const response = await fetch(SEEDED_URL);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+
+    for (const name of SEEDED_INGREDIENT_NAMES) {
+      expect(body).toContain(name);
+    }
+    for (const stepBody of SEEDED_STEP_BODIES) {
+      expect(body).toContain(stepBody);
+    }
+    expect(body).toContain("Ingredients");
+    expect(body).toContain("Instructions");
+    expect(body).toContain("Mark as cooked");
+    expect(body).toContain("Scaled for 2");
+  });
+
+  it("renders no image element for the seeded slug", async () => {
+    const response = await fetch(SEEDED_URL);
+    const body = await response.text();
+    expect(body).not.toMatch(/<img[\s>]/);
+  });
+
+  it("returns 404 with the not-found heading for an unseeded slug", async () => {
     const response = await fetch(`${BASE_URL}/recipes/does-not-exist`);
     expect(response.status).toBe(404);
+
+    const body = await response.text();
+    expect(body).toContain("Recipe not found");
   });
 });
