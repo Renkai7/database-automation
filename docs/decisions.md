@@ -247,3 +247,86 @@ inspected for the same pattern and remain UNKNOWN. Tiers 2-4 (Coolify deployment
 git history, owner recollection) were not attempted, since tier 1 already satisfied D-26's
 own stated stopping condition ("if a migration command is wired into a container start
 path, then D8 is already the fix and the investigation is complete").
+
+---
+
+## D15 — Proposed packaging strategy for the backup/restore-drill tooling
+**Status:** PROPOSED · 2026-09-07
+
+**Current state:** The Phase 1-2 tooling is roughly 2,400 lines of script plus 1,900 of
+test. Most of it is already generic, with no project coupling in its logic:
+`scripts/log.ts`, `scripts/db-query.ts`, `scripts/restore.ts`,
+`scripts/restore-cluster.ts`, `scripts/drill.ts`, and `scripts/drill-status.ts`.
+
+The coupling that does exist, stated plainly rather than softened: `scripts/backup.ts`
+hardcodes the recipe table list (`RECIPE_CORE_TABLES = ["ingredients", "recipes",
+"steps"]`) and a spot-check projection (`slug`, `base_servings`, `base_kcal`), and
+`scripts/drill-assertions.ts` mirrors that same projection as
+`RECIPE_SPOT_CHECK_FIELDS`. The drill assertions currently embed a recipe-specific
+projection — this is not minor coupling, and the tooling is not already reusable as
+shipped. `scripts/backup.ts` additionally hardcodes `-U recipe_app -d recipe_dev` inside
+its `pg_dump`/`pg_dumpall` invocation arguments. `scripts/env.ts` pins
+`DEV_DATABASE_HOST_ALLOWLIST`, `EXPECTED_DEV_DATABASE_PORT` ("5432"),
+`EXPECTED_DEV_DATABASE_NAME` ("recipe_dev"), and `EXPECTED_DEV_DATABASE_ROLE`
+("recipe_app"). The environment variable names themselves are also project-scoped:
+`RECIPE_DEV_DATABASE_URL` and `RECIPE_BACKUP_DESTINATION`.
+
+**Why:** Those pinned constants in `scripts/env.ts` are not an oversight to clean up —
+they are `D-16`, a phase-context decision recorded in that file's own comments (`D-16 /
+CR-01`), and they exist precisely so that widening what this workspace's tooling can
+reach is a reviewable source diff, never routine configuration. `D-16` is a phase-context
+decision, not an entry in this log — there is no `D16` heading here. The obvious
+packaging move is to turn those pinned constants into environment variables so each
+consuming project configures its own target. That move must not happen: it would convert
+this repository's strongest safeguard into exactly what `CLAUDE.md`'s non-negotiables
+forbid — a safeguard that depends on someone remembering to set it correctly, rather than
+one the architecture enforces.
+
+**Proposed resolution:** Configuration that lives in source, not in the environment. A
+`db-safety.config.ts` sits in the consuming repository, committed to version control,
+imported at module load, and validated with zod so a malformed config fails loudly at
+startup rather than silently under-constraining the target. Because it is source rather
+than environment, changing it stays a reviewable diff — the exact property `D-16` was
+protecting. The package supplies mechanism; the config supplies identity.
+
+**Proposed package shape (three layers, split by what each layer is):**
+1. **npm package** — the scripts, the assertion mechanism, the drill harness, and the
+   guardrail test suite: the things a consuming project imports.
+2. **Scaffold/template** — `docker-compose.yml`, an environment-file example, and the CI
+   workflow once Phase 5 exists: things a project copies rather than imports, because
+   they must live in the consumer's own tree.
+3. **Claude Code plugin/skill** — the agent-facing layer: the conventions, the rule
+   against echoing a supplied value back, the rule against reading `process.env`
+   directly (already enforced here by `tests/guardrails.test.ts`), and the slash
+   commands. This layer matters because it is what makes a new project *behave* like
+   this one, rather than merely holding the same files — copied files without the
+   conventions produce a project that has the tooling and still does the unsafe thing.
+
+**Consequence:** What does not transfer. Drill evidence never transfers — a passing
+restore drill in this repository proves nothing about another project, because what a
+drill proves is that this specific data, on this specific machine, came back. Every
+consuming project must destroy and restore its own real data and time it for itself. The
+script transfers; the proof never does. This is D7's consequence re-arming in each new
+project: backup status stays UNKNOWN until a human has performed the restore, for that
+project, again. Also non-transferable: the Coolify and Hetzner specifics, and the
+PostgreSQL 17 major-version pin from D9.
+
+**Timing:** Do not extract yet. Phases 3-7 hold most of the reusable value — the safety
+analyzer is more portable than any Phase 1-2 code, since its interface is SQL in and a
+verdict out with no database identity involved at all — and building them will reshape
+whatever shared surface an extraction would expose. Extracting now would freeze an API
+against a sample size of one. Extract at the end of Phase 5, once the analyzer, the
+migration runner, and the CI gate all exist and a second real consuming project is
+available to prove the seams.
+
+**Recommended preparatory step (not yet done):** Before Phase 3 begins, consolidate the
+identity currently spread across `scripts/env.ts`, `scripts/backup.ts`, and
+`scripts/drill-assertions.ts` into a single config module at the repository root,
+keeping it in source with the same reviewable-diff guarantee, so Phase 3 writes against
+that config instead of adding a fourth hardcoding site. This is a recommendation only.
+
+**Open questions (UNKNOWN):**
+- The distribution mechanism for the npm layer — private registry versus git
+  dependency — is UNKNOWN; it has not been decided.
+- Whether these are even the right seams to extract along is UNKNOWN, because no second
+  consuming project exists yet to test them against.
