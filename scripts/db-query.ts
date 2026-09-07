@@ -7,6 +7,7 @@
 // executes — so a leaked DATABASE_URL aborts before any connection is opened.
 import { Client } from "pg";
 import { assertDevelopmentDatabase, getDevDatabaseUrl } from "./env";
+import { safeErrorMessage } from "./log";
 
 function usageAndExit(): never {
   console.error("Usage: db-query <SQL>");
@@ -36,9 +37,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  // T-01-18: print only the error's own message, never the error object or the connection
-  // string — some pg error shapes carry connection details on other fields, but never on
-  // `message` itself.
-  console.error(error instanceof Error ? error.message : String(error));
+  // T-01-18: see scripts/log.ts for the never-print-the-raw-error-object rationale.
+  console.error(safeErrorMessage(error));
   process.exit(1);
 });

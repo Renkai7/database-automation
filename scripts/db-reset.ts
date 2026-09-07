@@ -7,6 +7,7 @@
 import { execa } from "execa";
 import { Client } from "pg";
 import { assertDevelopmentDatabase, getDevDatabaseUrl } from "./env";
+import { safeErrorMessage } from "./log";
 
 async function waitForReadyFallback(): Promise<void> {
   // A4: fallback for a Compose build that predates the `--wait` flag — a bounded
@@ -33,11 +34,9 @@ async function runStep(name: string, action: () => Promise<void>): Promise<void>
   try {
     await action();
   } catch (error) {
-    // Name the failing step explicitly; do not continue to the next one. Only the error's
-    // own message is printed, never a raw error object that might carry connection details.
-    console.error(
-      `[db:reset] FAILED at step "${name}": ${error instanceof Error ? error.message : String(error)}`,
-    );
+    // Name the failing step explicitly; do not continue to the next one. See scripts/log.ts
+    // for the never-print-the-raw-error-object rationale.
+    console.error(`[db:reset] FAILED at step "${name}": ${safeErrorMessage(error)}`);
     process.exit(1);
   }
   console.log(`[db:reset] ${name} done.`);
@@ -58,7 +57,7 @@ async function main(): Promise<void> {
     } catch (error) {
       console.log(
         "[db:reset] `docker compose up -d --wait` failed, falling back to a pg_isready poll " +
-          `(reason: ${error instanceof Error ? error.message : String(error)})`,
+          `(reason: ${safeErrorMessage(error)})`,
       );
       await execa("docker", ["compose", "up", "-d"]);
       await waitForReadyFallback();
@@ -91,6 +90,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  // See scripts/log.ts for the never-print-the-raw-error-object rationale.
+  console.error(safeErrorMessage(error));
   process.exit(1);
 });
