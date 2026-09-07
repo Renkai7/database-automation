@@ -121,8 +121,8 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 … ENV-05 | Phase 1 | Pending |
-| APP-01 | Phase 1 | Gaps Found |
+| ENV-01 … ENV-05 | Phase 1 | Gap closure done — awaiting re-verification |
+| APP-01 | Phase 1 | Gap closure done — awaiting re-verification |
 | BKP-01 … BKP-08 | Phase 2 | Pending |
 | ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
@@ -141,4 +141,9 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-06 after roadmap revision (Phase 1 split into Phase 1 + Phase 2; downstream phases renumbered 3-7; 100% coverage preserved)*
+*Last updated: 2026-09-07 after 01-08 gap-closure work — the two Phase 1 traceability rows now
+carry one identical status ("Gap closure done — awaiting re-verification") instead of
+contradicting each other; no requirement checkbox above was ticked, since that status names
+work pending re-verification, not verified completion. Previously updated 2026-09-06 after
+roadmap revision (Phase 1 split into Phase 1 + Phase 2; downstream phases renumbered 3-7; 100%
+coverage preserved).*
