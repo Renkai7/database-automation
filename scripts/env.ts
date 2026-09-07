@@ -6,7 +6,7 @@
 // process's validation result: an interrupted run or two concurrent runs each get an
 // independently validated connection or none at all (ENV-03).
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import dotenv from "dotenv";
 import { parse as parseConnectionString } from "pg-connection-string";
 import { z } from "zod";
@@ -192,4 +192,58 @@ export async function assertDevelopmentDatabase(
       `Refusing to proceed: connected to database "${actualName}", expected "${expectedName}".`,
     );
   }
+}
+
+// D-03/D-04 (02-CONTEXT.md): the backup destination is a second, independent configuration
+// value, deliberately NOT added to EnvSchema above -- that schema is parsed at module load by
+// the Next.js app, drizzle.config.ts, and the seed script, and a required entry there would
+// hard-fail all three for anyone who never takes a backup. getBackupDestination reads it
+// directly from process.env instead; scripts/env.ts is the one file the guardrail suite
+// (tests/guardrails.test.ts) exempts from the "no direct process.env read" check, so this is
+// the ONLY module in the workspace permitted to do so for this variable -- every other module
+// (scripts/backup.ts included) must call getBackupDestination.
+export const BACKUP_DESTINATION_ENV_VAR = "RECIPE_BACKUP_DESTINATION";
+
+// T-02-01 (threat register): rejects, before a single dump byte is written, the three ways a
+// backup destination could defeat D-03's "outside the repository" requirement. Every rejection
+// message names the variable and the failing constraint but never echoes the supplied value --
+// same discipline as assertLocalDevelopmentTarget above, and load-bearing here because the
+// value being validated is a filesystem path an operator may have mistyped, not a credential,
+// but the project's "never echo a supplied value back" convention applies uniformly regardless
+// of what kind of string is being rejected.
+export function assertBackupDestination(value: string): void {
+  if (value.length === 0) {
+    throw new Error(
+      `${BACKUP_DESTINATION_ENV_VAR} is not set. Set it in .env to an absolute path outside ` +
+        "this repository's working tree where backup artifacts should be written.",
+    );
+  }
+
+  if (!isAbsolute(value)) {
+    throw new Error(`${BACKUP_DESTINATION_ENV_VAR} must be an absolute path, not a relative one.`);
+  }
+
+  const resolved = resolve(value);
+  const relativeToWorkspace = relative(workspaceRoot, resolved);
+  const isInsideWorkspace =
+    relativeToWorkspace === "" ||
+    (!relativeToWorkspace.startsWith("..") && !isAbsolute(relativeToWorkspace));
+  if (isInsideWorkspace) {
+    throw new Error(
+      `${BACKUP_DESTINATION_ENV_VAR} must resolve outside this repository's working tree -- ` +
+        "the globals dump it holds carries a real role-password verifier (D-03), and a path " +
+        "inside the repo is one `git add -A` away from being committed.",
+    );
+  }
+}
+
+/**
+ * Reads and validates the configured backup destination. This is the ONLY permitted way for
+ * any other module in this workspace to obtain the destination path -- see the exemption note
+ * above `BACKUP_DESTINATION_ENV_VAR`.
+ */
+export function getBackupDestination(): string {
+  const value = process.env[BACKUP_DESTINATION_ENV_VAR] ?? "";
+  assertBackupDestination(value);
+  return value;
 }

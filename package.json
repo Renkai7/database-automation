@@ -11,10 +11,13 @@
     "db:seed": "tsx apps/recipe-app/src/db/seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
     "db:query": "tsx scripts/db-query.ts",
+    "db:backup": "tsx scripts/backup.ts",
+    "db:drill": "tsx scripts/drill.ts",
     "dev": "pnpm --filter recipe-app dev",
     "test": "vitest run"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "12.1.0",
     "@types/node": "^24.13.3",
     "@types/pg": "8.23.1",
     "dotenv": "^17.4.2",
