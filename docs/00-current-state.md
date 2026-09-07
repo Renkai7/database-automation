@@ -30,7 +30,7 @@ over. The app arrives into a finished safety system rather than the reverse.
 | Recipe app is greenfield — no code, schema, or database exists yet | owner |
 | No production data at risk for this application | owner |
 | A UI hand-off will be supplied by the owner | owner |
-| **A database backup restore has never been tested** | owner |
+| **A database backup restore has been drilled and timed by hand (2026-09-07)** — see `docs/20-restore-runbook.md`; the globals/roles restore path remains unproven on a genuinely role-empty cluster | Phase 2 drill |
 | Migrations are already decoupled from application deploys (existing setup) | owner |
 | Owner does not currently use SSH access to the Hetzner host | owner |
 | Local: Windows 11, Docker 29.6.1, Node v24.19.0, pnpm 10.25.0 | verified |
@@ -128,7 +128,7 @@ the safety work is absent, which is exactly how such work gets deferred. See ris
 
 | # | Risk | Status |
 |---|---|---|
-| R1 | **Restore has never been tested — recoverability is unproven.** Scope: owner's own data only, no third-party data at risk today | **CONFIRMED** |
+| R1 | **Restore drilled and timed by hand (2026-09-07) — both a table-drop-in-place restore and a full container/volume rebuild restore succeeded.** Scope: owner's own data only, no third-party data at risk today. Evidence: `docs/20-restore-runbook.md`. Open sub-risk carried forward, not closed: the globals/roles restore path was NOT EXERCISED in this drill (see runbook) — only `pnpm db:drill`'s disposable container currently proves it. | **DRILLED AND TIMED (see docs/20-restore-runbook.md); globals-restore path still unproven on a genuinely role-empty cluster** |
 | R2 | Possibly a single superuser credential used for all purposes | Unverified |
 | R5 | Avoiding SSH may push toward riskier exposure options instead | Under discussion |
 | R6 | Greenfield comfort may cause safety work to be deferred until data exists — at which point it is a retrofit again | Active, by design |

@@ -17,9 +17,14 @@
     }
   },
   "human": {
-    "lastPerformedAt": null,
-    "outcome": "UNKNOWN",
-    "timings": null,
+    "lastPerformedAt": "2026-09-07",
+    "outcome": "PASS",
+    "timings": {
+      "totalFirstRunMinutesLow": 3,
+      "totalFirstRunMinutesHigh": 4,
+      "copyPasteOnlyMinutesLow": 1,
+      "copyPasteOnlyMinutesHigh": 2
+    },
     "runbookRef": "docs/20-restore-runbook.md"
   }
 }

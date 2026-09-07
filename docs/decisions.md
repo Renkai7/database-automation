@@ -103,6 +103,16 @@ means learning it under pressure, during an incident.
 **Consequence:** backup status stays UNKNOWN — never PASS — until a restore has been
 performed by hand, timed, and documented.
 
+**Consequence discharged — 2026-09-07:** A restore has now been performed by hand,
+timed, and documented. The owner personally dropped `recipes` (with `CASCADE`) from the
+live local development database and restored it in place, then destroyed the container
+and its volume entirely and rebuilt the cluster from both dumps — both acts succeeded
+and were confirmed via row counts, spot-checked values, and the rendered Recipe Page.
+See `docs/20-restore-runbook.md` for the full procedure and what actually happened,
+including one open sub-risk carried forward: the globals/roles restore path was not
+genuinely exercised in this drill (the rebuilt cluster was never role-empty), so it
+remains proven only by `pnpm db:drill`'s disposable container, not by this human drill.
+
 ---
 
 ## D8 — Migrations never run at application startup

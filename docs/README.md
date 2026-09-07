@@ -11,7 +11,7 @@ honestly until the relevant phase has actually been performed.
 | 01 | System architecture | Phase 0 |
 | 04 | Drizzle migration workflow | Phase 0 |
 | 06 | Migration safety rules | Phase 2 |
-| 08 | Backup and restore runbook | **Phase 1 — written from a real restore, not from docs** |
+| 20 | [Backup and restore runbook](20-restore-runbook.md) | Live — written from a real restore, not from docs |
 | 03 | Database environment model | Phase 5 |
 | 05 | Production credential model | Phase 5 |
 | 07 | CI/CD flow | Phase 4 |
