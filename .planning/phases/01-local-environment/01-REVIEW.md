@@ -1,322 +1,264 @@
 ---
 phase: 01-local-environment
-reviewed: 2026-09-06T00:00:00Z
+reviewed: 2026-09-07T16:13:49Z
 depth: standard
-files_reviewed: 34
+files_reviewed: 12
 files_reviewed_list:
-  - .env.example
-  - .gitignore
   - apps/recipe-app/drizzle.config.ts
-  - apps/recipe-app/drizzle/0000_bumpy_khan.sql
-  - apps/recipe-app/drizzle/0001_busy_thunderbolt.sql
-  - apps/recipe-app/drizzle/meta/0000_snapshot.json
-  - apps/recipe-app/drizzle/meta/0001_snapshot.json
-  - apps/recipe-app/drizzle/meta/_journal.json
-  - apps/recipe-app/next-env.d.ts
-  - apps/recipe-app/next.config.ts
-  - apps/recipe-app/package.json
-  - apps/recipe-app/src/app/globals.css
-  - apps/recipe-app/src/app/layout.tsx
-  - apps/recipe-app/src/app/page.tsx
-  - apps/recipe-app/src/app/recipes/[slug]/error.tsx
-  - apps/recipe-app/src/app/recipes/[slug]/not-found.tsx
-  - apps/recipe-app/src/app/recipes/[slug]/page.tsx
-  - apps/recipe-app/src/components/IngredientsGrid.tsx
   - apps/recipe-app/src/components/RecipeScreen.tsx
-  - apps/recipe-app/src/components/StepsList.tsx
-  - apps/recipe-app/src/db/client.ts
-  - apps/recipe-app/src/db/schema.ts
-  - apps/recipe-app/src/db/seed.ts
-  - apps/recipe-app/tsconfig.json
-  - docker-compose.yml
-  - package.json
-  - pnpm-lock.yaml
-  - pnpm-workspace.yaml
   - scripts/db-query.ts
   - scripts/db-reset.ts
   - scripts/env.test.ts
   - scripts/env.ts
-  - tests/db-query.test.ts
-  - tests/db-reset.test.ts
+  - scripts/log.ts
+  - scripts/verify-migration-state.ts
   - tests/guardrails.test.ts
-  - tests/smoke.test.ts
-  - tsconfig.base.json
-  - vitest.config.ts
+  - tests/log.test.ts
+  - tests/target-pin.test.ts
+  - tests/verify-migration-state.test.ts
 findings:
-  critical: 2
+  critical: 1
   warning: 3
   info: 2
-  total: 7
+  total: 6
 status: issues_found
 ---
 
 # Phase 01: Code Review Report
 
-**Reviewed:** 2026-09-06
+**Reviewed:** 2026-09-07T16:13:49Z
 **Depth:** standard
-**Files Reviewed:** 36 (of 38 listed; lockfile and generated JSON skimmed per scope instructions; `.env.example` content could not be inspected — see note under CR-01)
+**Files Reviewed:** 12
 **Status:** issues_found
 
 ## Summary
 
-Phase 1's local-environment scaffolding is well-documented and mostly does what its inline
-comments and `01-CONTEXT.md` decisions claim, but there is one load-bearing gap between the
-**documented architecture decision** and the **actual code**: D-16 states the local-only
-binding for `db:query`/`db:reset` should be architectural — "no argument, flag, or
-**environment override** that redirects it at another database... repointing it requires
-editing source in a diff, not passing a parameter." What was actually built is the opposite of
-that: the connection target is entirely driven by an environment variable
-(`RECIPE_DEV_DATABASE_URL`, loaded from `.env`), validated only as *a well-formed URL* with no
-host/port restriction. The only safety net is a post-connect check of `current_database()`,
-which never inspects the host. This means the described "hardcoded to local, no environment
-override" claim does not hold at the architecture level — a `.env` edit alone (not a source
-diff) can point the tool at a non-local host, contradicting the project's explicit
-non-negotiable ("No production database access from the local machine... prefer architectural
-enforcement over remembered caution"). This is the review's headline finding (CR-01).
+This is an incremental review of the gap-closure work for the D-16 target-pin gap (plans
+01-06..01-08). The bulk of `scripts/env.ts`, its tests, and the CLI scripts that consume it are
+well-documented and internally consistent, and most of the specific hardening claims in the code
+comments (bare `DATABASE_URL` rejection, never-echo-the-value error messages, `current_database()`
+runtime check, no-stdin `db:reset`) hold up under inspection.
 
-The second Critical finding is that `db-reset.ts`'s own production code path trusts
-`drizzle-kit migrate`'s exit code with no independent verification of the resulting database
-state — exactly the known Windows footgun called out in this review's brief (`drizzle-kit
-migrate` can exit 0 without applying SQL). The *test suite* (`tests/db-reset.test.ts`) does
-verify real state independently, which is good, but that verification does not exist in the
-tool a developer or Claude Code actually runs day to day (`pnpm run db:reset`).
+However, the review turned up a **live, verified bypass of the D-16 development-target pin
+itself** — the exact thing this task was asked to stress-test. `assertLocalDevelopmentTarget`
+validates the connection string using the WHATWG `URL` parser, but the actual database
+connection is opened by `pg` (via `pg-connection-string`), which parses PostgreSQL connection
+URIs under different, spec-compliant semantics: a `?host=`/`?port=` query parameter silently
+overrides the authority-derived host/port. The validator inspects only `.hostname`/`.port`/
+`.pathname` and never looks at the query string, so a connection string can pass every pin check
+while actually connecting somewhere else entirely. This affects every entry point in scope:
+`db-query.ts`, `db-reset.ts`, `verify-migration-state.ts` (all via `getDevDatabaseUrl()`), and
+`drizzle.config.ts` (which also bundles `pg` inside `drizzle-kit`) — including "the single most
+destructive command in the pipeline" per that file's own comment. This is verified against the
+actual `pg-connection-string@2.14.0` and `pg@8.23.0` versions installed in this repo, not a
+theoretical concern.
 
-Positives worth naming explicitly since the brief asked for an honest verdict, not just
-findings: the `[slug]/page.tsx` correctly awaits `params` (Next 16 requirement) and correctly
-lets `notFound()` and a thrown DB error diverge into two different boundaries (`not-found.tsx`
-vs `error.tsx`) — a missing row and a down database do not look the same to a user, which was
-a specific risk called out in the brief and is handled correctly. `docker-compose.yml` binds
-the database port to `127.0.0.1` only, never `0.0.0.0`. Error messages in `scripts/env.ts`,
-`scripts/db-query.ts` and `scripts/db-reset.ts` are built from `error.message` only, never a
-raw error object or the connection string, and this is directly covered by tests
-(`scripts/env.test.ts`, `tests/db-query.test.ts`) that assert the literal secret value never
-appears in output. The two committed migrations and `_journal.json` are internally consistent
-(2 entries, matching tags, sequential `idx`).
+A handful of smaller robustness and test-quality issues are listed below as warnings/info.
 
 ## Critical Issues
 
-### CR-01: The "hardcoded to local" connection binding is actually environment-variable-driven with no host restriction
+### CR-01: D-16 development-target pin can be bypassed via a `?host=`/`?port=` query parameter
 
-**File:** `scripts/env.ts:48-56`, `scripts/db-query.ts:26`, `scripts/db-reset.ts:71`, `apps/recipe-app/drizzle.config.ts:11-13`, `apps/recipe-app/src/db/client.ts:9`, `apps/recipe-app/src/db/seed.ts:16`
+**File:** `scripts/env.ts:66-98` (`assertLocalDevelopmentTarget`), consumed by `scripts/db-query.ts:27`, `scripts/db-reset.ts:71`, `scripts/verify-migration-state.ts:35`, and `apps/recipe-app/drizzle.config.ts:11-12`
 
-**Issue:** Every entry point (`db-query`, `db-reset`, `drizzle.config.ts`, the Next.js app, the
-seed script) obtains its connection string via `getDevDatabaseUrl()`, which returns
-`env.RECIPE_DEV_DATABASE_URL`. That value is validated only as `z.string().url()`
-(`scripts/env.ts:48-50`) — any well-formed Postgres URL passes, including one pointing at a
-remote/staging/production host. The only runtime safety check,
-`assertDevelopmentDatabase()` (`scripts/env.ts:70-81`), queries `current_database()` and
-compares it to the string `"recipe_dev"` — it never inspects the host, port, or whether the
-target is loopback. `.env` is read via `dotenv.config()` (`scripts/env.ts:32`) from a file that
-is explicitly meant to be user-edited for local configuration.
+**Issue:** `assertLocalDevelopmentTarget` validates `parsed.hostname`, `parsed.port`, and
+`parsed.pathname` from Node's WHATWG `URL` parser. It never inspects `parsed.search` /
+`parsed.searchParams`. PostgreSQL connection URIs, however, allow any connection parameter
+(including `host`, `hostaddr`, and `port`) to be supplied as a query parameter, and that value
+*overrides* the authority-section host/port when the URI is actually parsed by `pg` for
+connecting. `pg@8.23.0` delegates connection-string parsing to `pg-connection-string@2.14.0`
+(`lib/connection-parameters.js:60`), whose `parse()` implementation does exactly this
+(`pg-connection-string/index.js:40-64`):
 
-This directly contradicts the project's own recorded decision, `01-CONTEXT.md` D-16: *"The
-script is hardcoded to local. It reads the development connection variable and nothing else —
-there is no argument, flag, or environment override that redirects it at another database.
-Repointing it requires editing source in a diff, not passing a parameter."* The code as written
-**is** exactly the environment-variable override the decision says does not exist: repointing
-`db-query`/`db-reset`/the app/drizzle-kit at any reachable host requires only editing one line
-of `.env`, no source diff at all. `scripts/db-query.ts`'s own header comment
-(lines 1-7) restates the same "hardcoded to local" framing, which is not accurate to what the
-code does — the comment says "no environment variable this file itself consults for a target,"
-which is true only because the indirection lives one file away in `scripts/env.ts`; the
-end-to-end target is still fully environment-driven.
-
-Compounding this: `apps/recipe-app/drizzle.config.ts` — the config `drizzle-kit migrate` (used
-by `db:migrate`, and therefore by `db-reset.ts` step 4) actually reads — never calls
-`assertDevelopmentDatabase()` at all. So even the weak, host-blind, database-name-only safety
-net does not apply to the single most destructive step in the whole pipeline (applying the
-full migration history). `drizzle-kit` runs against whatever `RECIPE_DEV_DATABASE_URL`
-resolves to, unconditionally.
-
-Per this project's explicit non-negotiables ("No production database access from the local
-machine," "prefer architectural enforcement over remembered caution"), a safeguard that
-depends on `.env` being correctly populated by a human (or an agent with file-write access) is
-not the architectural enforcement the decision log says was chosen. Today there is no
-production database to reach, which limits the blast radius, but the mechanism being built in
-this exact phase is supposed to be the thing that prevents that reach later — and as built, it
-does not.
-
-**Fix:** Enforce the host at the same layer that already owns environment validation, so it is
-impossible to bypass by editing `.env` alone:
-```typescript
-// scripts/env.ts
-const EnvSchema = z.object({
-  RECIPE_DEV_DATABASE_URL: z.string().url().refine(
-    (value) => {
-      const { hostname } = new URL(value);
-      return hostname === "localhost" || hostname === "127.0.0.1";
-    },
-    { message: "RECIPE_DEV_DATABASE_URL must point at localhost/127.0.0.1 — no remote host is a valid development database target." },
-  ),
-});
+```js
+for (const entry of result.searchParams.entries()) {
+  config[entry[0]] = entry[1]        // query params applied first
+}
+...
+if (!config.host) {                  // only fall back to the authority host
+  config.host = decodeURIComponent(hostname)   // if no query param set it
+}
+...
+if (!config.port) {
+  config.port = result.port
+}
 ```
-Also call `assertDevelopmentDatabase()` (or an equivalent host+name check) from a Drizzle Kit
-lifecycle hook, or wrap `drizzle-kit migrate`/`generate` invocations in a pre-flight check in
-`db-reset.ts` and any future migrate script, so the safety net actually covers the destructive
-path and not just the two hand-written CLI scripts. If the team still wants D-16's literal
-"no environment override, repointing requires a source diff" property, the URL (at least host
-and port) needs to be a constant in source, with only the password sourced from environment —
-not the whole connection string.
 
-*(Reviewer note: `.env.example` was in scope per the task brief but this session's file-read
-permissions denied access to it — both the dedicated Read tool and Grep returned "Permission
-... denied" for that specific path, while every other file in scope was readable. I could not
-independently confirm its placeholder content; `tests/guardrails.test.ts:94-99` does assert it
-contains the literal string `"PLACEHOLDER"`, which is some mitigation, but that test does not
-verify every variable `docker-compose.yml` requires — e.g. `RECIPE_DEV_DB_PASSWORD`
-(`docker-compose.yml:16`) — is actually documented there.)*
+Reproduced end-to-end against the versions actually installed in this repo:
 
-### CR-02: `db-reset.ts` trusts `drizzle-kit migrate`'s exit code with no independent verification of applied state
-
-**File:** `scripts/db-reset.ts:80-83`
-
-**Issue:** Step 4 of the reset pipeline is:
-```typescript
-await runStep("drizzle-kit migrate", async () => {
-  await execa("pnpm", ["run", "db:migrate"]);
-});
 ```
-`runStep` (lines 31-44) only distinguishes success/failure by whether the promise rejects
-(i.e., by `execa`'s default behavior of throwing on non-zero exit). It performs no query
-against the database afterward to confirm that the expected number of migrations were actually
-recorded in `drizzle.__drizzle_migrations` or that the expected tables exist. This is precisely
-the failure mode the review brief called out as known: `drizzle-kit migrate` has been observed
-to exit 0 on Windows without applying any SQL. If that happens here, `db-reset.ts` prints
-`"drizzle-kit migrate done."` and finally `"[db:reset] Complete."`, giving a false-positive
-success signal for the one step whose entire job is to prove the migration history applies
-cleanly to a truly empty database (the stated purpose of D-22's full-teardown design).
+RECIPE_DEV_DATABASE_URL = "postgres://dev:pass@localhost:5432/recipe_dev?host=evil-host.example.com"
 
-The independent verification that *does* exist — `assertRebuiltState()` in
-`tests/db-reset.test.ts:15-56`, which checks `drizzle.__drizzle_migrations` row count against
-the journal and checks table/row counts — lives only in the test suite, not in the tool itself.
-A developer (or Claude Code) running `pnpm run db:reset` directly, outside of `pnpm test`, gets
-none of that verification.
+assertLocalDevelopmentTarget(url):
+  parsed.hostname -> "localhost"        => passes the allowlist check
+  parsed.port     -> "5432"             => passes the port check
+  parsed.pathname -> "/recipe_dev"      => passes the database-name check
+  => the function returns normally, no throw
 
-**Fix:** Fold the same state assertion the test performs into the script itself, e.g. add a
-step after migrate that re-queries `drizzle.__drizzle_migrations` and compares its count to
-`_journal.json`'s entry count, failing loudly (non-zero exit, no silent "done.") if they don't
-match:
-```typescript
-await runStep("verify migration history applied", async () => {
-  const journal = JSON.parse(readFileSync(JOURNAL_PATH, "utf-8")) as { entries: unknown[] };
-  const client = new Client({ connectionString: getDevDatabaseUrl() });
+pg-connection-string.parse(url):
+  { host: 'evil-host.example.com', user: 'dev', password: 'pass', port: '5432', database: 'recipe_dev' }
+  => pg actually opens a TCP connection to evil-host.example.com:5432
+```
+
+(`?port=` behaves the same way for the port; `?dbname=`/`?database=` do **not** work as a bypass
+because `pg-connection-string` unconditionally re-derives `config.database` from the URL
+pathname after the query-param loop — only `host`/`port`/`hostaddr`-style keys are affected.)
+
+This defeats the entire purpose of D-16: a `.env` value that looks correctly pinned to
+`localhost:5432/recipe_dev` at a glance (and that passes every existing unit and e2e test in
+`scripts/env.test.ts` / `tests/target-pin.test.ts`, none of which exercise a query string) can
+silently redirect **every** tool in this workspace — `db-query`'s arbitrary-SQL execution,
+`db-reset`'s full migrate+seed pipeline, and `drizzle-kit migrate` itself (which also bundles
+`pg` inside `drizzle-kit@0.31.10/api.js`) — at an attacker- or misconfiguration-controlled host.
+
+This also defeats the stated defense-in-depth of `assertDevelopmentDatabase`'s
+`current_database()` runtime check (`scripts/env.ts:152-163`): that check only verifies the
+*name* reported by whatever server the client actually connected to. An attacker who controls
+the redirected host trivially names their own database `recipe_dev` and the runtime check
+passes too. Given this project's explicit non-negotiable ("no production database access from
+the local machine... because the architecture prevents it, not because anyone remembered to be
+careful"), a bypass this close to the exact vector the phase's non-negotiable is written against
+is a blocker, not a hardening nice-to-have.
+
+**Fix:** Do not trust the generic WHATWG `URL` parser to decide what `pg` will actually connect
+to. Either:
+
+1. Reject any connection string that carries a query component at all (the pinned dev target
+   never legitimately needs one), e.g.:
+
+```ts
+export function assertLocalDevelopmentTarget(url: string): void {
+  let parsed: URL;
   try {
-    await client.connect();
-    const { rows } = await client.query("SELECT count(*) AS count FROM drizzle.__drizzle_migrations");
-    if (Number(rows[0].count) !== journal.entries.length) {
-      throw new Error(
-        `Expected ${journal.entries.length} applied migrations, found ${rows[0].count} — ` +
-          `drizzle-kit migrate likely no-opped without applying SQL.`,
-      );
-    }
-  } finally {
-    await client.end();
+    parsed = new URL(url);
+  } catch { /* ...unchanged... */ }
+
+  if (parsed.search !== "") {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL must not contain query parameters -- a `host`, `hostaddr`, or " +
+        "`port` query parameter silently overrides the pinned target when the driver connects.",
+    );
   }
-});
+  // ...existing hostname/port/database checks...
+}
 ```
+
+   or, more narrowly, explicitly reject the `host`, `hostaddr`, and `port` keys specifically.
+
+2. Better still, validate using the same parser that will actually be used to connect
+   (`pg-connection-string`'s own `parse()`) instead of `new URL()`, so the value being validated
+   and the value being connected with can never diverge:
+
+```ts
+import parseConnectionString from "pg-connection-string";
+
+export function assertLocalDevelopmentTarget(url: string): void {
+  const parsed = parseConnectionString(url);
+  if (!(DEV_DATABASE_HOST_ALLOWLIST as readonly string[]).includes(parsed.host ?? "")) { /* ... */ }
+  if (String(parsed.port ?? "") !== EXPECTED_DEV_DATABASE_PORT) { /* ... */ }
+  if (parsed.database !== EXPECTED_DEV_DATABASE_NAME) { /* ... */ }
+}
+```
+
+Either fix should be accompanied by a regression test (see WR-03-equivalent gap below) that
+specifically exercises a `?host=`/`?port=` query-parameter redirection, since neither
+`scripts/env.test.ts` nor `tests/target-pin.test.ts` currently covers this vector.
 
 ## Warnings
 
-### WR-01: `tests/guardrails.test.ts` blanket-excludes every `*.test.ts` file from two constraints it exists to enforce
+### WR-01: No test coverage for the query-parameter bypass vector (CR-01)
 
-**File:** `tests/guardrails.test.ts:80-99, 120-136`
+**File:** `scripts/env.test.ts`, `tests/target-pin.test.ts`
 
-**Issue:** Both the connection-string-prefix check (D-19) and the direct-env-read check
-(ENV-03) filter out any file matching `*.test.ts` (lines 84 and 128-130) with the stated
-justification that `scripts/env.test.ts` (and, per the header comment, `db-query.test.ts`)
-legitimately construct fake `postgres://` literals and set
-`process.env.RECIPE_DEV_DATABASE_URL` directly to exercise `scripts/env.ts`'s own behavior.
-That justification is true for those specific files, but the exclusion as implemented is a
-wildcard over the whole `*.test.ts` class, not an allowlist of the two-or-three files that
-actually need the exception. As written, a brand-new test file could hardcode a real
-`postgres://user:realpassword@some-host/db` connection string, or read
-`process.env.RECIPE_DEV_DATABASE_URL` directly and bypass `scripts/env.ts` entirely, and this
-guardrail suite — whose entire purpose is to be the mechanical, no-human-judgment-required
-enforcement of exactly these two constraints (per this project's "architectural enforcement
-over remembered caution" principle) — would report green. This is a real, exploitable blind
-spot in the guardrail itself, not merely a style nit: it inverts the guardrail's own guarantee
-for one class of file.
+**Issue:** Both test suites are otherwise thorough about D-16 (host allowlist, port, database
+name, both IPv6 spellings, an end-to-end redirected-hostname case for `db-query`, `drizzle-kit
+migrate`, and `db-reset`), but none of them constructs a URL with a query string. The exact
+bypass in CR-01 would have gone undetected by the full existing test suite.
 
-**Fix:** Replace the blanket `*.test.ts` exclusion with an explicit, narrow allowlist of the
-files that are known to need it:
-```typescript
-const KNOWN_FIXTURE_FILES = ["scripts/env.test.ts", "tests/db-query.test.ts"];
-const files = (await sourceSurfaceFiles()).filter((file) => !KNOWN_FIXTURE_FILES.includes(file));
+**Fix:** After fixing CR-01, add cases such as:
+
+```ts
+it("throws when a host query parameter attempts to override the pinned host", async () => {
+  process.env.RECIPE_DEV_DATABASE_URL =
+    "postgres://dev:devpass@localhost:5432/recipe_dev?host=evil-host.example.com";
+  await expect(import("./env")).rejects.toThrow(/RECIPE_DEV_DATABASE_URL/);
+});
 ```
-This keeps the exact same intended exemption while ensuring any *other* test file — including
-ones added later — is still covered by the constraint.
 
-### WR-02: `db-reset.ts` step 3's environment assertion does not cover step 4's migrate invocation (TOCTOU-shaped gap)
+and an equivalent end-to-end case in `tests/target-pin.test.ts` for `db-query`/`db:migrate`.
 
-**File:** `scripts/db-reset.ts:68-83`
+### WR-02: `DEV_DATABASE_HOST_ALLOWLIST` contains an unreachable entry
 
-**Issue:** Step 3 opens its own short-lived `Client`, calls `assertDevelopmentDatabase()`, and
-closes the connection. Step 4 then shells out to `pnpm run db:migrate` (a separate process,
-using `drizzle.config.ts`, which as noted in CR-01 never calls `assertDevelopmentDatabase()` at
-all). The two steps share no connection and no enforced ordering guarantee beyond "step 3 ran
-first in this same script invocation." If `db-reset.ts`'s steps are ever reordered, if step 4
-is ever invoked independently (e.g. a developer runs `pnpm run db:migrate` directly, which is
-also exposed as its own top-level script in `package.json:10`), or if the two steps are moved
-into different scripts, there is nothing enforcing that the environment check actually applies
-to the migrate operation it's meant to gate. This is a narrower restatement of CR-01's
-"drizzle-kit never asserts" point, called out separately because it is also a general
-design-pattern concern independent of the host-check fix: the assertion should travel with the
-operation it protects, not run once and be trusted by a sibling process.
+**File:** `scripts/env.ts:55`
 
-**Fix:** See CR-01's fix — move the assertion (or an equivalent check) to run immediately
-before/after the `drizzle-kit migrate` invocation itself, not only as an isolated earlier step.
+**Issue:** `DEV_DATABASE_HOST_ALLOWLIST = ["localhost", "127.0.0.1", "::1", "[::1]"]`. Node's
+WHATWG `URL.hostname` always serializes an IPv6 host **with** brackets — confirmed directly:
+`new URL("postgres://dev:pass@[::1]:5432/recipe_dev").hostname === "[::1]"`, never `"::1"`. The
+bare `"::1"` entry can never be matched by `parsed.hostname` and is dead weight; the accompanying
+comment ("both IPv6 loopback spellings") and the guardrail test in
+`tests/guardrails.test.ts:190-196` (which asserts the allowlist contains exactly these four
+strings) both encode the same mistaken assumption, so this will keep being "verified" as correct
+by the test suite even though one of the four entries is unreachable.
 
-### WR-03: `ingredients`/`steps` position uniqueness and `recipes.baseServings` have no positivity/non-zero constraint, and `RecipeScreen` divides by it unguarded
+**Fix:** Drop `"::1"` from the allowlist (and from the guardrail test's expected array), or, if
+the intent is genuinely to accept both spellings, normalize `parsed.hostname` before comparing
+(e.g., strip surrounding brackets) rather than listing a form that `URL` never produces.
 
-**File:** `apps/recipe-app/src/db/schema.ts:13`, `apps/recipe-app/src/components/RecipeScreen.tsx:44`
+### WR-03: `db-reset.ts`'s `pg_isready` fallback hardcodes the database identity instead of reusing the shared constant
 
-**Issue:** `recipes.baseServings` is `integer(...).notNull()` with no `CHECK (base_servings > 0)`
-constraint at the schema or database level. `RecipeScreen.tsx:44` computes
-`const multiplier = servings / recipe.baseServings;`, which becomes `Infinity`/`NaN` if a future
-row is ever inserted with `baseServings` of `0` (or negative). Today's seed always sets `2`, so
-this is latent rather than triggered, but it is exactly the kind of "an agent mistake can
-destroy production data/quality" scenario the project's own threat model is built to defend
-against for the database layer — the same discipline is worth applying to a value that flows
-directly into division-based rendering math.
+**File:** `scripts/db-reset.ts:20`
 
-**Fix:** Add a database-level check constraint (`sql`check(base_servings > 0)`` `` via Drizzle's
-`check()` helper) and/or a defensive clamp in `RecipeScreen.tsx`:
-```typescript
-const multiplier = recipe.baseServings > 0 ? servings / recipe.baseServings : 1;
+**Issue:** `waitForReadyFallback` hardcodes `"-U", "recipe_app", "-d", "recipe_dev"` as literals.
+`scripts/env.ts` already exports `EXPECTED_DEV_DATABASE_NAME` as the single source of truth for
+the pinned database name specifically so that "changing any of these three values is a
+safety-relevant source diff" (per `env.ts`'s own comment) — but this literal doesn't reference
+it, so a future rename of the pinned database would silently leave this fallback probe checking
+the wrong database name without any compiler or test error pointing at this file.
+
+**Fix:** Import and use `EXPECTED_DEV_DATABASE_NAME` (and a corresponding exported user constant,
+if one exists) instead of the literal:
+
+```ts
+import { EXPECTED_DEV_DATABASE_NAME } from "./env";
+// ...
+["compose", "exec", "-T", "db", "pg_isready", "-U", "recipe_app", "-d", EXPECTED_DEV_DATABASE_NAME]
 ```
 
 ## Info
 
-### IN-01: `db-query.ts`/`db-reset.ts` duplicate the "print only `error.message`" pattern three times
+### IN-01: Weak substring assertion in the `db-reset` survival check
 
-**File:** `scripts/db-query.ts:38-44`, `scripts/db-reset.ts:36-41, 93-96`
+**File:** `tests/target-pin.test.ts:79-80`
 
-**Issue:** The `error instanceof Error ? error.message : String(error)` pattern, plus the
-security rationale comment explaining why only `.message` is ever printed, is repeated
-verbatim across both scripts. This is a security-sensitive pattern (it's the mechanism that
-keeps a connection string out of logs) — duplicating it means a future edit to one call site
-can silently diverge from the others without a shared point of enforcement or test coverage.
+**Issue:** `expect(survivalCheck.stdout).toContain("8")` is meant to confirm the seeded
+`ingredients` table still has its expected row count after a refused `db:reset`, but a plain
+substring check on `console.table`'s rendered output would also pass for an actual count of `18`,
+`80`, `8000`, or any other number containing the digit `8`, and could even coincidentally match
+box-drawing padding. This is the load-bearing assertion the test file's own header comment calls
+out as distinguishing "guard fires before teardown" from "guard fires after teardown," so a false
+pass here would hide exactly the regression the test exists to catch.
 
-**Fix:** Extract a single shared helper (e.g. in `scripts/env.ts` or a new `scripts/log.ts`)
-such as `function safeErrorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }`, imported by both scripts, so the "never print the raw error object" guarantee has one place to test and maintain.
+**Fix:** Assert on a tighter pattern, e.g. a row/column boundary
+(`toMatch(/\bingredient_count\b[\s\S]*\b8\b/)`) or switch the query to `SELECT count(*)::int` and
+parse the count out of stdout for an exact numeric comparison.
 
-### IN-02: `db:migrate` and `db:generate` are independently runnable top-level scripts, bypassing `db-reset.ts`'s own step ordering entirely
+### IN-02: Leaked-credential guardrail only matches the `postgres://` scheme spelling, not `postgresql://`
 
-**File:** `package.json:9-10`
+**File:** `tests/guardrails.test.ts:44,104-125`
 
-**Issue:** `db:migrate` (`drizzle-kit migrate`) and `db:generate` are exposed as standalone
-`pnpm` scripts, callable directly without going through `db-reset.ts` at all. This is likely
-intentional (the normal generate → inspect → migrate loop described in the guardrail comments
-needs `db:migrate` to be independently runnable), but it means the CR-01/WR-02 host-and-name
-assertion gap applies to the most commonly-run command in the whole workflow, not just the
-less-frequently-run `db:reset`. Flagging as Info rather than folding into CR-01 since the fix
-is the same one already proposed there.
+**Issue:** `CONNECTION_STRING_SCHEME_PREFIX` is built as `"postgres" + "://"`. PostgreSQL
+connection URIs accept both `postgres://` and `postgresql://` as the scheme
+(interchangeably, per PostgreSQL's own URI documentation). A credential accidentally committed
+using the `postgresql://` spelling would not be caught by this guardrail, since
+`"postgresql://...".includes("postgres://")` is `false` (the substring after `postgres` is `ql:`,
+not `://`).
 
-**Fix:** No separate fix needed beyond CR-01's — noted here so the fix is understood to cover
-this call path too, not just `db-reset.ts`.
+**Fix:** Check for both spellings, e.g. also build and check
+`["postgresql", "://"].join("")`, or match with a scheme-agnostic regex such as
+`/postgres(ql)?:\/\//`.
 
 ---
 
-_Reviewed: 2026-09-06_
+_Reviewed: 2026-09-07T16:13:49Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
