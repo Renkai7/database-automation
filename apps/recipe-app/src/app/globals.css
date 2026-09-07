@@ -1,0 +1,662 @@
+/* Only what genuinely transfers from the Modernist design system for this screen: the base
+   body rule and the heading font-family/weight rule. The Recipe Page's own component styling
+   is 100% inline (see Recipe Page.dc.html) and does not use any of the design system's button,
+   card, tag or nav component classes, so none of those are copied here (01-UI-SPEC.md Design
+   System table). Archivo itself is loaded via next/font/google in layout.tsx, not an
+   @import here. */
+:root {
+  --font-heading: var(--font-archivo, "Archivo", system-ui, sans-serif);
+  --font-body: var(--font-archivo, "Archivo", system-ui, sans-serif);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
+  color: #2a2320;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Net-new markup (not-found / error) — standard 8pt scale, base body style.
+   Kept entirely separate from the rp-* exception values below (two spacing
+   regimes, UI-SPEC "Spacing Scale").
+   ========================================================================== */
+
+.std-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+
+.std-heading {
+  font-size: 24px;
+}
+
+.std-body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #8d7d76;
+  max-width: 48ch;
+}
+
+.std-link,
+.std-button {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  color: #fffaf6;
+  background: #e8623c;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 24px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.std-link:hover,
+.std-button:hover {
+  background: #d1552f;
+}
+
+/* ==========================================================================
+   Recipe Page — ported verbatim from Recipe Page.dc.html. Values below are
+   NOT on a 4px grid; that is the source's own intentional departure from
+   Modernist (D-06/D13) and must not be normalised.
+   ========================================================================== */
+
+.rp-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-navbar {
+  flex: none;
+  padding: 18px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rp-icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rp-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.rp-sheet {
+  flex: 1;
+  background: #fffaf6;
+  border-radius: 34px 34px 0 0;
+  margin-top: 18px;
+  padding: 26px 22px 0;
+}
+
+.rp-sheet-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.rp-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.rp-title-block {
+  min-width: 0;
+}
+
+.rp-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.rp-subtitle {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #8d7d76;
+  margin: 5px 0 0;
+}
+
+.rp-fav-btn {
+  margin-left: auto;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 16px;
+  background: #fdeee8;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rp-fav-btn:hover {
+  background: #fbe1d8;
+}
+
+.rp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 0 18px;
+}
+
+.rp-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.rp-meta-icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
+.rp-meta-divider {
+  display: none;
+}
+
+.rp-servings {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rp-servings-label {
+  font-size: 12px;
+  color: #8d7d76;
+}
+
+.rp-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f7e7e0;
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.rp-stepper-btn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #fffaf6;
+  color: #2a2320;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rp-stepper-count {
+  min-width: 22px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.rp-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: #f7e7e0;
+  border-radius: 999px;
+}
+
+.rp-tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.rp-panels {
+  padding-top: 20px;
+}
+
+.rp-cta-wrap {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(255, 250, 246, 0), #fffaf6 34%);
+  padding: 22px 0 26px;
+  margin-top: 6px;
+}
+
+.rp-cta {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 16px 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.rp-home-bar {
+  height: 5px;
+  width: 130px;
+  border-radius: 999px;
+  background: #e6d5cd;
+  margin: 18px auto 0;
+}
+
+/* Ingredients grid (IngredientsGrid.tsx) */
+
+.rp-ing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.rp-ing-card {
+  background: #fdf1ea;
+  border-radius: 20px;
+  padding: 13px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rp-ing-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: #fbe1d8;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.rp-ing-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+}
+
+.rp-ing-qty {
+  font-size: 12px;
+  color: #8d7d76;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Steps list (StepsList.tsx) */
+
+.rp-steps-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-step {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 13px;
+  align-items: start;
+  padding: 0 2px 16px;
+}
+
+.rp-step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.rp-step-body-wrap {
+  padding-top: 4px;
+}
+
+.rp-step-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.rp-step-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: #fdf1ea;
+  color: #c04a26;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+/* -------------------------------- Tablet -------------------------------- */
+@media (min-width: 834px) {
+  .rp-navbar {
+    padding: 20px 28px 0;
+  }
+  .rp-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .rp-sheet {
+    border-radius: 36px 36px 0 0;
+    margin-top: 20px;
+    padding: 34px 40px 0;
+  }
+  .rp-header {
+    gap: 20px;
+  }
+  .rp-title {
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+  .rp-subtitle {
+    font-size: 14px;
+    margin-top: 7px;
+  }
+  .rp-fav-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 18px;
+  }
+  .rp-meta {
+    gap: 26px;
+    padding: 20px 0 22px;
+  }
+  .rp-meta-item {
+    gap: 8px;
+    font-size: 14px;
+  }
+  .rp-meta-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .rp-stepper {
+    gap: 5px;
+    padding: 4px;
+  }
+  .rp-stepper-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+  .rp-stepper-count {
+    min-width: 24px;
+    font-size: 14px;
+  }
+  .rp-tabs {
+    gap: 5px;
+    padding: 5px;
+    max-width: 420px;
+  }
+  .rp-tab {
+    padding: 13px 0;
+    font-size: 14px;
+  }
+  .rp-ing-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .rp-ing-card {
+    border-radius: 22px;
+    padding: 16px 18px 17px;
+  }
+  .rp-ing-chip {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 7px;
+  }
+  .rp-ing-name {
+    font-size: 15px;
+  }
+  .rp-ing-qty {
+    font-size: 13px;
+  }
+  .rp-step {
+    grid-template-columns: 34px 1fr;
+    gap: 15px;
+    padding-bottom: 20px;
+  }
+  .rp-step-num {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+  .rp-step-body-wrap {
+    padding-top: 5px;
+  }
+  .rp-step-text {
+    font-size: 14.5px;
+  }
+  .rp-step-timer {
+    margin-top: 9px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+  .rp-cta-wrap {
+    padding: 26px 0 30px;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .rp-cta {
+    width: 280px;
+  }
+  .rp-home-bar {
+    display: none;
+  }
+}
+
+/* -------------------------------- Desktop -------------------------------- */
+@media (min-width: 1440px) {
+  .rp-navbar {
+    padding: 24px 44px 0;
+  }
+  .rp-icon-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 17px;
+  }
+  .rp-sheet {
+    border-radius: 34px 34px 0 0;
+    margin-top: -16px;
+    padding: 40px 56px 0;
+  }
+  .rp-sheet-inner {
+    max-width: none;
+  }
+  .rp-body {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    column-gap: 56px;
+    align-items: start;
+    grid-template-areas:
+      "header tabs"
+      "meta   tabs"
+      "cta    panels";
+  }
+  .rp-header {
+    grid-area: header;
+    gap: 16px;
+  }
+  .rp-title {
+    font-size: 36px;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+  }
+  .rp-subtitle {
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .rp-fav-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 17px;
+  }
+  .rp-meta {
+    grid-area: meta;
+    position: sticky;
+    top: 0;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    background: #fdf1ea;
+    border-radius: 24px;
+    padding: 20px 22px;
+    gap: 14px;
+  }
+  .rp-meta-item {
+    font-size: 14px;
+    gap: 10px;
+  }
+  .rp-meta-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .rp-meta-divider {
+    display: block;
+    height: 1px;
+    background: #f0ddd4;
+  }
+  .rp-servings {
+    margin-left: 0;
+    gap: 12px;
+  }
+  .rp-servings-label {
+    font-size: 13.5px;
+  }
+  .rp-stepper {
+    background: #fffaf6;
+  }
+  .rp-stepper-btn {
+    background: #f7e7e0;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+  .rp-stepper-count {
+    min-width: 24px;
+    font-size: 14px;
+  }
+  .rp-tabs {
+    grid-area: tabs;
+    max-width: 400px;
+  }
+  .rp-panels {
+    grid-area: panels;
+    padding-top: 0;
+  }
+  .rp-cta-wrap {
+    grid-area: cta;
+    position: static;
+    background: none;
+    padding: 0;
+    margin-top: 14px;
+    text-align: initial;
+  }
+  .rp-cta {
+    width: 100%;
+  }
+  .rp-home-bar {
+    display: none;
+  }
+  .rp-ing-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    padding: 0 0 40px;
+  }
+  .rp-ing-card {
+    border-radius: 22px;
+    padding: 18px 20px 19px;
+  }
+  .rp-ing-chip {
+    width: 32px;
+    height: 32px;
+    border-radius: 11px;
+    font-size: 14px;
+    margin-bottom: 9px;
+  }
+  .rp-ing-name {
+    font-size: 15px;
+  }
+  .rp-ing-qty {
+    font-size: 13px;
+  }
+  .rp-steps-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 40px;
+    padding: 0 0 40px;
+  }
+  .rp-step {
+    padding-bottom: 22px;
+  }
+  .rp-step-text {
+    font-size: 14.5px;
+  }
+  .rp-step-timer {
+    margin-top: 9px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+}

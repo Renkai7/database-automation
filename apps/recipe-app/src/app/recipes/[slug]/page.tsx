@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
+import RecipeScreen from "@/components/RecipeScreen";
 
 // Next.js 16 removed the Next 15 synchronous-params compatibility shim entirely, so params
 // is typed as a Promise and must be awaited — reading it synchronously here would be a
@@ -13,20 +14,36 @@ export default async function RecipePage({
 }) {
   const { slug } = await params;
 
+  // Loads the recipe together with its ingredients and steps in one query, both children
+  // ordered by their `position` column — no hardcoded ingredient/step array anywhere here.
   const recipe = await db.query.recipes.findFirst({
     where: (recipes, { eq }) => eq(recipes.slug, slug),
+    with: {
+      ingredients: {
+        orderBy: (ingredients, { asc }) => [asc(ingredients.position)],
+      },
+      steps: {
+        orderBy: (steps, { asc }) => [asc(steps.position)],
+      },
+    },
   });
 
   if (!recipe) {
     notFound();
   }
 
-  // The designed screen is ported in plan 01-05; this route renders real database content,
-  // not placeholder content.
   return (
-    <main>
-      <h1>{recipe.title}</h1>
-      <p>{recipe.subtitle}</p>
-    </main>
+    <RecipeScreen
+      recipe={{
+        title: recipe.title,
+        subtitle: recipe.subtitle,
+        baseServings: recipe.baseServings,
+        timeLabel: recipe.timeLabel,
+        effort: recipe.effort,
+        baseKcal: recipe.baseKcal,
+      }}
+      ingredients={recipe.ingredients}
+      steps={recipe.steps}
+    />
   );
 }
