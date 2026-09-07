@@ -152,6 +152,89 @@ describe("scripts/env.ts — development target pin (D-16)", () => {
   });
 });
 
+describe("scripts/env.ts — development target pin: query-parameter bypass (CR-01)", () => {
+  it("throws when a `host` query parameter attempts to override the pinned host", async () => {
+    const redirectedHost = "evil-host.example.com";
+    process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devsecretpass@localhost:5432/recipe_dev?host=${redirectedHost}`;
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain(redirectedHost);
+  });
+
+  it("throws when a `port` query parameter attempts to override the pinned port", async () => {
+    process.env.RECIPE_DEV_DATABASE_URL =
+      "postgres://dev:devsecretpass@localhost:5432/recipe_dev?port=6543";
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain("6543");
+  });
+
+  it("throws when a `hostaddr` connection parameter is present, even though it targets the pinned host", async () => {
+    // RFC 5737 TEST-NET-3 address -- a safe, non-routable placeholder, not a real target.
+    const injectedAddress = "203.0.113.7";
+    process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devsecretpass@localhost:5432/recipe_dev?hostaddr=${injectedAddress}`;
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain(injectedAddress);
+  });
+
+  it("throws when a `service` connection parameter is present", async () => {
+    const serviceName = "some-service-name";
+    process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devsecretpass@localhost:5432/recipe_dev?service=${serviceName}`;
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain(serviceName);
+  });
+
+  it("still accepts a correctly pinned URL that carries no query parameters (guards against over-rejection)", async () => {
+    process.env.RECIPE_DEV_DATABASE_URL = "postgres://dev:devpass@localhost:5432/recipe_dev";
+
+    const { getDevDatabaseUrl } = await import("./env");
+
+    expect(getDevDatabaseUrl()).toBe(process.env.RECIPE_DEV_DATABASE_URL);
+  });
+});
+
 describe("scripts/env.ts — assertDevelopmentDatabase (D-21)", () => {
   function stubClient(name: string): QueryableClient {
     return {
