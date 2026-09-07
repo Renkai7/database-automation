@@ -8,6 +8,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import dotenv from "dotenv";
+import { parse as parseConnectionString } from "pg-connection-string";
 import { z } from "zod";
 
 function findWorkspaceRoot(startDir: string): string {
@@ -56,40 +57,71 @@ export const DEV_DATABASE_HOST_ALLOWLIST = ["localhost", "127.0.0.1", "::1", "[:
 export const EXPECTED_DEV_DATABASE_PORT = "5432";
 export const EXPECTED_DEV_DATABASE_NAME = "recipe_dev";
 
-// D-16: synchronous, pre-connect assertion that a connection string targets the pinned
-// development database and nothing else. Every rejection message names
-// RECIPE_DEV_DATABASE_URL and the pinned (allowed) value for the failing component, and never
-// interpolates anything taken from the supplied URL itself -- not the rejected host, port,
-// database name, or the URL as a whole. An operator who mistypes a value learns which
-// constraint failed and reads their own .env for what they actually set; the message never
-// echoes it back.
+// D-16 / CR-01: synchronous, pre-connect assertion that a connection string targets the pinned
+// development database and nothing else. This validates the EFFECTIVE target -- the host,
+// port, and database that `pg` will actually open a socket to -- by parsing with
+// `pg-connection-string`, the exact same parser `pg` itself uses internally
+// (`pg/lib/connection-parameters.js` requires it directly). Earlier code validated the
+// WHATWG `URL` parser's view of the string instead, which disagrees with `pg-connection-string`
+// on `?host=`/`?port=` query parameters (PostgreSQL connection URIs let any connection
+// parameter be supplied as a query parameter, and it overrides the authority-section value at
+// connect time) -- a pinned-looking string could pass every check while `pg` connected
+// somewhere else entirely (01-REVIEW.md CR-01). Using the driver's own parser as the single
+// source of truth removes that divergence by construction rather than trying to keep two
+// parsers in sync.
+//
+// `hostaddr` and `service` are rejected outright rather than validated: `hostaddr` names an
+// address to connect to that bypasses hostname resolution, and `service` indirects through an
+// external connection-service file resolved at connect time -- neither is something a
+// string-level effective-target check can see through, so both must be refused rather than
+// inspected.
+//
+// Every rejection message names RECIPE_DEV_DATABASE_URL and the pinned (allowed) value for the
+// failing component, and never interpolates anything taken from the supplied URL itself -- not
+// the rejected host, port, database name, hostaddr, service name, or the URL as a whole. An
+// operator who mistypes a value learns which constraint failed and reads their own .env for
+// what they actually set; the message never echoes it back.
 export function assertLocalDevelopmentTarget(url: string): void {
-  let parsed: URL;
+  let parsed: ReturnType<typeof parseConnectionString>;
   try {
-    parsed = new URL(url);
+    parsed = parseConnectionString(url);
   } catch {
     throw new Error(
-      "RECIPE_DEV_DATABASE_URL could not be parsed as a URL. The development target must be a " +
-        `loopback host, port ${EXPECTED_DEV_DATABASE_PORT}, and database "${EXPECTED_DEV_DATABASE_NAME}".`,
+      "RECIPE_DEV_DATABASE_URL could not be parsed as a connection string. The development " +
+        `target must be a loopback host, port ${EXPECTED_DEV_DATABASE_PORT}, and database ` +
+        `"${EXPECTED_DEV_DATABASE_NAME}".`,
     );
   }
 
-  if (!(DEV_DATABASE_HOST_ALLOWLIST as readonly string[]).includes(parsed.hostname)) {
+  if ("hostaddr" in parsed) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL must not set a `hostaddr` connection parameter -- it can direct " +
+        "the driver to connect to an address this check cannot see or validate.",
+    );
+  }
+
+  if ("service" in parsed) {
+    throw new Error(
+      "RECIPE_DEV_DATABASE_URL must not set a `service` connection parameter -- it resolves " +
+        "through an external connection-service file this check cannot see or validate.",
+    );
+  }
+
+  if (!(DEV_DATABASE_HOST_ALLOWLIST as readonly string[]).includes(parsed.host ?? "")) {
     throw new Error(
       "RECIPE_DEV_DATABASE_URL host is not in the pinned development loopback allowlist. " +
         `Allowed hosts: ${DEV_DATABASE_HOST_ALLOWLIST.join(", ")}.`,
     );
   }
 
-  if (parsed.port !== EXPECTED_DEV_DATABASE_PORT) {
+  if (String(parsed.port ?? "") !== EXPECTED_DEV_DATABASE_PORT) {
     throw new Error(
       "RECIPE_DEV_DATABASE_URL port does not match the pinned development port. " +
         `Allowed port: ${EXPECTED_DEV_DATABASE_PORT}.`,
     );
   }
 
-  const databaseName = parsed.pathname.replace(/^\//, "");
-  if (databaseName !== EXPECTED_DEV_DATABASE_NAME) {
+  if (parsed.database !== EXPECTED_DEV_DATABASE_NAME) {
     throw new Error(
       "RECIPE_DEV_DATABASE_URL database name does not match the pinned development database " +
         `name. Allowed database: ${EXPECTED_DEV_DATABASE_NAME}.`,
