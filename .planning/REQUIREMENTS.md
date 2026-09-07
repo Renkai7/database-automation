@@ -15,12 +15,12 @@
 
 ### Backup and Restore (BKP)
 
-- [ ] **BKP-01**: The owner has personally performed and timed a full backup and restore at least once
+- [x] **BKP-01**: The owner has personally performed and timed a full backup and restore at least once
 - [x] **BKP-02**: The backup procedure captures roles and globals separately via `pg_dumpall --globals-only`, not only a database dump
 - [x] **BKP-03**: Restore drills target a genuinely fresh instance matching the production image and extensions — never a pre-seeded container
 - [x] **BKP-04**: Restore verification asserts content — row counts, spot-checked values, referential integrity, sequence state — and never treats an exit code as proof
-- [ ] **BKP-05**: A deliberate destruction test has been performed: drop a table, restore, confirm the data returned
-- [ ] **BKP-06**: A restore runbook exists, written from an actual performed restore rather than from documentation
+- [x] **BKP-05**: A deliberate destruction test has been performed: drop a table, restore, confirm the data returned
+- [x] **BKP-06**: A restore runbook exists, written from an actual performed restore rather than from documentation
 - [x] **BKP-07**: An automated restore test runs against a disposable database and reports pass or fail
 - [x] **BKP-08**: A skipped or failing restore drill is visible, not silent
 
@@ -123,7 +123,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 |-------------|-------|--------|
 | ENV-01 … ENV-05 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | APP-01 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
-| BKP-01 … BKP-08 | Phase 2 | Pending |
+| BKP-01 … BKP-08 | Phase 2 | All 8 requirements checked complete 2026-09-07 (see `docs/20-restore-runbook.md`); phase-level UAT/security verification not yet run |
 | ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |

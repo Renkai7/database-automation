@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Backup & Restore Drill
-status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-09-07T22:06:23.349Z"
+status: verifying
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-09-07T22:38:44.944Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 02 execution started
-state_head: 91644e90dff20d48e98e11782e40629ee4504ebc
+state_head: 1804243e7674902d342bf2dce1c9530819997de2
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 Phase: 02 (Backup & Restore Drill) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-07 — Phase 02 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P02 | 30min | 3 tasks | 6 files |
 | Phase 02 P03 | 20min | 3 tasks | 7 files |
 | Phase 02 P04 | 55min | 3 tasks | 9 files |
+| Phase 02 P05 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 02]: [Phase 02] 02-04: recordAutomatedDrillResult accepts only the automated outcome -- the human half is read from disk or defaulted to its honest UNKNOWN starting state, never accepted as a parameter, so no code path can set the human fact.
 - [Phase 02]: [Phase 02] 02-04: Added an optional onStepTiming callback to scripts/restore.ts's restoreIntoContainer (Rule 3 deviation, outside this plan's own files_modified) to populate the required globalsRestore/dataRestore duration fields without forking the restore logic.
 - [Phase 02]: [Phase 02] 02-04: D-20's three-outcome boundary implemented as control flow -- the container-start step sits outside any try/catch leading to a status write, so a never-ran drill structurally cannot touch docs/restore-drill-status.json.
+- [Phase 02]: [Phase 02] 02-05: The plan's DROP TABLE recipes CASCADE constraint-gap prediction did not hold on the real run -- pnpm db:restore is a full-database restore, so both foreign keys returned intact; recorded honestly in docs/20-restore-runbook.md rather than reconciled with the original prediction.
+- [Phase 02]: [Phase 02] 02-05: Act-2 globals restore verdict was NOT EXERCISED on this machine (rebuilt cluster is never role-empty) -- recorded as a real, open risk in docs/00-current-state.md R1 and the runbook, not closed by the drill's overall PASS.
+- [Phase 02]: [Phase 02] 02-05: scripts/restore-cluster.ts's misleading 'final line of output' comment (verdict actually prints second-to-last) recorded in .planning/WINDOWS.md rather than fixed, since the file is outside plan 02-05's files_modified.
 
 ### Pending Todos
 
@@ -134,6 +138,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T22:06:23.315Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-09-07T22:38:44.910Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None
