@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Local Environment
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-07T00:45:45.768Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-09-07T00:53:38.196Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 01 execution started
-state_head: 311559ff0ed02b561f7ec93e6c4fa37a17411edd
+state_head: ec66b38683d0581c8eadd8a72c98a6df3a8a638d
 progress:
   total_phases: 7
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 01 (Local Environment) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 01 execution started
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01-local-environment P01 | 25min | 3 tasks | 10 files |
 | Phase 01 P02 | 20min | 2 tasks | 18 files |
+| Phase 01 P03 | 35min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 01]: [Phase 01-02] apps/recipe-app ships without 'type: module' — Next 16.3.4's next.config.ts compiler emits CJS, which conflicted with the plan-specified ESM package type
 - [Phase 01]: [Phase 01-02] zod installed at the workspace root, not in apps/recipe-app, because scripts/env.ts resolves bare imports relative to its own root-level directory
 - [Phase 01]: [Phase 01-02] tests/smoke.test.ts kills its spawned server via taskkill /T /F on win32 to avoid orphaning the nested next-server process that plain execa .kill() left running
+- [Phase 01]: [Phase 01-03] seed.ts rewritten to insert through Drizzle's own table objects (drizzle(client,{schema}) over a one-shot pg.Client) instead of raw SQL, so a schema column rename breaks the seed at type-check time.
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T00:45:45.753Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-09-07T00:53:38.178Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
