@@ -8,6 +8,7 @@ import { execa } from "execa";
 import { Client } from "pg";
 import { assertDevelopmentDatabase, getDevDatabaseUrl } from "./env";
 import { safeErrorMessage } from "./log";
+import { assertMigrationHistoryApplied } from "./verify-migration-state";
 
 async function waitForReadyFallback(): Promise<void> {
   // A4: fallback for a Compose build that predates the `--wait` flag — a bounded
@@ -79,6 +80,16 @@ async function main(): Promise<void> {
   // Step 4: apply the full migration history through the root db:migrate target.
   await runStep("drizzle-kit migrate", async () => {
     await execa("pnpm", ["run", "db:migrate"]);
+  });
+
+  // CR-02: `drizzle-kit migrate` has been observed to exit zero on Windows without applying
+  // any SQL. D-22's whole purpose is to prove the migration history applies to a truly empty
+  // instance, so an unverified migrate makes that claim unfalsifiable -- this step re-queries
+  // the database directly instead of trusting the exit code above. It fails loudly (runStep
+  // exits non-zero and does not print a completion line) rather than warning and continuing;
+  // it takes no flag, argument, or environment variable that skips it (D-24).
+  await runStep("verify migration history applied", async () => {
+    await assertMigrationHistoryApplied();
   });
 
   // Step 5: reseed through the root db:seed target.
