@@ -1,0 +1,25 @@
+{
+  "automated": {
+    "lastRunAt": "2026-09-07T21:58:20.039Z",
+    "outcome": "PASS",
+    "tiers": {
+      "artifactIntegrity": true,
+      "rowCounts": true,
+      "schemaEquality": true,
+      "contentAndReferentialIntegrity": true
+    },
+    "durationMs": {
+      "backup": 617,
+      "containerStart": 1987,
+      "globalsRestore": 94,
+      "dataRestore": 134,
+      "assert": 402
+    }
+  },
+  "human": {
+    "lastPerformedAt": null,
+    "outcome": "UNKNOWN",
+    "timings": null,
+    "runbookRef": "docs/20-restore-runbook.md"
+  }
+}

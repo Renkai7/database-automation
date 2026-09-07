@@ -40,6 +40,14 @@ export interface RestoreIntoContainerOptions {
   username: string;
   /** In-container database name the data dump is restored into. */
   database: string;
+  /**
+   * 02-04-PLAN.md Task 1: optional per-step timing hook, invoked once for each of the two
+   * restore steps with its own elapsed milliseconds -- scripts/drill.ts uses this to populate
+   * docs/restore-drill-status.json's durationMs.globalsRestore/dataRestore fields. Omitted by
+   * every other call site (there are none today besides drill.ts), so adding it here is
+   * source-compatible with the existing signature.
+   */
+  onStepTiming?: (step: "globalsRestore" | "dataRestore", durationMs: number) => void;
 }
 
 const CONTAINER_DATA_DUMP_PATH = "/tmp/data.dump";
@@ -67,6 +75,7 @@ export async function restoreIntoContainer(
   // bootstrap identity that collides with no role in the globals dump) there is nothing for it
   // to collide with -- tolerating that error here is exactly how a drill would report PASS
   // having never exercised the globals restore.
+  const globalsStartedAt = Date.now();
   const globalsResult = await target.exec([
     "psql",
     "-v",
@@ -78,6 +87,7 @@ export async function restoreIntoContainer(
     "-f",
     CONTAINER_GLOBALS_DUMP_PATH,
   ]);
+  options.onStepTiming?.("globalsRestore", Date.now() - globalsStartedAt);
   if (globalsResult.exitCode !== 0) {
     throw new Error(
       `Globals restore failed (exit ${globalsResult.exitCode}): ${globalsResult.stderr}`,
@@ -87,6 +97,7 @@ export async function restoreIntoContainer(
   // RESEARCH.md Pitfall 5: --clean must always be paired with --if-exists -- unpaired, it
   // returns exit 1 for objects simply absent from the target, indistinguishable from a real
   // failure.
+  const dataStartedAt = Date.now();
   const dataResult = await target.exec([
     "pg_restore",
     "--clean",
@@ -100,6 +111,7 @@ export async function restoreIntoContainer(
     options.database,
     CONTAINER_DATA_DUMP_PATH,
   ]);
+  options.onStepTiming?.("dataRestore", Date.now() - dataStartedAt);
   if (dataResult.exitCode !== 0) {
     throw new Error(`Data restore failed (exit ${dataResult.exitCode}): ${dataResult.stderr}`);
   }

@@ -1,9 +1,20 @@
-// BKP-03/BKP-04/BKP-07 (02-CONTEXT.md D-11/D-12/D-13/D-15): `db:drill` -- one hermetic sequence
-// that backs up the live development database, starts a genuinely fresh, never-pre-seeded
-// `postgres:17` container, restores both dumps into it, and asserts real restored content
-// against the manifest just written. Takes no command-line arguments and no target of any
-// kind; the disposable container's connection is one this file's own harness constructed, never
-// a string a human or an agent typed (D-06).
+// BKP-03/BKP-04/BKP-07/BKP-08 (02-CONTEXT.md D-11/D-12/D-13/D-15/D-17/D-18/D-20): `db:drill` --
+// one hermetic sequence that backs up the live development database, starts a genuinely fresh,
+// never-pre-seeded `postgres:17` container, restores both dumps into it, and asserts real
+// restored content against the manifest just written. Takes no command-line arguments and no
+// target of any kind; the disposable container's connection is one this file's own harness
+// constructed, never a string a human or an agent typed (D-06).
+//
+// D-20 boundary, implemented as three explicit outcomes rather than one catch-all:
+//   - The backup step or the container start failed -- the drill never ran. Nothing below this
+//     point writes to docs/restore-drill-status.json; the record simply keeps showing the last
+//     drill that actually happened and ages until assertDrillStatusFresh's own staleness gate
+//     goes red. There is no "skipped" outcome anywhere in this file or in scripts/drill-status.ts.
+//   - The container started, but a restore or assertion step failed -- the drill ran and failed.
+//     Recorded as FAIL with whichever tiers actually ran and the durations collected so far.
+//   - Everything passed -- recorded as PASS with all four tiers true.
+// In every branch, the container is stopped BEFORE the status write happens (never the other
+// way around), so a write failure can never leave a container running.
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -19,6 +30,7 @@ import {
   assertSequenceState,
   assertSpotCheckedValues,
 } from "./drill-assertions";
+import { recordAutomatedDrillResult, type AutomatedDrillOutcome } from "./drill-status";
 import { EXPECTED_DEV_DATABASE_NAME, getBackupDestination } from "./env";
 import { safeErrorMessage } from "./log";
 import { restoreIntoContainer } from "./restore";
@@ -35,13 +47,21 @@ export const DRILL_BOOTSTRAP_USERNAME = "drilluser";
 // runDrill() call. A tier that throws is recorded false here AND still rethrown by runTier
 // below, so the drill still exits non-zero naming the failing step through runStep's own
 // logging -- this record is additional structure layered on top of that failure, not a
-// replacement for it. Nothing in this plan persists this record to disk; that is plan 02-04's
-// job (D-17).
+// replacement for it. This is also the exact shape persisted into
+// docs/restore-drill-status.json's automated.tiers field by recordAutomatedDrillResult.
 export interface DrillTierResults {
   artifactIntegrity: boolean;
   rowCounts: boolean;
   schemaEquality: boolean;
   contentAndReferentialIntegrity: boolean;
+}
+
+interface DrillDurationsMs {
+  backup: number;
+  containerStart: number;
+  globalsRestore: number;
+  dataRestore: number;
+  assert: number;
 }
 
 function randomThrowawayPassword(): string {
@@ -53,7 +73,7 @@ function randomThrowawayPassword(): string {
 // afterward. Here, a failure after the container has started still needs the outer
 // try/finally's container.stop() to run -- and process.exit() terminates the process
 // immediately, skipping any pending `finally` block. So this variant logs and re-throws instead,
-// letting runDrill()'s own try/finally guarantee the container is always stopped, and leaves the
+// letting runDrill()'s own control flow guarantee the container is always stopped, and leaves the
 // final process.exit(1) to the top-level main().catch() below.
 async function runStep<T>(name: string, action: () => Promise<T>): Promise<T> {
   console.log(`[db:drill] ${name}...`);
@@ -129,10 +149,22 @@ async function dumpRestoredSchema(container: StartedPostgreSqlContainer): Promis
 /**
  * The full hermetic drill: back up the live development database, start a fresh disposable
  * container, restore both dumps into it, and assert restored content against the manifest just
- * written. The container is always stopped afterward, success or failure.
+ * written. The container is always stopped afterward, success or failure; the committed status
+ * record (docs/restore-drill-status.json) is written only once the container has genuinely
+ * started, and only after it has been stopped again (D-20).
  */
 export async function runDrill(): Promise<void> {
+  const durationMs: DrillDurationsMs = {
+    backup: 0,
+    containerStart: 0,
+    globalsRestore: 0,
+    dataRestore: 0,
+    assert: 0,
+  };
+
+  const backupStartedAt = Date.now();
   const manifest = await runStep("back up the live development database", () => runBackup());
+  durationMs.backup = Date.now() - backupStartedAt;
   const destination = getBackupDestination();
 
   const tierResults: DrillTierResults = {
@@ -142,37 +174,58 @@ export async function runDrill(): Promise<void> {
     contentAndReferentialIntegrity: false,
   };
 
-  let container: StartedPostgreSqlContainer | undefined;
-  try {
-    container = await runStep("start a fresh, never-pre-seeded postgres:17 container", () =>
+  // D-20: nothing above this line can leave the status record touched -- if runBackup() failed,
+  // scripts/backup.ts's own runStep already called process.exit(1) directly and this function
+  // never resumed. A container that fails to start below is the second half of the same rule:
+  // the error simply propagates out of runDrill() unrecorded, and main().catch() below exits
+  // non-zero. The drill "never ran" in either case -- there is nothing to record.
+  const containerStartedAt = Date.now();
+  const container: StartedPostgreSqlContainer = await runStep(
+    "start a fresh, never-pre-seeded postgres:17 container",
+    () =>
       new PostgreSqlContainer(DRILL_CONTAINER_IMAGE)
         .withDatabase(EXPECTED_DEV_DATABASE_NAME)
         .withUsername(DRILL_BOOTSTRAP_USERNAME)
         .withPassword(randomThrowawayPassword())
         .start(),
-    );
+  );
+  durationMs.containerStart = Date.now() - containerStartedAt;
 
+  // From here on the container genuinely started -- any failure below is a drill that RAN and
+  // FAILED, which D-20 requires be recorded (with whichever tiers actually ran and the durations
+  // collected so far), never silently dropped. `drillError` is captured rather than caught-and-
+  // rethrown immediately so the container is always stopped BEFORE either status-write branch
+  // below runs.
+  let drillError: unknown;
+  try {
     await runStep("restore globals and data dumps into the disposable container", () =>
       restoreIntoContainer(
-        container!,
+        container,
         {
           dataDumpPath: join(destination, manifest.dataDump.file),
           globalsDumpPath: join(destination, manifest.globalsDump.file),
         },
-        { username: DRILL_BOOTSTRAP_USERNAME, database: EXPECTED_DEV_DATABASE_NAME },
+        {
+          username: DRILL_BOOTSTRAP_USERNAME,
+          database: EXPECTED_DEV_DATABASE_NAME,
+          onStepTiming: (step, ms) => {
+            durationMs[step] = ms;
+          },
+        },
       ),
     );
 
+    const assertStartedAt = Date.now();
     await runStep("assert restored content against the manifest", async () => {
       // Built from discrete host/port/user/password/database values the harness itself
       // obtained from the started container -- never getConnectionUri(), so nothing in this
       // path can ever be handed a connection string someone typed.
       const assertionClient = new Client({
-        host: container!.getHost(),
-        port: container!.getPort(),
-        user: container!.getUsername(),
-        password: container!.getPassword(),
-        database: container!.getDatabase(),
+        host: container.getHost(),
+        port: container.getPort(),
+        user: container.getUsername(),
+        password: container.getPassword(),
+        database: container.getDatabase(),
       });
       await assertionClient.connect();
       try {
@@ -182,7 +235,7 @@ export async function runDrill(): Promise<void> {
         await runTier(tierResults, "rowCounts", () => assertRowCounts(assertionClient, manifest));
         await runTier(tierResults, "schemaEquality", async () => {
           const sourceSql = await dumpSourceSchema();
-          const restoredSql = await dumpRestoredSchema(container!);
+          const restoredSql = await dumpRestoredSchema(container);
           assertSchemaEquality({ sourceSql, restoredSql });
         });
         await runTier(tierResults, "contentAndReferentialIntegrity", async () => {
@@ -195,15 +248,24 @@ export async function runDrill(): Promise<void> {
         await assertionClient.end();
       }
     });
+    durationMs.assert = Date.now() - assertStartedAt;
   } catch (error) {
+    drillError = error;
     console.error(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
-    throw error;
   } finally {
-    if (container) {
-      await runStep("stop the disposable container", () => container!.stop());
-    }
+    // Always stops the container before either status-write branch below runs -- a write
+    // failure can then never leave a container running.
+    await runStep("stop the disposable container", () => container.stop());
   }
 
+  if (drillError) {
+    const outcome: AutomatedDrillOutcome = { outcome: "FAIL", tiers: tierResults, durationMs };
+    await recordAutomatedDrillResult(outcome);
+    throw drillError;
+  }
+
+  const outcome: AutomatedDrillOutcome = { outcome: "PASS", tiers: tierResults, durationMs };
+  await recordAutomatedDrillResult(outcome);
   console.log(`[db:drill] Tier results: ${JSON.stringify(tierResults)}`);
 }
 
