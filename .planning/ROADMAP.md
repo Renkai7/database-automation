@@ -41,7 +41,7 @@ expand-and-contract migration — it is test material, not a deliverable in its 
   2. A schema edit to the recipe app's Drizzle schema, run through the documented loop, produces a migration, applies locally, and the app boots against the resulting schema.
   3. The destroy-and-rebuild command tears down and recreates the local database in one step, leaving a clean, freshly-migrated schema with no manual cleanup.
 
-**Plans**: 5/5 plans executed
+**Plans**: 8 plans (5 executed; 3 gap-closure plans added after verification found gaps)
 
 Plans:
 **Wave 1**
@@ -63,6 +63,20 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 01-05-PLAN.md — Port the Recipe Page to real rows, plus not-found and error paths
+
+**Gap closure** *(added 2026-09-07 after `01-VERIFICATION.md` returned `gaps_found`; run with `/gsd-execute-phase 01 --gaps-only`)*
+
+**Wave 1**
+
+- [ ] 01-06-PLAN.md — Pin the development database target in source so no environment override can redirect any tool, wire the assertion into the migrate path, and make the guardrail suite catch both regressions
+
+**Wave 2** *(blocked on gap-closure Wave 1)*
+
+- [ ] 01-07-PLAN.md — Make `db:reset` verify its own migrated state instead of trusting an exit code, and give the never-leak-a-credential output rule one tested definition
+
+**Wave 3** *(blocked on gap-closure Wave 2)*
+
+- [ ] 01-08-PLAN.md — Guard the servings scaler against a non-positive divisor, and make the Phase 1 traceability rows tell the truth
 
 ### Phase 2: Backup & Restore Drill
 
@@ -156,7 +170,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Local Environment | 5/5 | In Progress|  |
+| 1. Local Environment | 5/8 | Gaps Found — closing |  |
 | 2. Backup & Restore Drill | 0/TBD | Not started | - |
 | 3. Safety Analyzer | 0/TBD | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
