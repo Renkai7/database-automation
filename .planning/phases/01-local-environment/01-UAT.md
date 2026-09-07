@@ -53,5 +53,11 @@ blocked: 0
   severity: cosmetic
   test: 2
   note: "Breakpoint VALUES are confirmed correct. The gap is that typography does not scale up at the tablet breakpoint — body/step text stays at phone size on a wider viewport."
-  artifacts: []  # Filled by diagnosis
-  missing: []    # Filled by diagnosis
+  root_cause: "The 834px tablet block DOES scale type, but non-uniformly: the title grows +42% (24px -> 34px) while every body-copy selector grows only +7-12% (subtitle 12.5->14, meta 13->14, step text 13.5->14.5, ingredient name 13.5->15, ingredient qty 12->13). The result is a heading that dominates a wider column while the reading text stays at effectively phone size. The tablet block is a spacing/layout scale-up that was not carried through to the body type ramp."
+  artifacts:
+    - path: "apps/recipe-app/src/app/globals.css"
+      issue: "@media (min-width: 834px) block (lines 390-508): body-copy font-size steps are ~1px, disproportionate to the 34px title"
+  missing:
+    - "Raise body-copy font sizes in the 834px block so the tablet type ramp is proportionate to the 34px title"
+    - "Check whether the same disproportion repeats in the 1440px desktop block (title 36px vs body still 14-16px)"
+  debug_session: ""  # diagnosed inline during UAT — single-file CSS, no debug session needed
