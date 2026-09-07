@@ -12,6 +12,7 @@
     "db:reset": "tsx scripts/db-reset.ts",
     "db:query": "tsx scripts/db-query.ts",
     "db:backup": "tsx scripts/backup.ts",
+    "db:restore": "tsx scripts/restore.ts",
     "db:drill": "tsx scripts/drill.ts",
     "dev": "pnpm --filter recipe-app dev",
     "test": "vitest run"

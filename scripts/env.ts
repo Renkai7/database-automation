@@ -57,6 +57,15 @@ export const DEV_DATABASE_HOST_ALLOWLIST = ["localhost", "127.0.0.1", "::1", "[:
 export const EXPECTED_DEV_DATABASE_PORT = "5432";
 export const EXPECTED_DEV_DATABASE_NAME = "recipe_dev";
 
+// 02-03-PLAN.md Task 1: the pinned application role, alongside the three constants above. Must
+// equal docker-compose.yml's POSTGRES_USER -- this is the role scripts/restore.ts and
+// scripts/restore-cluster.ts run `pg_restore`/`psql` as inside the pinned development
+// container, and (02-03-PLAN.md Task 2) the role scripts/restore-cluster.ts's pre-flight check
+// looks for to decide whether the globals restore is genuinely exercisable. Changing this value
+// is a safety-relevant source diff, not routine configuration, exactly like the three constants
+// above.
+export const EXPECTED_DEV_DATABASE_ROLE = "recipe_app";
+
 // D-16 / CR-01: synchronous, pre-connect assertion that a connection string targets the pinned
 // development database and nothing else. This validates the EFFECTIVE target -- the host,
 // port, and database that `pg` will actually open a socket to -- by parsing with
