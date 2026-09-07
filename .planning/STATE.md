@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Local Environment
 status: executing
-stopped_at: Phase 1 UI-SPEC approved
-last_updated: "2026-09-06T23:36:33.326Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-09-07T00:26:32.936Z"
 last_activity: 2026-09-06
-last_activity_desc: "ROADMAP.md revised: Phase 1 split into Phase 1 (Local Environment) and Phase 2 (Backup & Restore Drill); downstream phases renumbered 3-7; all 52 v1 requirements remapped, 100% coverage preserved"
-state_head: 5c8ac11709bd681d22266a6d942f7c8c3060b80e
+last_activity_desc: Phase 01 execution started
+state_head: 597103dcf24c13fdccd0e01550b3690d6f434308
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** A schema change reaches production without anyone hand-running SQL, and no AI mistake can destroy production data — because the architecture prevents it, not because anyone remembered to be careful.
-**Current focus:** Phase 1 — Local Environment
+**Current focus:** Phase 01 — Local Environment
 
 ## Current Position
 
-Phase: 01 (Local Environment) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
+Phase: 01 (Local Environment) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-09-06 — ROADMAP.md revised: Phase 1 split into Phase 1 (Local Environment) and Phase 2 (Backup & Restore Drill); downstream phases renumbered 3-7; all 52 v1 requirements remapped, 100% coverage preserved
+Last activity: 2026-09-06 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01-local-environment P01 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -64,6 +69,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - D4 (OPEN): Staging connectivity mechanism — Tailscale subnet-route vs. restricted SSH tunnel. Not settled yet; resolving it is explicit work inside Phase 6, not an assumption carried into it.
 - D9 (ACCEPTED): PostgreSQL 17 pinned across dev/staging/production — the Phase 1 environment and the Phase 3 rule catalogue both depend on this being correct.
 - D12 (ACCEPTED): The Migration Runner (Phase 4) re-derives classification from the actual SQL immediately before executing — the only architecturally non-bypassable enforcement point. Every earlier gate (pre-commit, even the Phase 5 CI check) sits on a bypassability spectrum and should be described honestly as such.
+- [Phase 01-local-environment]: Redeploy investigation confirmed migrate-on-boot in AI-Diagramming-Tool; D8 moved PROPOSED to ACCEPTED and D14 was opened.
+- [Phase 01-local-environment]: Pinned @types/node to 24.13.3 instead of the pnpm-resolved latest 26.4.1, to match the installed Node runtime (v24.19.0).
 
 ### Pending Todos
 
@@ -86,6 +93,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-06T22:49:36.959Z
-Stopped at: Phase 1 UI-SPEC approved
-Resume file: .planning/phases/01-local-environment/01-UI-SPEC.md
+Last session: 2026-09-07T00:26:32.921Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None

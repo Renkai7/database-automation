@@ -46,7 +46,7 @@ expand-and-contract migration — it is test material, not a deliverable in its 
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Workspace, PostgreSQL 17 container, connection-variable template, and the timeboxed redeploy investigation
+- [x] 01-01-PLAN.md — Workspace, PostgreSQL 17 container, connection-variable template, and the timeboxed redeploy investigation
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

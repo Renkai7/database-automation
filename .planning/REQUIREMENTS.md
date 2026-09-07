@@ -7,7 +7,7 @@
 
 ### Environment (ENV)
 
-- [ ] **ENV-01**: Development PostgreSQL runs as a local Docker container pinned to PostgreSQL 17, including any extensions production will use
+- [x] **ENV-01**: Development PostgreSQL runs as a local Docker container pinned to PostgreSQL 17, including any extensions production will use
 - [ ] **ENV-02**: A Drizzle schema edit can be turned into a generated migration, inspected, and applied locally in one documented loop
 - [ ] **ENV-03**: Connection variables are named per environment, so no single generic variable can silently point at the wrong database
 - [ ] **ENV-04**: The development database can be destroyed and rebuilt from scratch with one command
@@ -134,6 +134,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | APP-03 | Phase 7 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 52 total
 - Mapped to phases: 52 ✓
 - Unmapped: 0 ✓
