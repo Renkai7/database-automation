@@ -15,9 +15,9 @@ import { describe, expect, it } from "vitest";
 // Built at runtime, not as a literal -- the same self-match-avoidance idiom
 // tests/target-pin.test.ts and tests/guardrails.test.ts already use. This also keeps this file
 // off tests/guardrails.test.ts's fixture allowlists: it never constructs a fixture connection
-// string as a literal substring, and it never reads process.env.RECIPE_DEV_DATABASE_URL
-// directly -- it only sets it in a child process's environment, the same shape
-// tests/target-pin.test.ts already uses.
+// string as a literal substring, and it never reads the development connection variable
+// directly off the process environment -- it only sets it in a child process's own environment,
+// the same shape tests/target-pin.test.ts already uses.
 const SCHEME_PREFIX = ["postgres", "://"].join("");
 const REDIRECTED_HOST = "not-a-loopback-host.example.com";
 const LEAKED_PASSWORD = "leaked-restore-cli-password";
