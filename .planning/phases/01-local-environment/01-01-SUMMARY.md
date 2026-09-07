@@ -191,3 +191,10 @@ None - no external service configuration required. The `.env` file was generated
 ---
 *Phase: 01-local-environment*
 *Completed: 2026-09-06*
+
+## Self-Check: PASSED
+
+- All key-files.created (`pnpm-workspace.yaml`, `package.json`, `tsconfig.base.json`, `vitest.config.ts`, `docker-compose.yml`, `.env.example`, `pnpm-lock.yaml`) confirmed present on disk.
+- `git log --oneline --all` confirms all three task/plan commits exist: `a4abf80` (Task 1), `597103d` (Task 3), and this metadata commit.
+- Re-ran every plan-level `<verification>` command immediately before writing this summary: `docker compose up -d --wait` reports Healthy; `SHOW server_version` returns `17.11`; extension count is `0`; `docker compose config --services` prints one service; `pnpm exec vitest run --passWithNoTests` exits 0 against real config; `git check-ignore .env.example` exits non-zero (not ignored, as required).
+- Re-ran Task 1's automated acceptance check against `docs/00-current-state.md` section 7: printed `investigation-section-ok`.
