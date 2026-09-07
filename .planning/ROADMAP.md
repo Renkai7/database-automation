@@ -58,7 +58,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01-04-PLAN.md — Direct database access (`db:query`), one-command destroy and rebuild (`db:reset`), and the guardrail suite
+- [x] 01-04-PLAN.md — Direct database access (`db:query`), one-command destroy and rebuild (`db:reset`), and the guardrail suite
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
