@@ -7,11 +7,11 @@
 
 ### Environment (ENV)
 
-- [x] **ENV-01**: Development PostgreSQL runs as a local Docker container pinned to PostgreSQL 17, including any extensions production will use
-- [x] **ENV-02**: A Drizzle schema edit can be turned into a generated migration, inspected, and applied locally in one documented loop
-- [x] **ENV-03**: Connection variables are named per environment, so no single generic variable can silently point at the wrong database
-- [x] **ENV-04**: The development database can be destroyed and rebuilt from scratch with one command
-- [x] **ENV-05**: Claude Code can query and inspect the development database directly, with no manual relaying of commands through a Coolify terminal
+- [ ] **ENV-01**: Development PostgreSQL runs as a local Docker container pinned to PostgreSQL 17, including any extensions production will use
+- [ ] **ENV-02**: A Drizzle schema edit can be turned into a generated migration, inspected, and applied locally in one documented loop
+- [ ] **ENV-03**: Connection variables are named per environment, so no single generic variable can silently point at the wrong database
+- [ ] **ENV-04**: The development database can be destroyed and rebuilt from scratch with one command
+- [ ] **ENV-05**: Claude Code can query and inspect the development database directly, with no manual relaying of commands through a Coolify terminal
 
 ### Backup and Restore (BKP)
 
@@ -82,7 +82,7 @@
 
 The recipe app is a thin test fixture. These requirements exist to exercise the pipeline, not to build a product.
 
-- [x] **APP-01**: A minimal recipe schema exists and the application boots against it
+- [ ] **APP-01**: A minimal recipe schema exists and the application boots against it
 - [ ] **APP-02**: The schema evolves through a sequence of real changes that exercise the SAFE, REVIEW REQUIRED, and BLOCKED paths
 - [ ] **APP-03**: At least one expand-and-contract change is carried out across multiple releases rather than as a single destructive migration
 
@@ -122,7 +122,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ENV-01 … ENV-05 | Phase 1 | Pending |
-| APP-01 | Phase 1 | Complete |
+| APP-01 | Phase 1 | Gaps Found |
 | BKP-01 … BKP-08 | Phase 2 | Pending |
 | ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
