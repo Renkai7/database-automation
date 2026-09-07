@@ -76,6 +76,82 @@ describe("scripts/env.ts — missing RECIPE_DEV_DATABASE_URL", () => {
   });
 });
 
+describe("scripts/env.ts — development target pin (D-16)", () => {
+  it("throws when the host is not in the pinned loopback allowlist, and the message names RECIPE_DEV_DATABASE_URL and no rejected value", async () => {
+    const redirectedHost = "evil-host.example.com";
+    process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devsecretpass@${redirectedHost}:5432/recipe_dev`;
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain(redirectedHost);
+  });
+
+  it("throws when the port does not match the pinned development port, and the message carries no rejected value", async () => {
+    process.env.RECIPE_DEV_DATABASE_URL = "postgres://dev:devsecretpass@localhost:9999/recipe_dev";
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain("9999");
+  });
+
+  it("throws when the database name does not match the pinned development database name, and the message carries no rejected value", async () => {
+    const redirectedName = "some_other_database";
+    process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devsecretpass@localhost:5432/${redirectedName}`;
+
+    let message = "";
+    try {
+      await import("./env");
+      throw new Error("expected import to reject");
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("RECIPE_DEV_DATABASE_URL");
+    expect(message).not.toContain("postgres://");
+    expect(message).not.toContain("devsecretpass");
+    expect(message).not.toContain(redirectedName);
+  });
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "accepts the pinned host spelling %s with the pinned port and database name",
+    async (hostSpelling) => {
+      process.env.RECIPE_DEV_DATABASE_URL = `postgres://dev:devpass@${hostSpelling}:5432/recipe_dev`;
+
+      const { getDevDatabaseUrl } = await import("./env");
+
+      expect(getDevDatabaseUrl()).toBe(process.env.RECIPE_DEV_DATABASE_URL);
+    },
+  );
+
+  it("exports the pinned constants used by the guardrail suite", async () => {
+    process.env.RECIPE_DEV_DATABASE_URL = "postgres://dev:devpass@localhost:5432/recipe_dev";
+    const { DEV_DATABASE_HOST_ALLOWLIST, EXPECTED_DEV_DATABASE_PORT, EXPECTED_DEV_DATABASE_NAME } =
+      await import("./env");
+
+    expect(DEV_DATABASE_HOST_ALLOWLIST).toEqual(["localhost", "127.0.0.1", "::1", "[::1]"]);
+    expect(EXPECTED_DEV_DATABASE_PORT).toBe("5432");
+    expect(EXPECTED_DEV_DATABASE_NAME).toBe("recipe_dev");
+  });
+});
+
 describe("scripts/env.ts — assertDevelopmentDatabase (D-21)", () => {
   function stubClient(name: string): QueryableClient {
     return {
