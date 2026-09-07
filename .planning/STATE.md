@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Local Environment
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-09-07T15:20:20.240Z"
-last_activity: 2026-09-06
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-09-07T15:47:41.476Z"
+last_activity: 2026-09-07
 last_activity_desc: Phase 01 execution started
-state_head: 5c9f83355dd27d7301878dc0fba9312241c4d04a
+state_head: 48d5db5ffc37cfbad16efc47a79dd97142449d03
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 ## Current Position
 
-Phase: 01 (Local Environment) — READY TO EXECUTE
-Plan: 5 of 5
+Phase: 01 (Local Environment) — EXECUTING
+Plan: 2 of 8
 Status: Ready to execute
-Last activity: 2026-09-06 — Phase 01 execution started
+Last activity: 2026-09-07 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 35min | 2 tasks | 5 files |
 | Phase 01-local-environment P04 | 20min | 3 tasks | 6 files |
 | Phase 01 P05 | 20min | 2 tasks | 10 files |
+| Phase 01 P06 | 55min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 01]: [Phase 01-04] Installed pg + @types/pg at the workspace root (Rule 3) -- scripts/db-query.ts and scripts/db-reset.ts resolve bare imports from their own directory upward, same pnpm-workspace resolution issue plan 01-02 hit with zod. — pg was only present in apps/recipe-app/node_modules; root-level CLI scripts under scripts/ could not resolve it.
 - [Phase 01]: [Phase 01-05] Dropped desktop app-shell 'Kitchen' nav bar; used uniform back/save icon nav row at all breakpoints since the appshell chrome pointed at unbuilt sections (D-07)
 - [Phase 01]: [Phase 01-05] Servings stepper always renders in the meta row regardless of active tab, rather than the phone frame's tab-gated placement (documented simplification for the human-check step)
+- [Phase 01]: 01-06: Chose the stronger D-16 fix (host+port+database-name as source constants) over a hostname-only allowlist, per 01-VERIFICATION.md's explicit instruction to pick whichever satisfies D-16's literal text. — A hostname-only allowlist still lets .env redirect to a different local database on the same host, which is literally 'another database' reached through an environment override.
 
 ### Pending Todos
 
@@ -104,6 +106,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T01:27:36.004Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-09-07T15:47:41.453Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
