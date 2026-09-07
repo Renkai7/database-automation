@@ -40,8 +40,11 @@ export default function RecipeScreen({ recipe, ingredients, steps }: RecipeScree
   const onSteps = !onIngredients;
 
   // Source: `mult = s.servings / 2` — the divisor is now the recipe's real base_servings
-  // column rather than the source's hardcoded literal.
-  const multiplier = servings / recipe.baseServings;
+  // column rather than the source's hardcoded literal. Guarded per WR-03 (01-REVIEW.md):
+  // the column carries no positivity constraint, this value scales every displayed
+  // ingredient quantity and the calorie label, and an unguarded division by a non-positive
+  // base-servings value would put Infinity or NaN into rendered output.
+  const multiplier = recipe.baseServings > 0 ? servings / recipe.baseServings : 1;
   const kcalLabel = `${round(recipe.baseKcal * multiplier)} kcal`;
   const servingsLabel = servings === 1 ? "Scaled for one" : `Scaled for ${servings}`;
 
