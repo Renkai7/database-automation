@@ -10,8 +10,8 @@
 - [x] **ENV-01**: Development PostgreSQL runs as a local Docker container pinned to PostgreSQL 17, including any extensions production will use
 - [x] **ENV-02**: A Drizzle schema edit can be turned into a generated migration, inspected, and applied locally in one documented loop
 - [x] **ENV-03**: Connection variables are named per environment, so no single generic variable can silently point at the wrong database
-- [ ] **ENV-04**: The development database can be destroyed and rebuilt from scratch with one command
-- [ ] **ENV-05**: Claude Code can query and inspect the development database directly, with no manual relaying of commands through a Coolify terminal
+- [x] **ENV-04**: The development database can be destroyed and rebuilt from scratch with one command
+- [x] **ENV-05**: Claude Code can query and inspect the development database directly, with no manual relaying of commands through a Coolify terminal
 
 ### Backup and Restore (BKP)
 

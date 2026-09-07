@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Local Environment
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-09-07T00:53:38.196Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-09-07T01:09:59.647Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 01 execution started
-state_head: ec66b38683d0581c8eadd8a72c98a6df3a8a638d
+state_head: 161abf42d0af4f5f4078eec97148e45aa344be08
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 01 (Local Environment) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 01 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-local-environment P01 | 25min | 3 tasks | 10 files |
 | Phase 01 P02 | 20min | 2 tasks | 18 files |
 | Phase 01 P03 | 35min | 2 tasks | 5 files |
+| Phase 01-local-environment P04 | 20min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 01]: [Phase 01-02] zod installed at the workspace root, not in apps/recipe-app, because scripts/env.ts resolves bare imports relative to its own root-level directory
 - [Phase 01]: [Phase 01-02] tests/smoke.test.ts kills its spawned server via taskkill /T /F on win32 to avoid orphaning the nested next-server process that plain execa .kill() left running
 - [Phase 01]: [Phase 01-03] seed.ts rewritten to insert through Drizzle's own table objects (drizzle(client,{schema}) over a one-shot pg.Client) instead of raw SQL, so a schema column rename breaks the seed at type-check time.
+- [Phase 01]: [Phase 01-04] Installed pg + @types/pg at the workspace root (Rule 3) -- scripts/db-query.ts and scripts/db-reset.ts resolve bare imports from their own directory upward, same pnpm-workspace resolution issue plan 01-02 hit with zod. — pg was only present in apps/recipe-app/node_modules; root-level CLI scripts under scripts/ could not resolve it.
 
 ### Pending Todos
 
@@ -99,6 +101,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T00:53:38.178Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-09-07T01:09:59.630Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
