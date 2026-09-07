@@ -82,7 +82,7 @@
 
 The recipe app is a thin test fixture. These requirements exist to exercise the pipeline, not to build a product.
 
-- [ ] **APP-01**: A minimal recipe schema exists and the application boots against it
+- [x] **APP-01**: A minimal recipe schema exists and the application boots against it
 - [ ] **APP-02**: The schema evolves through a sequence of real changes that exercise the SAFE, REVIEW REQUIRED, and BLOCKED paths
 - [ ] **APP-03**: At least one expand-and-contract change is carried out across multiple releases rather than as a single destructive migration
 
@@ -122,7 +122,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ENV-01 … ENV-05 | Phase 1 | Pending |
-| APP-01 | Phase 1 | Pending |
+| APP-01 | Phase 1 | Complete |
 | BKP-01 … BKP-08 | Phase 2 | Pending |
 | ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
