@@ -195,6 +195,52 @@ describe("structural guardrails", () => {
     ).toEqual(["127.0.0.1", "::1", "[::1]", "localhost"].sort());
   });
 
+  it("no Phase 2 command script reads process.argv, stdin, or an interactive prompt library (D-06)", () => {
+    // 02-03-PLAN.md Task 3: makes "no command in this phase can be pointed at another database"
+    // permanent rather than plan-time -- a command that accepts an argument is the command that
+    // later accepts a target. Needles are built at runtime, matching this file's own convention
+    // (CONNECTION_STRING_SCHEME_PREFIX above), so this assertion's own source never contains the
+    // literal expressions it searches for.
+    const phase2CommandScripts = [
+      "scripts/backup.ts",
+      "scripts/restore.ts",
+      "scripts/restore-cluster.ts",
+      "scripts/drill.ts",
+    ];
+    const argvNeedle = ["process", ".argv"].join("");
+    const stdinNeedle = ["process", ".stdin"].join("");
+    const promptLibraries = ["readline", "prompts", "inquirer"];
+
+    for (const file of phase2CommandScripts) {
+      // Comment-only lines removed before scanning, so a doc comment describing this very
+      // constraint (as this file's own comments do) cannot trip the check it is documenting.
+      const content = readFileSync(file, "utf-8")
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n");
+
+      expect(
+        content,
+        `D-06: "${file}" must not reference "${argvNeedle}" -- a command that accepts an ` +
+          "argument is the command that later accepts a target",
+      ).not.toContain(argvNeedle);
+
+      expect(
+        content,
+        `D-06: "${file}" must not reference "${stdinNeedle}" -- a command that accepts an ` +
+          "argument is the command that later accepts a target",
+      ).not.toContain(stdinNeedle);
+
+      for (const lib of promptLibraries) {
+        expect(
+          content,
+          `D-06: "${file}" must not reference "${lib}" -- a command that accepts an argument ` +
+            "is the command that later accepts a target",
+        ).not.toContain(lib);
+      }
+    }
+  });
+
   it("apps/recipe-app/drizzle.config.ts calls the shared target assertion (D-16, closes the PARTIAL key link)", () => {
     const content = readFileSync("apps/recipe-app/drizzle.config.ts", "utf-8");
     expect(
