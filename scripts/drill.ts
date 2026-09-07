@@ -10,7 +10,15 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testconta
 import { execa } from "execa";
 import { Client } from "pg";
 import { runBackup } from "./backup";
-import { assertArtifactIntegrity, assertRowCounts, assertSchemaEquality } from "./drill-assertions";
+import {
+  assertArtifactIntegrity,
+  assertContentHashes,
+  assertNoOrphanRows,
+  assertRowCounts,
+  assertSchemaEquality,
+  assertSequenceState,
+  assertSpotCheckedValues,
+} from "./drill-assertions";
 import { EXPECTED_DEV_DATABASE_NAME, getBackupDestination } from "./env";
 import { safeErrorMessage } from "./log";
 import { restoreIntoContainer } from "./restore";
@@ -176,6 +184,12 @@ export async function runDrill(): Promise<void> {
           const sourceSql = await dumpSourceSchema();
           const restoredSql = await dumpRestoredSchema(container!);
           assertSchemaEquality({ sourceSql, restoredSql });
+        });
+        await runTier(tierResults, "contentAndReferentialIntegrity", async () => {
+          await assertContentHashes(assertionClient, manifest);
+          await assertSpotCheckedValues(assertionClient, manifest);
+          await assertNoOrphanRows(assertionClient);
+          await assertSequenceState(assertionClient, manifest);
         });
       } finally {
         await assertionClient.end();

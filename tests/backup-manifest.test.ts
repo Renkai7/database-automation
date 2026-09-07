@@ -27,11 +27,14 @@ const SCRAM_VERIFIER_PREFIX = ["SCRAM", "-SHA-256"].join("");
 // (the fourth action item: "a future field cannot be added without this test noticing").
 const EXPECTED_MANIFEST_KEYS = [
   "appliedMigrationCount",
+  "contentHashes",
   "dataDump",
   "gitCommit",
   "globalsDump",
   "postgresVersion",
   "rowCounts",
+  "sequences",
+  "spotChecks",
   "takenAt",
 ].sort();
 
@@ -44,6 +47,22 @@ function buildRealisticManifest(): BackupManifest {
     dataDump: { file: "recipe_dev-20260907T193650Z.dump", sha256: "a".repeat(64) },
     globalsDump: { file: "recipe_dev-20260907T193650Z-globals.sql", sha256: "b".repeat(64) },
     rowCounts: { "public.recipes": 1, "public.ingredients": 8, "public.steps": 5 },
+    contentHashes: {
+      "public.recipes": "1".repeat(32),
+      "public.ingredients": "2".repeat(32),
+      "public.steps": "3".repeat(32),
+    },
+    spotChecks: {
+      recipes: [{ slug: "chicken-rice-bowl", baseServings: 2, baseKcal: 620 }],
+      ingredients: [{ name: "Chicken breast", quantity: "200.00", unit: "g", position: 0 }],
+      steps: [
+        { position: 0, timerLabel: "12 min" },
+        { position: 1, timerLabel: null },
+      ],
+    },
+    sequences: [
+      { schemaName: "drizzle", sequenceName: "__drizzle_migrations_id_seq", lastValue: 2 },
+    ],
   };
 }
 

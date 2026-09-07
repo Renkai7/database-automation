@@ -46,10 +46,57 @@ const DumpFileSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/, "must be a 64-character lowercase hex SHA-256 digest"),
 });
 
-// D-05's field list for this plan (tier 3/4 fields -- schema snapshot, sequence state -- are
-// out of scope here per 02-01-PLAN.md's success_criteria and land with the later plans that
-// build tiers 3-4). No field below can hold a connection string, a role password, or a
-// password hash.
+// Tier 4 (02-02-PLAN.md Task 2): one md5 hex digest per table, keyed the same qualified-name
+// way as rowCounts above. Fixed field order (schema field order = the SQL SELECT column order
+// scripts/backup.ts and scripts/drill-assertions.ts both use) matters for the array-typed spot
+// check schemas below -- see their read_first note before reordering any field.
+const ContentHashSchema = z
+  .string()
+  .regex(/^[0-9a-f]{32}$/, "must be a 32-character lowercase hex MD5 digest");
+
+const RecipeSpotCheckSchema = z.object({
+  slug: z.string().min(1),
+  baseServings: z.number().int(),
+  baseKcal: z.number().int(),
+});
+
+const IngredientSpotCheckSchema = z.object({
+  name: z.string().min(1),
+  // Postgres numeric(10,2) round-trips through `pg` as a string, never a JS number -- storing
+  // it as anything else would risk float precision loss on a value this manifest treats as an
+  // exact spot-checked quantity.
+  quantity: z.string().min(1),
+  unit: z.string(),
+  position: z.number().int(),
+});
+
+// timerLabel is nullable, not optional-with-default: this is the field that proves the
+// NULL-versus-empty-string distinction survived a restore (02-CONTEXT.md D-13's tier 4).
+// Coercing a recorded SQL NULL to "" here would silently defeat that regression's whole point.
+const StepSpotCheckSchema = z.object({
+  position: z.number().int(),
+  timerLabel: z.string().nullable(),
+});
+
+const SpotChecksSchema = z.object({
+  recipes: z.array(RecipeSpotCheckSchema),
+  ingredients: z.array(IngredientSpotCheckSchema),
+  steps: z.array(StepSpotCheckSchema),
+});
+
+// pg_sequences.last_value is bigint and can be SQL NULL for a sequence that has never been
+// advanced -- represented here as `number | null`, matching how scripts/backup.ts and
+// scripts/drill-assertions.ts both convert it (Number(...) when non-null, null when null).
+const SequenceStateSchema = z.object({
+  schemaName: z.string().min(1),
+  sequenceName: z.string().min(1),
+  lastValue: z.number().int().nullable(),
+});
+
+// D-05's field list. No field below can hold a connection string, a role password, or a
+// password hash -- contentHashes/spotChecks/sequences (tier 3/4 fields, added 02-02) are all
+// non-credential aggregates or named non-credential column projections, never a whole row and
+// never a dump file's raw contents.
 export const ManifestSchema = z.object({
   takenAt: z.string().min(1),
   postgresVersion: z.string().min(1),
@@ -58,6 +105,9 @@ export const ManifestSchema = z.object({
   dataDump: DumpFileSchema,
   globalsDump: DumpFileSchema,
   rowCounts: z.record(z.string(), z.number().int().nonnegative()),
+  contentHashes: z.record(z.string(), ContentHashSchema),
+  spotChecks: SpotChecksSchema,
+  sequences: z.array(SequenceStateSchema),
 });
 
 export type BackupManifest = z.infer<typeof ManifestSchema>;
