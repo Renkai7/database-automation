@@ -16,7 +16,8 @@
     "db:restore:cluster": "tsx scripts/restore-cluster.ts",
     "db:drill": "tsx scripts/drill.ts",
     "dev": "pnpm --filter recipe-app dev",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:drill": "vitest run --config vitest.drill.config.ts"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "12.1.0",
