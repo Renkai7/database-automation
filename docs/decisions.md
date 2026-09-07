@@ -106,7 +106,7 @@ performed by hand, timed, and documented.
 ---
 
 ## D8 — Migrations never run at application startup
-**Status:** PROPOSED · 2026-09-06
+**Status:** ACCEPTED · 2026-09-06 (moved from PROPOSED — see D14)
 
 Migration execution is a separate, gated pipeline step. The application container never
 migrates itself on boot.
@@ -115,6 +115,10 @@ migrates itself on boot.
 way to migrate is to restart the app, and the only way to restart is to redeploy — with
 no gate between "migration generated" and "migration runs against user data". Decoupled,
 deploys become boring because the schema is already correct when the new container starts.
+
+**Confirmed necessary, not just a reasonable default:** D14's Phase 1 investigation found
+this exact coupling — migrate-on-boot — live in an existing deployed application, which is
+what moved this entry from PROPOSED to ACCEPTED.
 
 ---
 
@@ -201,3 +205,35 @@ features those screens imply is not, unless the fixture scope is explicitly revi
 **Blocked on:** Claude Design authorization. The claude_design MCP server is registered at
 user scope but returns HTTP 403 until /design-login is run from an interactive session;
 the built-in DesignSync tool reports the same. Import is pending that step.
+
+---
+
+## D14 — Redeploy root-cause investigation: migrate-on-boot confirmed in an existing app
+**Status:** ACCEPTED · 2026-09-06
+
+Phase 1's D-25/D-26/D-27 timeboxed investigation (tier 1: existing-repo inspection) found
+that `AI-Diagramming-Tool` — a sibling repository deployed to Coolify at
+`app.frametrue.dev`, per its own `docker-compose.coolify.yml` — runs Drizzle migrations at
+application boot: `apps/api/src/index.ts` calls `initDb()` before accepting any traffic,
+and `initDb()` (`apps/api/src/db/client.ts`) runs `drizzle-orm/node-postgres/migrator`'s
+`migrate()` against `DATABASE_URL` on every container start. That repo's own
+`pg-pool-migrate-on-boot.test.ts` exists specifically to prove this behavior.
+
+**Why this is a decision, not just a finding:** it directly contradicts the owner-stated
+premise recorded in `docs/00-current-state.md` §2 ("migrations are already decoupled from
+application deploys"), and it names the exact mechanism — migrate-on-boot — that forces a
+container restart (a redeploy) every time a schema change ships. That is a precise
+structural match for pain point 2 in `docs/00-current-state.md` §7.
+
+**Consequence:** D8 ("migrations never run at application startup") moves from PROPOSED to
+ACCEPTED — confirmed necessary by direct evidence in the owner's own prior work, not merely
+a reasonable-sounding default.
+
+**Scope note, honestly recorded:** whether `AI-Diagramming-Tool` specifically is the app the
+owner recalls causing redeploys, or a different app built the same way, was not
+established — tier 1 stopped at this decisive hit per the D-25 timebox. Other candidate
+repos with their own Dockerfile (`Fitness Coach`, `saas-boilerplate`) were not individually
+inspected for the same pattern and remain UNKNOWN. Tiers 2-4 (Coolify deployment history,
+git history, owner recollection) were not attempted, since tier 1 already satisfied D-26's
+own stated stopping condition ("if a migration command is wired into a container start
+path, then D8 is already the fix and the investigation is complete").

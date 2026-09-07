@@ -94,6 +94,36 @@ the safety work is absent, which is exactly how such work gets deferred. See ris
 2. **Production redeploys were required too often.** Root cause still unidentified —
    migrations are reportedly already decoupled, so something else is driving them.
 
+   Investigation (2026-09-06): D-26 tier 1 reached and decisive. Enumerated the 18 git
+   repositories under `C:/Users/ms531/Documents/Software Projects/` (immediate siblings of
+   this repo, depth ≤3, `node_modules` excluded) and inspected each one's Dockerfile,
+   `docker-compose*.yml`, `Procfile`, and `package.json` start/entrypoint scripts for a wired
+   migration command (`drizzle-kit migrate`, `prisma migrate deploy`, `knex migrate`,
+   `sequelize db:migrate`, `alembic upgrade`, `rails db:migrate`, direct `psql -f`). Tier 2
+   (Coolify deployment history) was not attempted — not reachable from this machine, per D2.
+   Tier 3 (git history of the app found) was not attempted — tier 1 was already decisive, so
+   the timebox was spent confirming it instead. Tier 4 (owner recollection): none solicited
+   beyond the owner statement already recorded above, which this finding contradicts.
+
+   Root cause confirmed: `AI-Diagramming-Tool` — a sibling repository deployed to Coolify at
+   `app.frametrue.dev` / `frametrue.dev` per its own `docker-compose.coolify.yml` (env var
+   `DATABASE_URL` injected by Coolify at deploy time) — runs its Drizzle migrations at
+   application boot, not as a decoupled step. `apps/api/src/index.ts` calls `initDb()` before
+   accepting any traffic; for the hosted-Postgres path, `initDb()`
+   (`apps/api/src/db/client.ts`) imports `drizzle-orm/node-postgres/migrator` and runs
+   `migrate(db, { migrationsFolder })` against `DATABASE_URL` on every container start. That
+   repo's own test, `apps/api/src/test/pg-pool-migrate-on-boot.test.ts` (titled "initDb()
+   migrates before first request (HOST-02)"), exists specifically to prove this behavior.
+   This directly contradicts the owner-stated premise recorded above ("migrations are already
+   decoupled") and names the exact mechanism that would force a redeploy (container restart)
+   every time a schema change ships — a precise structural match for this pain point. Not
+   established: whether this specific app is the one the owner recalls causing redeploys, or
+   whether other apps built the same way also do this — tier 1 stopped at the first decisive
+   hit per the timebox, so the two other candidate repos with their own Dockerfile
+   (`Fitness Coach`, `saas-boilerplate`) were not individually inspected for the same pattern
+   and stay UNKNOWN. See `docs/decisions.md` D14 for the resulting decision-log entry and D8's
+   updated status.
+
 ## 8. Open risks
 
 | # | Risk | Status |
