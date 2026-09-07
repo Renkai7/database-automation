@@ -3,21 +3,45 @@
 // caution"). Every assertion is a pure file read against files enumerated via `git ls-files`
 // — this suite must run with no Docker daemon and no database reachable.
 //
-// Scoping note on assertions 4 and 7 (documented, not silently narrowed): both are stated in
-// the plan as scanning the whole "source surface" for a literal substring. Taken completely
-// literally they would flag this project's OWN pre-existing, legitimate test fixtures --
-// scripts/env.test.ts (and this plan's own db-query.test.ts) construct fake
-// "postgres://user:pass@host/db"-shaped strings and set process.env.RECIPE_DEV_DATABASE_URL
-// directly specifically to exercise scripts/env.ts's own rejection/assertion behavior. That is
-// the opposite of the anti-pattern these two checks exist to catch (a real credential or a
-// bypass of the shared module in PRODUCTION code). Both checks are therefore scoped to
-// non-test files (anything not matching *.test.ts) in the source surface -- see the two
-// `it()` blocks below for the exact reasoning inline.
+// Scoping note on assertions 4 and 7 (WR-01: narrowed, not silently dropped). Both scan the
+// whole "source surface" for a pattern that a handful of this project's OWN test fixtures
+// legitimately also contain -- a fixture connection-string literal, or a direct read of the
+// development connection variable as test setup for scripts/env.ts itself. Taken with no
+// exception those two checks would flag exactly the fixtures they were never meant to catch.
+// The fix is two narrow, explicitly enumerated allowlists (FIXTURE_FILES_WITH_CONNECTION_STRINGS
+// and FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE below) rather than the blanket "any file
+// matching *.test.ts" exemption this suite used to carry -- a newly added test file is now
+// covered by these two checks by default, not exempt by default. Adding an entry to either
+// list is a deliberate, reviewable decision, not routine maintenance.
 import { execa } from "execa";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const ALLOWED_ROOT_FILES = ["package.json", "docker-compose.yml", ".env.example"];
+
+// WR-01: the only files that genuinely need to be exempt from the connection-string-prefix
+// check (assertion 4 below) -- each constructs a fixture connection string, or asserts one is
+// absent from output, for a reason unrelated to the leaked-credential/bypass anti-pattern that
+// check exists to catch. Derived by reading each file, not assumed.
+const FIXTURE_FILES_WITH_CONNECTION_STRINGS = [
+  "scripts/env.test.ts",
+  "tests/db-query.test.ts",
+  "tests/db-reset.test.ts",
+];
+
+// WR-01: the only files that genuinely need to be exempt from the direct-env-read check
+// (assertion 7 below) -- scripts/env.test.ts sets the development connection variable directly
+// as test setup for scripts/env.ts's own behavior, which is testing the shared module, not
+// bypassing it. This is a separate, narrower list from the one above: the two checks exempt
+// different files for different reasons, and collapsing them into one shared list would
+// silently re-widen whichever check has the smaller genuine need.
+const FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE = ["scripts/env.test.ts"];
+
+// Built at runtime, not as a literal, so this check's own needle never appears in this file's
+// source as a literal substring -- matching the init-script and direct-sync tokens below. This
+// is what keeps this file passing against its own assertion once the blanket *.test.ts
+// exemption is gone (this file is deliberately not a member of either allowlist above).
+const CONNECTION_STRING_SCHEME_PREFIX = ["postgres", "://"].join("");
 
 async function sourceSurfaceFiles(): Promise<string[]> {
   const { stdout } = await execa("git", ["ls-files"]);
@@ -77,18 +101,20 @@ describe("structural guardrails", () => {
     }
   });
 
-  it("only .env.example carries a PostgreSQL connection-string scheme prefix among non-test source files (D-19)", async () => {
-    // Excludes *.test.ts: fixture files that deliberately construct fake connection-string
-    // literals to test scripts/env.ts's own bare-DATABASE_URL rejection are not the leaked-
-    // credential anti-pattern this check exists to catch.
-    const files = (await sourceSurfaceFiles()).filter((file) => !file.endsWith(".test.ts"));
+  it("only .env.example and the enumerated fixture files carry a PostgreSQL connection-string scheme prefix (D-19, WR-01)", async () => {
+    // WR-01: excludes only the explicitly enumerated fixture allowlist, not every *.test.ts
+    // file -- a new test file is covered by this check by default.
+    const files = (await sourceSurfaceFiles()).filter(
+      (file) => !FIXTURE_FILES_WITH_CONNECTION_STRINGS.includes(file),
+    );
     const offenders = files.filter((file) => {
       if (file === ".env.example") return false;
-      return readFileSync(file, "utf-8").includes("postgres://");
+      return readFileSync(file, "utf-8").includes(CONNECTION_STRING_SCHEME_PREFIX);
     });
     expect(
       offenders,
-      "D-19: no committed non-test source file other than .env.example may contain a postgres:// connection-string prefix",
+      `D-19/WR-01: no committed file other than .env.example or an enumerated fixture may ` +
+        `contain a ${CONNECTION_STRING_SCHEME_PREFIX} connection-string prefix`,
     ).toEqual([]);
 
     const envExample = readFileSync(".env.example", "utf-8");
@@ -117,21 +143,66 @@ describe("structural guardrails", () => {
     expect(content, "D-24: db-reset.ts must not read from stdin").not.toContain("process.stdin");
   });
 
-  it("no non-test file outside scripts/env.ts reads the dev connection variable directly (ENV-03)", async () => {
-    // Excludes *.test.ts for the same reason as the connection-string-prefix check above:
-    // scripts/env.test.ts legitimately sets process.env.RECIPE_DEV_DATABASE_URL directly as
-    // test setup for scripts/env.ts itself -- that is testing the shared module, not
-    // bypassing it. Matches the literal `process.env.RECIPE_DEV_DATABASE_URL` read pattern
-    // rather than a bare mention of the variable name, so a comment or .env.example's own
-    // documented variable name (its whole purpose) does not false-positive.
+  it("no file outside scripts/env.ts and the enumerated fixture reads the dev connection variable directly (ENV-03, WR-01)", async () => {
+    // WR-01: excludes only the explicitly enumerated fixture allowlist above, not every
+    // *.test.ts file -- a new test file is covered by this check by default. The needle is
+    // built at runtime (matching the direct read expression the shared env module's own
+    // consumers must never write) rather than as a literal, so this file's own source does not
+    // contain the exact expression it searches for.
     const target = ["process.env.", "RECIPE_DEV_DATABASE_URL"].join("");
     const files = (await sourceSurfaceFiles()).filter(
-      (file) => file !== "scripts/env.ts" && !file.endsWith(".test.ts"),
+      (file) =>
+        file !== "scripts/env.ts" &&
+        !FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE.includes(file),
     );
     const offenders = files.filter((file) => readFileSync(file, "utf-8").includes(target));
     expect(
       offenders,
-      "ENV-03: every file that opens a database connection must import scripts/env.ts's shared accessors rather than reading the connection variable directly",
+      "ENV-03/WR-01: every file that opens a database connection must import scripts/env.ts's shared accessors rather than reading the connection variable directly",
     ).toEqual([]);
+  });
+
+  it("scripts/env.ts still pins the development target in source, host/port/name (D-16)", () => {
+    const content = readFileSync("scripts/env.ts", "utf-8");
+    for (const symbol of [
+      "DEV_DATABASE_HOST_ALLOWLIST",
+      "EXPECTED_DEV_DATABASE_PORT",
+      "EXPECTED_DEV_DATABASE_NAME",
+      "assertLocalDevelopmentTarget",
+    ]) {
+      expect(
+        content,
+        `D-16 (01-VERIFICATION.md gap: failed truth #6): scripts/env.ts must still define or ` +
+          `reference "${symbol}" -- this is part of the source-level development target pin; ` +
+          "removing it silently reopens the gap a .env edit could redirect any tool in this " +
+          "workspace at another database.",
+      ).toContain(symbol);
+    }
+
+    // Non-greedy up to "] as const" rather than a bracket-depth-blind `[^\]]*` -- the allowlist
+    // itself contains a bracketed IPv6 literal ("[::1]"), whose own closing bracket would
+    // otherwise truncate the match before the array's real closing bracket.
+    const allowlistMatch = content.match(/DEV_DATABASE_HOST_ALLOWLIST\s*=\s*(\[[\s\S]*?\])\s*as const/);
+    expect(
+      allowlistMatch,
+      "D-16: could not locate the DEV_DATABASE_HOST_ALLOWLIST array literal in scripts/env.ts",
+    ).not.toBeNull();
+    const hosts = [...allowlistMatch![1].matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+    expect(
+      hosts,
+      "D-16: the pinned host allowlist must contain exactly the four loopback spellings " +
+        "(dotted-quad, named, and both IPv6 loopback spellings) and no other host",
+    ).toEqual(["127.0.0.1", "::1", "[::1]", "localhost"].sort());
+  });
+
+  it("apps/recipe-app/drizzle.config.ts calls the shared target assertion (D-16, closes the PARTIAL key link)", () => {
+    const content = readFileSync("apps/recipe-app/drizzle.config.ts", "utf-8");
+    expect(
+      content,
+      "D-16 (01-VERIFICATION.md key link, recorded PARTIAL): apps/recipe-app/drizzle.config.ts " +
+        "must call assertLocalDevelopmentTarget -- otherwise the migrate/generate path, the " +
+        "single most destructive command in the pipeline, inherits no guard from the shared " +
+        "env module at all.",
+    ).toContain("assertLocalDevelopmentTarget");
   });
 });
