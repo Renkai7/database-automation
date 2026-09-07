@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Backup & Restore Drill
 status: executing
-stopped_at: Completed 02-02-PLAN.md (Task 1-3, all live-verified)
-last_updated: "2026-09-07T21:29:05.503Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-09-07T21:48:17.961Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 02 execution started
-state_head: 85f1f844ec1ddd00ef5a51f2a107a66535ed2f74
+state_head: dcdf5baa5e7c5d78dfde5cbfca0aa17868531c60
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 11
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 02 (Backup & Restore Drill) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 02 execution started
 
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-local-environment P08 | 20min | 2 tasks | 2 files |
 | Phase 02 P01 | 55min | 2 tasks | 9 files |
 | Phase 02 P02 | 30min | 3 tasks | 6 files |
+| Phase 02 P03 | 20min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 02]: [Phase 02] 02-01: Only BKP-02 and BKP-03 marked complete in REQUIREMENTS.md -- BKP-04 and BKP-07 stay Pending because this plan's own success_criteria frames both as explicitly partial (tiers 1-2 of 4; drill mechanics without the committed pass/fail record).
 - [Phase 02]: [Phase 02] 02-02: contentHashes/spotChecks compared via explicit field-order arrays (not raw JSON.stringify of query-result objects) so the comparison never depends on pg driver vs zod parser key-ordering incidentals.
 - [Phase 02]: [Phase 02] 02-02: tests/backup-manifest.test.ts updated (Rule 1 deviation, not in this plan's own files_modified) -- its fixture and key-set regression guard needed the three new required manifest fields or pnpm test would break.
+- [Phase 02]: [Phase 02] 02-03: restoreIntoDevContainer/verifyRestoredRowCounts exported from scripts/restore.ts and reused by scripts/restore-cluster.ts rather than duplicated -- single place the copy-in/pg_restore/cleanup and row-count-verification logic lives.
+- [Phase 02]: [Phase 02] 02-03: db:restore:cluster's pre-flight role check treats the pinned role already existing (this repo's normal docker compose rebuild outcome) as an honest NOT EXERCISED verdict, not an error -- pnpm db:drill is the command that exercises the globals-restore path on every run.
+- [Phase 02]: [Phase 02] 02-03: BKP-05 left Pending in REQUIREMENTS.md -- this plan builds the tooling half (argument-free, target-pinned restore commands); the human-performed destruction test is explicitly plan 02-05's job per this plan's own success_criteria.
 
 ### Pending Todos
 
@@ -126,6 +130,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-07T21:29:05.470Z
-Stopped at: Completed 02-02-PLAN.md (Task 1-3, all live-verified)
+Last session: 2026-09-07T21:48:17.928Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
