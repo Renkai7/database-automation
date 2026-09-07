@@ -76,7 +76,7 @@ Plans:
 
 **Wave 3** *(blocked on gap-closure Wave 2)*
 
-- [ ] 01-08-PLAN.md — Guard the servings scaler against a non-positive divisor, and make the Phase 1 traceability rows tell the truth
+- [x] 01-08-PLAN.md — Guard the servings scaler against a non-positive divisor, and make the Phase 1 traceability rows tell the truth
 
 ### Phase 2: Backup & Restore Drill
 
