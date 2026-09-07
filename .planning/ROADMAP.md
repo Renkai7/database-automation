@@ -20,7 +20,7 @@ expand-and-contract migration — it is test material, not a deliverable in its 
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Local Environment** - A disposable local Postgres dev loop works end-to-end, and the database can be destroyed and rebuilt in one command
+- [x] **Phase 1: Local Environment** - A disposable local Postgres dev loop works end-to-end, and the database can be destroyed and rebuilt in one command (completed 2026-09-07)
 - [ ] **Phase 2: Backup & Restore Drill** - The owner has personally destroyed and restored real data, timed it, and an automated restore test proves it against a genuinely fresh instance
 - [ ] **Phase 3: Safety Analyzer** - Migration SQL is parsed and classified SAFE / REVIEW REQUIRED / BLOCKED, proven against adversarial fixtures
 - [ ] **Phase 4: Migration Runner & History Tests** - A runner re-derives classification at execution time, and the full migration history is proven consistent
@@ -170,7 +170,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Local Environment | 7/8 | In Progress|  |
+| 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 0/TBD | Not started | - |
 | 3. Safety Analyzer | 0/TBD | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
