@@ -1,0 +1,33 @@
+# Local development PostgreSQL, only. No application container runs here (D-04):
+# the recipe app runs on the host via `pnpm dev`.
+#
+# Extension baseline: this container installs NO extensions. The empty set is a
+# declared Phase 1 baseline (D-13), not a claim about production — production's
+# actual extension list is UNKNOWN (see docs/00-current-state.md section 4) and
+# stays UNKNOWN until it is confirmed directly. If an extension is ever needed,
+# it arrives as a Drizzle migration (`CREATE EXTENSION ...`), never through the
+# Postgres image's container-startup script-mount convention (D-14) — there is
+# deliberately no such mount below.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: recipe_app
+      POSTGRES_PASSWORD: ${RECIPE_DEV_DB_PASSWORD}
+      POSTGRES_DB: recipe_dev
+    ports:
+      # Loopback-only publication (D-18): the app needs the port from the host,
+      # but the local network must never be able to reach it. Do not switch this
+      # to an all-interfaces host component.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - recipe_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recipe_app -d recipe_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  recipe_dev_pgdata:
