@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 01 (Local Environment) — ALL PLANS EXECUTED, AWAITING RE-VERIFICATION
 Plan: 8 of 8
 Status: All 8 plans have a SUMMARY.md; the plan-counter field above previously drifted (plans 04-07 did not each advance it) and is corrected here to match disk state. Phase re-verification (/gsd-verify-work) has not yet run.
-Last activity: 2026-09-07 — Phase 01 execution started
+Last activity: 2026-09-07 — Completed quick task 260907-ir1: Fix UAT gap G-01-2 (tablet body-copy type ramp)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -100,6 +100,12 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - **Phase 6**: Coolify's actual volume/backup/networking behavior on this specific instance is community-sourced only (MEDIUM confidence) — must be verified hands-on before staging connectivity is trusted, not assumed from GitHub issues/vendor docs alone.
 - **Phase 7**: Whether this repository's GitHub plan tier permits disabling environment-protection bypass on a private repo is unconfirmed (documented as public-repo-only on Free/Pro/Team). Until verified, the production REVIEW REQUIRED gate is only conditionally non-bypassable.
 - **Phase 7 (honesty constraint, not a defect to fix)**: A solo founder can self-approve a GitHub environment review. The REVIEW REQUIRED gate buys deliberation with assembled context, not independent review — must never be described or implemented as equivalent to a second reviewer.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260907-ir1 | Fix UAT gap G-01-2: raise tablet body-copy type scale in recipe-app globals.css | 2026-09-07 | f598dea | [260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop](./quick/260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop/) |
 
 ## Deferred Items
 
