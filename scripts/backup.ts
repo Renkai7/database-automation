@@ -248,8 +248,14 @@ export async function runBackup(): Promise<BackupManifest> {
 
 async function main(): Promise<void> {
   const manifest = await runBackup();
+  // The manifest filename is derivable from the data dump's own filename (both are stamped from
+  // the same compactTimestamp call in runBackup) rather than adding a second return value to
+  // runBackup -- keeps runBackup's return type (BackupManifest) unchanged for scripts/drill.ts,
+  // which already destructures its result as a plain manifest.
+  const manifestFile = manifest.dataDump.file.replace(/\.dump$/, "-manifest.json");
   console.log(
-    `[db:backup] Wrote ${manifest.dataDump.file}, ${manifest.globalsDump.file}, and the manifest.`,
+    `[db:backup] Wrote ${manifest.dataDump.file}, ${manifest.globalsDump.file}, and manifest ` +
+      `${manifestFile}.`,
   );
   console.log("[db:backup] Complete.");
 }
