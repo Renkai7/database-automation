@@ -1,13 +1,20 @@
-// D-02: the code floor. A rules file cannot lower the BLOCKED verdict for the named
-// irreversible-data-loss operations -- DROP TABLE, DROP SCHEMA, DROP DATABASE, TRUNCATE,
-// DROP COLUMN, and DELETE/UPDATE without a row-scoping WHERE. A separate module rather than
-// inline in classify.ts, deliberately: this is the one piece of the classifier that is a
-// guard, not a transform -- the re-derive-never-trust pattern scripts/verify-migration-state.ts
-// already establishes in this repo, applied to a rules file instead of a live database. It
-// re-runs the loaded rules through the SAME classifyFacts function real classification uses
-// (passed in, never imported and re-implemented) and throws loudly if any floor operation
-// resolves to anything other than BLOCKED -- including "no rule matched", which D-06 would
-// otherwise resolve to REVIEW REQUIRED. Never a silent fallback to a hardcoded floor verdict.
+// D-02/D-17 (04-CONTEXT.md): the code floor. Its stated definition is "irreversible data loss
+// or self-disarming" -- a rules file can never lower the BLOCKED verdict for the named
+// irreversible-data-loss operations (DROP TABLE, DROP SCHEMA, DROP DATABASE, TRUNCATE,
+// DROP COLUMN, DELETE/UPDATE without a row-scoping WHERE) NOR for a statement that disarms its
+// own safety rail (any form that sets, resets or defaults `lock_timeout`/`statement_timeout`).
+// A migration turning off its own timeout is architecturally identical to a rules file
+// downgrading DROP TABLE: both are an attempt to remove the constraint rather than to satisfy
+// it, which is why D-17 widens this floor's definition rather than adding an unexplained
+// member -- a future candidate is judged against the principle, not against a list. A separate
+// module rather than inline in classify.ts, deliberately: this is the one piece of the
+// classifier that is a guard, not a transform -- the re-derive-never-trust pattern
+// scripts/verify-migration-state.ts already establishes in this repo, applied to a rules file
+// instead of a live database. It re-runs the loaded rules through the SAME classifyFacts
+// function real classification uses (passed in, never imported and re-implemented) and throws
+// loudly if any floor operation resolves to anything other than BLOCKED -- including "no rule
+// matched", which D-06 would otherwise resolve to REVIEW REQUIRED. Never a silent fallback to a
+// hardcoded floor verdict.
 //
 // This module also houses the equivalent self-check for D-06's default (further down:
 // D06_UNMATCHED_CANARY_FACTS / assertUnmatchedDefaultsToReview, added closing a gap
@@ -45,6 +52,24 @@ export const D07_FLOOR_FACTS: StatementFacts[] = [
   { ...EMPTY_FACTS, statementKind: "ExecuteDynamic", dynamicSqlUnresolved: true },
 ];
 
+/** D-17's floor operations (04-CONTEXT.md, Task 2's checkpoint decision: "cover-all-scopes"):
+ * a migration that sets, resets or defaults `lock_timeout`/`statement_timeout` at ANY scope --
+ * session (`SET`/`SET LOCAL`/`RESET`/`RESET ALL`, folded into the `SetGuc` entry below via the
+ * shared `disarmsTimeout` fact), cluster-wide (`ALTER SYSTEM SET`), database-wide
+ * (`ALTER DATABASE ... SET`) or role-wide (`ALTER ROLE ... SET`). The database- and role-scoped
+ * forms are floored, not left as a gap, precisely because they are the MORE dangerous ones: they
+ * persist beyond the migration's own session, so Phase 7's production runner inherits the
+ * protection rather than the gap. Kept as its own named export, never merged into
+ * D02_FLOOR_FACTS or D07_FLOOR_FACTS, for the same reason floor.ts already keeps those two
+ * distinct: each set answers to a different decision, which matters when Phase 7 audits why a
+ * verdict could not be overridden. */
+export const D17_FLOOR_FACTS: StatementFacts[] = [
+  { ...EMPTY_FACTS, statementKind: "SetGuc", disarmsTimeout: true },
+  { ...EMPTY_FACTS, statementKind: "AlterSystem", transactionHostile: true, disarmsTimeout: true },
+  { ...EMPTY_FACTS, statementKind: "AlterDatabaseSet", disarmsTimeout: true },
+  { ...EMPTY_FACTS, statementKind: "AlterRoleSet", disarmsTimeout: true },
+];
+
 /** The shape classify.ts's classifyFacts satisfies -- declared here so floor.ts has no import
  * dependency on classify.ts (classify.ts imports floor.ts, not the reverse). */
 export type ClassifyFactsFn = (
@@ -52,24 +77,37 @@ export type ClassifyFactsFn = (
   rules: RulesFile["rules"],
 ) => { verdict: string; ruleIds: string[]; rationales: string[] };
 
+/** The three floor decision groups `assertFloorNotWeakened` iterates, each labelled with the
+ * decision it answers to so a violation's error message names which one, not just which
+ * statementKind. */
+const FLOOR_GROUPS: Array<{ decision: string; facts: StatementFacts[] }> = [
+  { decision: "D-02", facts: D02_FLOOR_FACTS },
+  { decision: "D-07", facts: D07_FLOOR_FACTS },
+  { decision: "D-17", facts: D17_FLOOR_FACTS },
+];
+
 /**
- * Runs every D02_FLOOR_FACTS and D07_FLOOR_FACTS entry through `classifyFacts` (the exact
- * function real classification uses) against the loaded rules. Throws RulesFileError naming the
- * offending fact set and the verdict it produced if any result is not BLOCKED -- this covers the
- * "no rule matched" case too, since D-06 would otherwise resolve an unmatched floor operation to
- * REVIEW REQUIRED, which is exactly the silent weakening D-02/D-07 exist to prevent. Both floor
- * sets run through the identical check: an unresolvable dynamic EXECUTE is exactly as
- * non-weakenable as DROP TABLE, just for a different reason (D-07: nobody can read what it would
- * execute, rather than D-02: the operation is named and irreversible).
+ * Runs every D02_FLOOR_FACTS, D07_FLOOR_FACTS and D17_FLOOR_FACTS entry through `classifyFacts`
+ * (the exact function real classification uses) against the loaded rules. Throws RulesFileError
+ * naming the offending fact set, the decision it belongs to, and the verdict it produced if any
+ * result is not BLOCKED -- this covers the "no rule matched" case too, since D-06 would
+ * otherwise resolve an unmatched floor operation to REVIEW REQUIRED, which is exactly the
+ * silent weakening D-02/D-07/D-17 exist to prevent. All three floor sets run through the
+ * identical check: a migration disarming its own timeout is exactly as non-weakenable as
+ * DROP TABLE, just for a different reason (D-17: it is an attempt to remove the constraint
+ * itself, rather than D-02: the operation is named and irreversible).
  */
 export function assertFloorNotWeakened(rulesFile: RulesFile, classifyFacts: ClassifyFactsFn): void {
-  for (const facts of [...D02_FLOOR_FACTS, ...D07_FLOOR_FACTS]) {
-    const outcome = classifyFacts(facts, rulesFile.rules);
-    if (outcome.verdict !== "BLOCKED") {
-      throw new RulesFileError(
-        `Rules file validation failed: floor operation "${facts.statementKind}" resolved to ` +
-          `"${outcome.verdict}", not BLOCKED. The rules file cannot weaken the code floor (D-02/D-07).`,
-      );
+  for (const group of FLOOR_GROUPS) {
+    for (const facts of group.facts) {
+      const outcome = classifyFacts(facts, rulesFile.rules);
+      if (outcome.verdict !== "BLOCKED") {
+        throw new RulesFileError(
+          `Rules file validation failed: floor operation "${facts.statementKind}" (${group.decision}) ` +
+            `resolved to "${outcome.verdict}", not BLOCKED. The rules file cannot weaken the code floor ` +
+            `(${group.decision}).`,
+        );
+      }
     }
   }
 }
@@ -108,6 +146,18 @@ export function assertFloorNotWeakened(rulesFile: RulesFile, classifyFacts: Clas
 // `nesting-depth-exceeded` rule, BLOCKED, D-05's recursion-limit floor) -- including it here
 // would make this self-check reject the shipped rules file itself, a false positive.
 //
+// `disarmsTimeout: true` is EXCLUDED from this canary set for the identical reason
+// (04-02-PLAN.md task 3 deviation, see 04-02-SUMMARY.md): D-17's own `disarms-timeout-guc` rule
+// (rules.json) matches on `disarmsTimeout: true` alone, by design, precisely so it catches every
+// disarming statement kind and any future one that sets the fact -- so paired with statementKind
+// "Unrecognized" it is, like `nestingLimitExceeded`, a genuinely catalogued case (BLOCKED, the
+// D17_FLOOR_FACTS floor above), not an unmatched one. Including it here would make this
+// self-check reject the shipped rules file itself: `assertUnmatchedDefaultsToReview` requires
+// exactly REVIEW_REQUIRED, and a canary correctly caught by a real floor rule resolves BLOCKED
+// instead -- a stronger, not a weaker, verdict, so the rejection would be a false positive, not
+// a real gap. `transactionHostile: true` carries no equivalent broad rule (no rule in this
+// catalogue matches on it alone), so it stays a genuine canary below.
+//
 // The `AddUniqueConstraint` canary is a second, independently-documented unmatched case (see
 // classify.ts's `withPairingRuleApplied` comment: "an AddUniqueConstraint whose usingIndexName
 // is set, which no ordinary rule matches") -- included for defense in depth beyond the
@@ -123,6 +173,7 @@ export const D06_UNMATCHED_CANARY_FACTS: StatementFacts[] = [
   { ...EMPTY_FACTS, statementKind: "Unrecognized", hasWhereClause: true },
   { ...EMPTY_FACTS, statementKind: "Unrecognized", dynamicSqlUnresolved: true },
   { ...EMPTY_FACTS, statementKind: "Unrecognized", bodyInspected: true },
+  { ...EMPTY_FACTS, statementKind: "Unrecognized", transactionHostile: true },
   { ...EMPTY_FACTS, statementKind: "Unrecognized", sourceContext: "do-block" },
   { ...EMPTY_FACTS, statementKind: "Unrecognized", sourceContext: "function-body" },
   { ...EMPTY_FACTS, statementKind: "Unrecognized", defaultVolatility: "literal" },

@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "notes": "Deliberately excludes require-lock-timeout/require-statement-timeout equivalents (squawk's rules): those describe how the runner opens its session, not what the SQL says. RUN-02 makes the Phase 4 runner responsible for setting them on every migration; a rule flagging every migration for a property the runner already guarantees would be a false positive by construction (03-CONTEXT.md D-04).",
+  "version": 2,
+  "notes": "Deliberately excludes require-lock-timeout/require-statement-timeout equivalents (squawk's rules): those describe how the runner opens its session, not what the SQL says. RUN-02 makes the Phase 4 runner responsible for setting them on every migration; a rule flagging every migration for a property the runner already guarantees would be a false positive by construction (03-CONTEXT.md D-04). create-index-concurrently-standalone is not a separate rule id: the existing create-index-concurrently row (below) already grants SAFE to any CREATE INDEX CONCURRENTLY regardless of what else is in the file, so a second row matching the identical fact set would be a duplicate, not new coverage (04-02-PLAN.md task 3).",
   "rules": [
     {
       "id": "drop-table",
@@ -232,6 +232,41 @@
       "match": { "statementKind": "ExecuteDynamic", "dynamicSqlUnresolved": true },
       "verdict": "BLOCKED",
       "rationale": "An EXECUTE whose argument the analyzer cannot resolve to a static string could be anything, including a drop -- neither the analyzer nor a reviewer can read what it would actually run, which is the weakest possible form of the REVIEW REQUIRED gate (D-07). This is the analyzer refusing to guess, not a rule that can be reasoned into REVIEW_REQUIRED: the load-time floor self-check (D07_FLOOR_FACTS) refuses to start if a rules file ever assigns this anything weaker than BLOCKED."
+    },
+    {
+      "id": "disarms-timeout-guc",
+      "category": "analyzer-integrity",
+      "match": { "disarmsTimeout": true },
+      "verdict": "BLOCKED",
+      "rationale": "A migration that sets, resets or defaults lock_timeout or statement_timeout at any scope -- session, cluster-wide (ALTER SYSTEM), database-wide or role-wide -- is disarming the runner's own safety rail, architecturally identical to a rules file downgrading DROP TABLE (D-17); matching on the fact alone, never on statementKind, covers every disarming statement kind and any future one that sets this fact."
+    },
+    {
+      "id": "set-guc-non-timeout",
+      "category": "compatibility",
+      "match": { "statementKind": "SetGuc", "disarmsTimeout": false },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "An ordinary session-level SET/RESET that does not touch lock_timeout or statement_timeout is metadata-only with no lock hazard, but any application code or later statement in the same session relying on the previous setting could break, so a human should glance at what changed."
+    },
+    {
+      "id": "vacuum-in-migration",
+      "category": "lock-hazard",
+      "match": { "statementKind": "Vacuum" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "VACUUM cannot run inside a transaction block and can hold locks or scan large tables for a long time depending on options and table size, so a human should confirm it belongs in a gated migration rather than routine maintenance."
+    },
+    {
+      "id": "create-database-in-migration",
+      "category": "compatibility",
+      "match": { "statementKind": "CreateDatabase" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "CREATE DATABASE cannot run inside a transaction block and creates a whole new database outside the schema this migration pipeline otherwise governs, so a human should confirm it belongs in a gated migration rather than manual provisioning."
+    },
+    {
+      "id": "reindex-in-migration",
+      "category": "lock-hazard",
+      "match": { "statementKind": "Reindex" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "A non-concurrent REINDEX takes ACCESS EXCLUSIVE on the indexed table for the whole rebuild, blocking reads and writes until it finishes, so a human should confirm the lock is acceptable."
     },
     {
       "id": "empty-input",

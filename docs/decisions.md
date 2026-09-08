@@ -429,3 +429,83 @@ stop tracking it as an open question.
 decisions (D-01 through D-16 there) are phase-scoped planning artifacts. This entry is the
 durable summary a later phase — most concretely, Phase 4's runner and Phase 7's extraction — can
 read without reopening Phase 3's full planning history.
+
+---
+
+## D17 — The code floor widens to "irreversible data loss or self-disarming"
+**Status:** ACCEPTED · 2026-09-08
+
+`packages/automation`'s code floor (D16 above; `04-CONTEXT.md` D-17) now fixes BLOCKED for a
+second class of statement alongside the original irreversible-data-loss set: a migration that
+sets, resets or defaults `lock_timeout` or `statement_timeout`, at **every** scope —
+session (`SET`/`SET LOCAL`/`RESET`/`RESET ALL`), cluster-wide (`ALTER SYSTEM SET`),
+database-wide (`ALTER DATABASE ... SET`) or role-wide (`ALTER ROLE ... SET`). No rules file may
+assign anything weaker than BLOCKED to a disarming statement; the analyzer refuses to run rather
+than classify with a weakened floor (`assertFloorNotWeakened`, `D17_FLOOR_FACTS`).
+
+**Why every scope, not just the session-scoped forms (Phase 4 plan 02's own checkpoint
+decision):** the database- and role-scoped forms were the ones `04-CONTEXT.md` explicitly left to
+discretion. They are covered, not recorded as a gap, precisely because they are the *more*
+dangerous forms of the same act — they persist beyond the migration's own session, onto every
+later connection, so leaving them uncovered would hand Phase 7's production runner a gap rather
+than a protection. All four disarming node shapes route through one shared fact
+(`StatementFacts.disarmsTimeout`) and one shared inspector helper, so there is no per-scope
+allowlist to drift.
+
+**Why this is architecturally the same act as downgrading DROP TABLE:** a migration disarming its
+own safety rail is an attempt to remove the constraint rather than to satisfy it — the identical
+shape the original D02/`03-CONTEXT.md` D-02 floor exists to make un-editable. The floor's stated
+definition is deliberately a principle ("irreversible data loss or self-disarming"), not a list
+that grew an unexplained member, so a future candidate is judged against the reasoning rather than
+against an enumeration.
+
+**Consequence, recorded rather than left implicit:** `D06_UNMATCHED_CANARY_FACTS` (the D-06
+"SAFE must be earned" self-check) gained a `transactionHostile: true` canary, but deliberately did
+**not** gain a `disarmsTimeout: true` canary — that combination is now a genuinely catalogued case
+(BLOCKED, via `disarms-timeout-guc`), so including it would make the self-check reject the shipped
+rules file itself, exactly like the pre-existing `nestingLimitExceeded` exclusion. See
+`packages/automation/src/classifier/floor.ts`'s own comment for the full reasoning.
+
+---
+
+## D18 — `idle_in_transaction_session_timeout` is deliberately not set or floored this phase
+**Status:** ACCEPTED, revisit at Phase 7 · 2026-09-08
+
+Unlike `lock_timeout`/`statement_timeout` (D19 below), the Phase 4 runner does not set
+`idle_in_transaction_session_timeout` at connect time, and D17's widened floor does not treat
+disarming it as a floor violation.
+
+**Why:** the runner's own transaction discipline (`04-CONTEXT.md` D-09/D-11) means nothing in it
+ever leaves a transaction open and idle — every wrapped migration runs `BEGIN` immediately
+followed by its statements and `COMMIT`, with no interactive or user-driven pause in between. A
+third pinned timeout would therefore be a value with nothing behind it, the same reasoning D16 (via
+`04-CONTEXT.md` D-16) already used to decline a concurrent-index timeout exemption: a number
+invented without evidence is worse than no number, because it invites a false sense of coverage.
+
+**Revisit condition:** if a later phase (most plausibly Phase 6 or 7, once staging/production
+introduce operator-driven or long-lived sessions) introduces any code path that can hold a
+transaction open across an interactive or network-bound pause, this decision must be reopened —
+that is precisely the scenario `idle_in_transaction_session_timeout` exists to bound.
+
+---
+
+## D19 — The Phase 4 runner's pinned session timeouts
+**Status:** ACCEPTED · 2026-09-08
+
+`lock_timeout = 3000ms` and `statement_timeout = 30000ms` are pinned source constants
+(`04-CONTEXT.md` D-13), applied as libpq connect-time startup options (`options=-c
+lock_timeout=3000 -c statement_timeout=30000`, D-14) and independently re-verified against
+`pg_settings` before any migration statement executes (D-15) — never trusted from a `SET` issued
+after connect, and never merely assumed to have taken effect.
+
+**One pair applies to everything, including concurrent index builds** (D-16, no exemption): a
+`CREATE INDEX CONCURRENTLY` build that outruns `statement_timeout` fails loudly and the operator
+makes a deliberate decision, rather than the runner quietly granting one class of statement
+unbounded runtime. A longer, separate timeout for concurrent builds was considered and declined
+for lack of evidence — revisit at Phase 7 once real data volumes make the number empirical rather
+than invented.
+
+**Implementation note:** these constants and their connect-time application are the Phase 4
+runner's own concern (`packages/automation/src/runner/`, `scripts/db-migrate.ts`) — this entry
+records the decision made in phase planning so it is discoverable without reopening
+`04-CONTEXT.md`, mirroring D16's own "durable summary" role for the safety analyzer's contract.

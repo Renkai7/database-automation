@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { loadDefaultRules } from "../src/adapter/default-rules";
 import { analyzeSql } from "../src/analyze";
 import { classifyFacts, loadRules } from "../src/classifier/classify";
-import { D02_FLOOR_FACTS, D07_FLOOR_FACTS } from "../src/classifier/floor";
+import { D02_FLOOR_FACTS, D06_UNMATCHED_CANARY_FACTS, D07_FLOOR_FACTS } from "../src/classifier/floor";
 import { parseRulesFile, type Rule } from "../src/classifier/rules-schema";
 import { EMPTY_FACTS, RulesFileError } from "../src/types";
 
@@ -38,6 +38,8 @@ const VALID_FACT_NAMES = new Set([
   "nestingDepth",
   "nestingLimitExceeded",
   "bodyInspected",
+  "transactionHostile",
+  "disarmsTimeout",
 ]);
 
 // Boolean-typed StatementFacts fields -- a rule matching one of these with a string (or vice
@@ -50,6 +52,8 @@ const BOOLEAN_FACTS = new Set([
   "dynamicSqlUnresolved",
   "nestingLimitExceeded",
   "bodyInspected",
+  "transactionHostile",
+  "disarmsTimeout",
 ]);
 
 // String-or-null-typed StatementFacts fields (nullable identifiers).
@@ -395,5 +399,107 @@ describe("D-06 gap closure (03-VERIFICATION.md): enumerating every legal stateme
       const outcome = classifyFacts(facts, rules.rules);
       expect(outcome.verdict, `expected floor fact set "${facts.statementKind}" to stay BLOCKED`).toBe("BLOCKED");
     }
+  });
+});
+
+// 04-02-PLAN.md task 3: the five new rule ids D-17 and the seven new statement kinds require --
+// catalogue-completeness assertions in the same style TASK_2_RULE_IDS above already establishes.
+const TASK_04_02_RULE_IDS = [
+  "disarms-timeout-guc",
+  "set-guc-non-timeout",
+  "vacuum-in-migration",
+  "create-database-in-migration",
+  "reindex-in-migration",
+];
+
+describe("04-02-PLAN.md task 3: the widened floor's new rule ids (D-17)", () => {
+  it("every new rule id this task names is present, in the right category", () => {
+    const rulesFile = parseRulesFile(loadRawRulesFile());
+    const byId = new Map(rulesFile.rules.map((rule): [string, Rule] => [rule.id, rule]));
+    for (const id of TASK_04_02_RULE_IDS) {
+      expect(byId.has(id), `expected rules.json to contain rule id "${id}"`).toBe(true);
+    }
+    expect(byId.get("disarms-timeout-guc")?.category).toBe("analyzer-integrity");
+    expect(byId.get("disarms-timeout-guc")?.verdict).toBe("BLOCKED");
+    expect(byId.get("set-guc-non-timeout")?.category).toBe("compatibility");
+    expect(byId.get("vacuum-in-migration")?.category).toBe("lock-hazard");
+    expect(byId.get("create-database-in-migration")?.category).toBe("compatibility");
+    expect(byId.get("reindex-in-migration")?.category).toBe("lock-hazard");
+  });
+
+  it("disarms-timeout-guc's match object is exactly { disarmsTimeout: true } -- matching on the fact alone, never on statementKind, deliberately", () => {
+    const rulesFile = parseRulesFile(loadRawRulesFile());
+    const rule = rulesFile.rules.find((r) => r.id === "disarms-timeout-guc");
+    expect(rule?.match).toEqual({ disarmsTimeout: true });
+  });
+
+  it("mutating disarms-timeout-guc's verdict to REVIEW_REQUIRED in an in-memory copy makes loadRules throw RulesFileError", () => {
+    const raw = loadRawRulesFile() as { version: number; rules: Rule[]; notes?: string };
+    const weakened = {
+      ...raw,
+      rules: raw.rules.map((rule) =>
+        rule.id === "disarms-timeout-guc" ? { ...rule, verdict: "REVIEW_REQUIRED" as const } : rule,
+      ),
+    };
+    expect(() => loadRules(weakened)).toThrow(RulesFileError);
+  });
+
+  it("no rule.json fixture file (real-migration corpus verdicts) changes as a side effect of the new rules -- version bumped to record the catalogue change", () => {
+    const rulesFile = parseRulesFile(loadRawRulesFile());
+    expect(rulesFile.version).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// 04-02-PLAN.md task 3 behavior: "a test walks Object.keys(EMPTY_FACTS) and asserts every field
+// of small domain (boolean or enum) is varied away from its neutral default by at least one
+// entry in D06_UNMATCHED_CANARY_FACTS, so a future added field cannot be forgotten silently."
+describe("D06_UNMATCHED_CANARY_FACTS covers every small-domain StatementFacts field (Pitfall 5)", () => {
+  // Identifier-shaped nullable string fields are not "small domain" (schema/table/column/
+  // constraintName/indexName/usingIndexName have unbounded value spaces, and statementKind
+  // itself IS the canary's own base case -- "Unrecognized" -- not a field varied away from a
+  // neutral default). nestingDepth is a number, not boolean/enum. nestingLimitExceeded and
+  // disarmsTimeout are deliberately excluded per floor.ts's own comment: paired with
+  // statementKind "Unrecognized" both are genuinely catalogued (BLOCKED) cases, so including
+  // them here would make assertUnmatchedDefaultsToReview reject the shipped rules file itself --
+  // a false positive, not a real gap (04-02-PLAN.md task 3 deviation, 04-02-SUMMARY.md).
+  const EXCLUDED_SMALL_DOMAIN_FIELDS = new Set([
+    "statementKind",
+    "schema",
+    "table",
+    "column",
+    "constraintName",
+    "indexName",
+    "usingIndexName",
+    "nestingDepth",
+    "nestingLimitExceeded",
+    "disarmsTimeout",
+  ]);
+
+  it("every EMPTY_FACTS field not in the documented exclusion set is varied away from its neutral default by at least one D06_UNMATCHED_CANARY_FACTS entry", () => {
+    const emptyFacts = EMPTY_FACTS as unknown as Record<string, unknown>;
+    const requiredFields = Object.keys(emptyFacts).filter((field) => !EXCLUDED_SMALL_DOMAIN_FIELDS.has(field));
+
+    const uncovered = requiredFields.filter(
+      (field) =>
+        !D06_UNMATCHED_CANARY_FACTS.some((canary) => {
+          const canaryRecord = canary as unknown as Record<string, unknown>;
+          return canaryRecord[field] !== emptyFacts[field];
+        }),
+    );
+
+    expect(uncovered, `EMPTY_FACTS fields with no canary varying them away from default: ${uncovered.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
+  it("transactionHostile:true is a canary entry, and disarmsTimeout:true deliberately is not", () => {
+    const hasTransactionHostileCanary = D06_UNMATCHED_CANARY_FACTS.some(
+      (canary) => canary.statementKind === "Unrecognized" && canary.transactionHostile === true,
+    );
+    const hasDisarmsTimeoutCanary = D06_UNMATCHED_CANARY_FACTS.some(
+      (canary) => canary.statementKind === "Unrecognized" && canary.disarmsTimeout === true,
+    );
+    expect(hasTransactionHostileCanary).toBe(true);
+    expect(hasDisarmsTimeoutCanary).toBe(false);
   });
 });
