@@ -4,20 +4,28 @@
 // `{ reject: false }` and assert on exitCode and output, never import cli.ts's own main()
 // directly (it calls process.exit()).
 //
-// The RULES_INVALID (40) case has no CLI-level override for which rules file loads (D-02's own
-// must_haves prohibition: no parameter may route around the bundled, floor-checked rules file) --
-// so proving it end-to-end through the real spawned binary means temporarily swapping the
-// bundled rules.json's own content, exactly like tracer.test.ts's loadRules unit test weakens it
-// in memory, but here written to disk and restored in a `finally` block so a failed assertion
-// can never leave the real rules file corrupted.
-import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// WR-04 fix (03-REVIEW.md): the RULES_INVALID (40) case has no CLI-level override for which
+// rules file loads (D-02's own must_haves prohibition: no parameter may route around the
+// bundled, floor-checked rules file), so this suite does NOT prove that exit code end to end
+// through the real spawned binary -- doing so would require temporarily overwriting the real,
+// shipped `src/rules/rules.json` in place. Even restored in a `finally` block, a crashed test
+// process between the write and the restore (a timeout, an OOM, a CI runner interrupt) would
+// leave the repository's real, tracked policy file corrupted with `drop-table` set to SAFE --
+// a repo-hygiene and CI-flakiness hazard this project treats as unacceptable for a
+// safety-critical file, regardless of how the D-02 floor self-check would eventually surface
+// the corruption. The RulesFileError-throwing behaviour itself (a rules file that weakens the
+// D-02 drop-table floor is rejected, with a message naming "floor") is already covered at the
+// unit level by tracer.test.ts's "refuses to load a rules file whose drop-table rule is
+// weakened to SAFE" test, which exercises loadRules directly with an in-memory weakened copy --
+// never touching the file on disk. cli.ts's own catch-and-map-to-EXIT_CODES.RULES_INVALID logic
+// is a single, simple `instanceof RulesFileError` branch (see cli.ts's own header comment); this
+// suite covers every OTHER exit code end to end without needing to mutate a safety-critical
+// file to do it.
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
-
-const RULES_PATH = fileURLToPath(new URL("../src/rules/rules.json", import.meta.url));
 
 const SAFE_SQL = "CREATE TABLE cli_test_safe (id int);\n";
 const REVIEW_REQUIRED_SQL = "ALTER TABLE cli_test_review RENAME COLUMN old_name TO new_name;\n";
@@ -107,27 +115,9 @@ describe("CLI outcome exit codes (D-10, D-12)", () => {
     expect(result.stdout).not.toContain("BLOCKED");
   });
 
-  it("a rules file that weakens the D-02 drop-table floor exits 40 and prints the validation complaint", async () => {
-    const dir = makeTempDir();
-    const path = writeFixture(dir, "blocked.sql", BLOCKED_SQL);
-
-    const originalRules = readFileSync(RULES_PATH, "utf-8");
-    try {
-      const parsed = JSON.parse(originalRules) as { rules: Array<{ id: string; verdict: string }> };
-      const weakened = {
-        ...parsed,
-        rules: parsed.rules.map((rule) => (rule.id === "drop-table" ? { ...rule, verdict: "SAFE" } : rule)),
-      };
-      writeFileSync(RULES_PATH, JSON.stringify(weakened, null, 2), "utf-8");
-
-      const result = await execa("pnpm", ["run", "db:analyze", path], { reject: false });
-
-      expect(result.exitCode).toBe(40);
-      expect(`${result.stdout}\n${result.stderr}`.toLowerCase()).toContain("floor");
-    } finally {
-      writeFileSync(RULES_PATH, originalRules, "utf-8");
-    }
-  });
+  // WR-04: no test in this file mutates the real, shipped src/rules/rules.json (see the module
+  // header comment). RULES_INVALID (40)'s trigger condition -- a rules file that weakens the
+  // D-02 drop-table floor -- is covered at the unit level by tracer.test.ts instead.
 
   it(
     "three input files whose verdicts are SAFE, BLOCKED and REVIEW_REQUIRED exit 20 and print a section for all three",
