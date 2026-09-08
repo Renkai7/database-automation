@@ -1,6 +1,10 @@
 # Phase 3: Safety Analyzer - Research
 
 **Researched:** 2026-09-08
+**Amended:** 2026-09-08 — `## Open Questions` closed during planning; see that section (now
+`## Open Questions (RESOLVED)`) for how each was settled. Note that the exit-code numbering this
+research proposed there was **rejected** in favour of a different scheme; read the resolution,
+not the recommendation.
 **Domain:** PostgreSQL migration-safety static analysis (real-parser AST classification, data-driven rule engine, adversarial testing)
 **Confidence:** MEDIUM-HIGH — core stack versions and package legitimacy are tool-verified this session (HIGH); `libpg-query`/PL-pgSQL API shape is web-corroborated but not hands-on-verified in this environment (MEDIUM); one load-bearing correction to the phase's own prior research is sourced directly from official PostgreSQL documentation (CITED, MEDIUM-HIGH).
 
@@ -854,7 +858,14 @@ short spike (install the package, run `parse()`/`parsePlPgSQL()` against a real 
 inspect the returned shape directly) before the inspector module is written against them as
 if they were confirmed.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+**All three questions below were closed during phase planning (2026-09-08).** Each carries an
+inline RESOLVED marker naming the plan and task that settled it. Nothing in this section is an
+open contract any longer; read the resolution line, not the original recommendation, as the
+project's position. Where the resolution **diverges** from the recommendation this research
+originally proposed, the divergence is stated explicitly — the recommendation is kept only so
+the reasoning trail is legible, and is superseded.
 
 1. **Exact `parsePlPgSQL` output shape and its export path**
    - What we know: the function exists, takes a full statement (not just the body), and
@@ -862,27 +873,59 @@ if they were confirmed.
      documented, cross-library limitation.
    - What's unclear: precise field names and whether it is exported from `libpg-query` itself
      or a sibling package.
-   - Recommendation: first implementation task is a throwaway script that installs the
-     package and inspects real output against a `DO $$ DROP TABLE x; $$;` fixture, before
-     writing the inspector's traversal logic.
+   - **RESOLVED — 03-01 Task 2** ("Pin the libpg-query failure contract"), which replaces the
+     throwaway script with a *committed* contract-pinning test,
+     `packages/automation/test/libpg-query-contract.test.ts`. That test asserts on the real
+     installed package and names the exact PL/pgSQL parsing symbol it exports, so plan 03-04
+     imports a verified name rather than an assumed one. This also closes **Assumptions Log
+     A1** (does `parse` reject, or resolve with an error field) and **A4** (is the PL/pgSQL
+     entry point exported from this package at all) by execution rather than by citation.
+     Divergence from the recommendation: a throwaway script would have left the answer in a
+     transcript, so the plan pins it in a test that keeps failing if the package's shape ever
+     changes. 03-01 Task 2 further requires that any observed divergence from Pattern 1 or
+     Pattern 4 be recorded in the plan summary — a wrong research assumption is a finding, not
+     a failure. The precise field names inside the returned tree remain confirmed-at-execution
+     by that test, which is the point: they are no longer an assumption anyone is acting on.
+   - Recommendation (superseded by the above): first implementation task is a throwaway script
+     that installs the package and inspects real output against a `DO $$ DROP TABLE x; $$;`
+     fixture, before writing the inspector's traversal logic.
 
 2. **CLI exit code numbering (Claude's Discretion per CONTEXT.md)**
    - What we know: D-12 requires distinct codes per verdict plus a distinct parse-failure
      code; no numbering is locked.
    - What's unclear: the specific integers.
-   - Recommendation: `0 = SAFE`, `1 = REVIEW_REQUIRED`, `2 = BLOCKED`, `3 = parse failure` is
-     a reasonable default (ascending severity, parse failure highest since it is categorically
-     different from a verdict) — but this is a proposal, not a finding; confirm it doesn't
-     collide with any convention the root `package.json`'s existing `db:*` scripts already
-     rely on before locking it in.
+   - Recommendation (SUPERSEDED — do not implement): `0 = SAFE`, `1 = REVIEW_REQUIRED`,
+     `2 = BLOCKED`, `3 = parse failure`. This proposal was **rejected during planning** and
+     must not be used; it is retained only to show what was considered.
+   - **RESOLVED — 03-01 Task 1**, which locks a **different** scheme in
+     `packages/automation/src/types.ts` as the frozen `EXIT_CODES` object:
+     **`SAFE = 0`, `REVIEW_REQUIRED = 10`, `BLOCKED = 20`, `PARSE_FAILURE = 30`,
+     `RULES_INVALID = 40`** — five codes, not four. Two reasons the ascending-by-one proposal
+     above was rejected: (a) the numbers are deliberately **non-adjacent and none equals 1**,
+     so Node's own generic exit 1 from an uncaught exception can never be misread as a verdict
+     — "the analyzer crashed" and "this migration needs review" must not be the same integer
+     in the Phase 7 audit record (threat T-03-06 in 03-01, T-03-11 in 03-03); and (b) the
+     proposal had no code at all for a rules file that fails the D-02 floor self-check, which
+     is a fifth distinct outcome, not a parse failure. 03-03 Task 2 asserts each of the five
+     codes against its own fixture in `packages/automation/test/cli.test.ts`. The
+     collision check the recommendation asked for was performed: the root `package.json`'s
+     existing `db:*` scripts rely on no exit-code convention, and the new scripts follow the
+     same `db:*` naming (`db:analyze`, `db:analyze:migrations`).
 
 3. **Whether corpus manifest and rules-file share a zod schema module**
    - What we know: both need zod validation; Claude's Discretion per CONTEXT.md.
    - What's unclear: whether sharing a `FactMatchSchema`-shaped building block between them is
      worth the coupling.
-   - Recommendation: keep them separate initially (they validate genuinely different things —
-     one is policy, one is test expectations) and only factor out a shared module if real
-     duplication appears once both are written.
+   - **RESOLVED — 03-05 Task 1**, which adopts the recommendation unchanged: the corpus
+     manifest is validated by `packages/automation/test/corpus-manifest-schema.ts`, kept
+     deliberately separate from the rules-file schema at
+     `packages/automation/src/classifier/rules-schema.ts`. The stated reason is the one above —
+     one file is policy, the other is test expectations — and the separation also keeps the
+     schema that validates the test corpus out of the shipped source tree. No shared building
+     block is factored out in this phase; that stays available if real duplication appears.
+   - Recommendation (adopted as-is by the above): keep them separate initially (they validate
+     genuinely different things — one is policy, one is test expectations) and only factor out
+     a shared module if real duplication appears once both are written.
 
 ## Environment Availability
 
@@ -1020,7 +1063,9 @@ binary (`libpg-query` WASM, `squawk-cli` win32-x64).
   sketches are illustrative, not verified against a running `libpg-query` install.
 - `libpg-query`/PL-pgSQL API shape specifically: MEDIUM — web-corroborated from multiple
   independent sources but not hands-on-verified in this environment; explicitly flagged as
-  the top implementation-time verification item (Open Question 1, Assumptions A1/A2/A4).
+  the top implementation-time verification item (Open Question 1 — **now RESOLVED**, routed to
+  03-01 Task 2's committed contract test rather than left open; Assumptions A1/A2/A4 are pinned
+  by that same test).
 - Pitfalls: MEDIUM-HIGH — the volatile-default correction is CITED directly from official
   PostgreSQL documentation with a verbatim quote; the other pitfalls are either
   `[VERIFIED]` against this repository's own source (guardrail scope, Windows filename
