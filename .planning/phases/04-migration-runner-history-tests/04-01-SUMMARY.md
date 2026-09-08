@@ -204,6 +204,13 @@ None - no external service configuration required.
 - RUN-01/RUN-02/RUN-03 have a working, tested implementation behind `pnpm db:migrate`; REQUIREMENTS.md's own checkboxes for those IDs stay unticked for now because sibling plans later in this phase also declare them (the shared-ID gate correctly reported `0/3 ready` this run) -- they will tick once every declaring plan in Phase 4 has its own SUMMARY.
 - No blockers for the next plan in this phase.
 
+## Self-Check: PASSED
+
+- All 13 files listed in `key-files.created` verified present on disk via `[ -f ]`.
+- Commits `e0de3b6` (Task 1), `fbb4830` (Task 3), `0d19b19` (this SUMMARY) all found via `git log --oneline --all`.
+- `pnpm test` (38 files, 338 tests) green; `pnpm exec tsc --noEmit -p packages/automation/tsconfig.json` clean.
+- Plan-level `<verification>` block re-confirmed: `pnpm db:migrate` against an already-migrated dev database exits 0 and applies nothing; `pnpm db:reset`'s independent `assertMigrationHistoryApplied` post-check passes; zero occurrences of `drizzle-kit migrate` remain in the tracked source surface; zero `pg` imports under `packages/automation/src/`.
+
 ---
 *Phase: 04-migration-runner-history-tests*
 *Completed: 2026-09-08*
