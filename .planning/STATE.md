@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-09-08T20:50:05.349Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-09-08T21:18:13.843Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 04 execution started
-state_head: fff2c1173d6715c457cc6b2b4f3f558cefd81695
+state_head: e45b5498268b532096e855d4b4d50447735c3ff8
 progress:
   total_phases: 7
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 04 (Migration Runner & History Tests) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 04 execution started
 
@@ -81,6 +81,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-safety-analyzer P06 | ~35min | 3 tasks | 16 files |
 | Phase 03-safety-analyzer P07 | 50min | 3 tasks | 9 files |
 | Phase 04 P01 | 31min | 3 tasks | 22 files |
+| Phase 04-migration-runner-history-tests P02 | 20min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 03]: [Review-fix pass, post-03-07, no PLAN.md] 03-REVIEW.md's two Criticals were both real false-SAFE paths, reproduced live against the real analyzer before any fix: (1) CR-02 -- `inspectAlterTableStmt` inspected only `cmds[0]`, so a multi-subcommand `ALTER TABLE` (e.g. `ADD COLUMN notes text, DROP COLUMN secret_data`) silently discarded every subcommand after the first; `inspectStatement`'s contract changed to `StatementFacts[]` (one entry per subcommand for ALTER TABLE, single-element elsewhere), with `analyze.ts`/`inspect-plpgsql.ts` building one Finding per subcommand and worst-verdict-wins across them. (2) CR-01 -- an empty `match: {}` rule vacuously matched every statement (`Array.prototype.every` on zero conditions), silently granting blanket SAFE to any unmatched statement kind without touching a D-02/D-07 floor rule; `FactMatchSchema` now `.refine`s to reject an empty match object at load time. Also fixed: WR-01 (fixed `$$` PL/pgSQL body-reconstruction delimiter collided with a body's own nested `$$`-tagged literal, turning valid PostgreSQL into a parse failure -- replaced with a collision-verified `$gsd_N$` tag), WR-02 (embedded-statement reparse silently kept only the first statement -- now fails loud via a new `reparseEmbeddedSql` guard unless the reparse yields exactly one statement), WR-04 (`cli.test.ts` mutated the real shipped `rules.json` on disk for its RULES_INVALID case -- removed; that behaviour is already unit-tested via `tracer.test.ts`'s in-memory `loadRules` weakening). WR-03 (pure-core imports reach outside the package boundary via `scripts/log.ts`) deliberately left open per this pass's own instructions -- a tracked Phase-7 extractability concern, not a safety issue. IN-02 (unverified suspicion of a false-SAFE variant of WR-01) investigated with a disposable probe script against the real `libpg-query` package and resolved ABSENT: `parsePlPgSQL` returns one `plpgsql_funcs` entry per embedded DO/FUNCTION construct in the reconstructed text, and `extractEmbeddedSql`'s walk is a deep, generic, unconditional tree traversal, so an injected DROP TABLE in a second embedded construct was still found and classified in every crafted case; the WR-01 fix also makes the underlying truncation mechanism structurally impossible going forward. Corpus fixtures + manifest rows added for the CR-02 case (blocked + safe halves). Every fix was TDD RED->GREEN with its own regression test file and its own atomic commit (`cd33399`, `7f4d505`, `c7e807b`, `fe3b30f`, `a282148`, `bc4c172`). Full `pnpm test`: 296/296 (was 278/278); `tsc --noEmit` clean.
 - [Phase 04]: 04-01: Two-phase classify-then-execute in runMigrations (classify all pending migrations before executing any), derived directly from D-08's own wording distinction between 'apply nothing further' (BLOCKED) and 'applying nothing at all' (parse failure). — Only reading that satisfies both D-08 sentences literally; proven via a recording fake client in packages/automation/test/run-migrations.test.ts.
 - [Phase 04]: 04-01: User checkpoint decision -- the D-02 no-second-migrate-path guardrail in tests/guardrails.test.ts is unconditional with no per-file allowlist, mirroring the existing drizzle-kit push guardrail idiom exactly. — Six prose mentions reworded (not five -- packages/automation/src/runner/timeouts.ts's own D-15 comment also carried the phrase and was found only once the unconditional whole-source-surface scan ran).
+- [Phase 04]: [Phase 04] 04-02: D-17's widened floor covers ALL scopes (session/cluster/database/role) per the checkpoint decision cover-all-scopes -- disarms-timeout-guc matches disarmsTimeout:true unconditionally, so ALTER DATABASE/ALTER ROLE SET are floored, not left as a gap. — User's explicit checkpoint decision: database/role-scoped forms are the MORE dangerous ones since they persist beyond the migration's own session, so Phase 7's production runner inherits the protection rather than the gap.
+- [Phase 04]: [Phase 04] 04-02: D06_UNMATCHED_CANARY_FACTS deliberately excludes a disarmsTimeout:true canary (only transactionHostile:true added) -- disarms-timeout-guc matches disarmsTimeout:true unconditionally by design, making that combination a genuinely catalogued BLOCKED case, mirroring the existing nestingLimitExceeded exclusion. — Including it would make assertUnmatchedDefaultsToReview reject the shipped rules file itself (a stronger, not weaker, verdict). Equivalent enumeration-exploit coverage proven instead via timeout-disarm-floor.test.ts and a parallel transactionHostile-enumeration test. Recorded as unmet-truth #4 in WINDOWS.md for transparency against the plan's literal must_haves wording.
 
 ### Pending Todos
 
@@ -167,6 +170,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T20:50:05.296Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-09-08T21:18:13.787Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

@@ -167,7 +167,7 @@ Plans:
   4. A migration deliberately made to fail partway through leaves a state that is reported clearly rather than silently marked applied, and recovering from it never requires hand-editing `_journal.json`.
   5. Running a real recipe-app schema change of each kind — one that lands SAFE, one REVIEW REQUIRED, one BLOCKED — through the runner produces the expected outcome for each.
 
-**Plans**: 1/7 plans executed
+**Plans**: 2/7 plans executed
 
 Plans:
 
@@ -177,7 +177,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — The analyzer learns transaction-hostility and timeout self-disarm, and the code floor widens to "irreversible data loss or self-disarming"
+- [x] 04-02-PLAN.md — The analyzer learns transaction-hostility and timeout self-disarm, and the code floor widens to "irreversible data loss or self-disarming"
 - [ ] 04-03-PLAN.md — The Testcontainers history harness: empty-database full history, existing-database newest-only, tamper-then-refuse, and the committed status record
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -249,7 +249,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
-| 4. Migration Runner & History Tests | 1/7 | In Progress|  |
+| 4. Migration Runner & History Tests | 2/7 | In Progress|  |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |

@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 4
 waived_count: 0
 fixed_count: 0
-total_count: 3
-last_updated: 2026-09-07T22:35:27.932Z
+total_count: 4
+last_updated: 2026-09-08T21:17:37.004Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,7 @@ last_updated: 2026-09-07T22:35:27.932Z
 | 1 | 01 | deviation | scripts/env.test.ts |  | Task 2 (tdd=true) had no genuine RED phase: all 7 tests passed on first run against Task 1's env.ts, which already satisfied every hardening behaviour (bare-var-before-zod ordering, credential-free messages). No implementation change was needed or made. | open |  | 2026-09-07T00:43:46.523Z |  |
 | 2 | 02 | deviation | .env.example |  | Sandbox permission settings deny Read/Write/Bash access to .env and .env.example; the RECIPE_BACKUP_DESTINATION documentation block and the real .env value could not be written by the executor. Verified end-to-end with the var passed inline instead; user must add it to .env.example and their real .env manually. | open |  | 2026-09-07T21:07:19.259Z |  |
 | 3 | 02 | deviation | scripts/restore-cluster.ts | 241 | Comment says the globals verdict is 'Printed again as the final line of output', but console.log("[db:restore:cluster] Complete.") runs after it, so the verdict is actually the second-to-last line. Owner (during the 02-05 human drill) looked at the last line first and did not find the verdict, costing a round trip. Not in plan 02-05's files_modified so left unfixed here; recorded per docs/20-restore-runbook.md. | open |  | 2026-09-07T22:35:27.932Z |  |
+| 4 | 04 | unmet-truth | packages/automation/src/classifier/floor.ts |  | D06_UNMATCHED_CANARY_FACTS gained a transactionHostile canary but deliberately NOT a disarmsTimeout one -- disarms-timeout-guc matches disarmsTimeout:true unconditionally by design, so that combination is now a genuinely catalogued (BLOCKED) case, mirroring the existing nestingLimitExceeded exclusion; equivalent enumeration-exploit coverage is proven instead via timeout-disarm-floor.test.ts and rules-catalogue.test.ts's transactionHostile-enumeration test. | open |  | 2026-09-08T21:17:37.004Z |  |
 
 ````json
 [
@@ -55,6 +56,18 @@ last_updated: 2026-09-07T22:35:27.932Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-07T22:35:27.932Z",
+    "resolved_at": null
+  },
+  {
+    "id": 4,
+    "kind": "unmet-truth",
+    "phase": "04",
+    "file": "packages/automation/src/classifier/floor.ts",
+    "line": null,
+    "description": "D06_UNMATCHED_CANARY_FACTS gained a transactionHostile canary but deliberately NOT a disarmsTimeout one -- disarms-timeout-guc matches disarmsTimeout:true unconditionally by design, so that combination is now a genuinely catalogued (BLOCKED) case, mirroring the existing nestingLimitExceeded exclusion; equivalent enumeration-exploit coverage is proven instead via timeout-disarm-floor.test.ts and rules-catalogue.test.ts's transactionHostile-enumeration test.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-08T21:17:37.004Z",
     "resolved_at": null
   }
 ]
