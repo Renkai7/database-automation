@@ -23,7 +23,7 @@ expand-and-contract migration — it is test material, not a deliverable in its 
 - [x] **Phase 1: Local Environment** - A disposable local Postgres dev loop works end-to-end, and the database can be destroyed and rebuilt in one command (completed 2026-09-07)
 - [x] **Phase 2: Backup & Restore Drill** - The owner has personally destroyed and restored real data, timed it, and an automated restore test proves it against a genuinely fresh instance (completed 2026-09-07)
 - [x] **Phase 3: Safety Analyzer** - Migration SQL is parsed and classified SAFE / REVIEW REQUIRED / BLOCKED, proven against adversarial fixtures (completed 2026-09-08)
-- [ ] **Phase 4: Migration Runner & History Tests** - A runner re-derives classification at execution time, and the full migration history is proven consistent
+- [x] **Phase 4: Migration Runner & History Tests** - A runner re-derives classification at execution time, and the full migration history is proven consistent (completed 2026-09-08)
 - [ ] **Phase 5: CI Pipeline Gate** - A destructive migration cannot merge — not even by the repository owner
 - [ ] **Phase 6: Private Staging Connectivity** - CI and the dev machine reach staging with zero inbound ports, and the open connectivity decision is resolved and verified
 - [ ] **Phase 7: Production Runner, Environment Gate & Audit Log** - Schema changes reach production under supervision, behind an honestly-described self-approval gate and a complete audit trail
@@ -249,7 +249,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
-| 4. Migration Runner & History Tests | 7/7 | In Progress|  |
+| 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |

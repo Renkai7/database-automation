@@ -42,7 +42,7 @@
 - [x] **RUN-04**: Statements are not forced into a single transaction where doing so would break `CREATE INDEX CONCURRENTLY` and similar safe forms
 - [x] **RUN-05**: An empty database plus the full migration history produces the expected schema, verified automatically
 - [x] **RUN-06**: An existing database plus only the new migration applies cleanly, verified automatically
-- [ ] **RUN-07**: The application starts successfully against the resulting schema
+- [x] **RUN-07**: The application starts successfully against the resulting schema
 - [x] **RUN-08**: A partially failed migration leaves a recoverable, clearly reported state — no silent journal manipulation
 
 ### Pipeline Gate (CI)
@@ -83,7 +83,7 @@
 The recipe app is a thin test fixture. These requirements exist to exercise the pipeline, not to build a product.
 
 - [x] **APP-01**: A minimal recipe schema exists and the application boots against it
-- [ ] **APP-02**: The schema evolves through a sequence of real changes that exercise the SAFE, REVIEW REQUIRED, and BLOCKED paths
+- [x] **APP-02**: The schema evolves through a sequence of real changes that exercise the SAFE, REVIEW REQUIRED, and BLOCKED paths
 - [ ] **APP-03**: At least one expand-and-contract change is carried out across multiple releases rather than as a single destructive migration
 
 ## v2 Requirements
@@ -125,8 +125,8 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | APP-01 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | BKP-01 … BKP-08 | Phase 2 | All 8 complete 2026-09-07. Runbook `docs/20-restore-runbook.md` written from the owner's performed drill. Verification passed 33/34 — the one gap (per-step timings not separately measured) accepted by the owner. Security audit SECURED, 26/26 threats closed, 0 open. Open follow-up: WR-03 (restore target pinned by call-site convention, not internal contract) — see `02-SECURITY.md`. |
 | ANLZ-01 … ANLZ-07 | Phase 3 | All 7 complete 2026-09-08. Verification passed 5/5. Code review found 2 Critical false-SAFE defects (empty-`match` blanket rule; multi-subcommand `ALTER TABLE` dropping all but the first subcommand) and verification found a third (enumerate-every-`statementKind` blanket rule) — all fixed with regression tests, plus a fourth (`LANGUAGE sql` function bodies uninspected) found by probing during execution. Analyzer cross-checked against squawk-cli over a 51-row corpus: 21 disagreements, 0 in squawk’s favour; squawk missed a `DROP TABLE` hidden in a `DO` block that this analyzer blocks. Open follow-ups: production PostgreSQL major version still UNKNOWN (`docs/decisions.md` D16); WR-03 package-boundary import deferred to Phase 7; `DROP OWNED BY` classifies REVIEW_REQUIRED — owner judgement call whether it belongs on the D-02 floor. |
-| RUN-01 … RUN-08 | Phase 4 | Implemented — awaiting phase verification. RUN-01 (04-01, 04-03), RUN-02 (04-01), RUN-03 (04-01, 04-04), RUN-04 (04-04), RUN-05 (04-03), RUN-06 (04-03), RUN-07 (04-07), RUN-08 (04-05). All eight have a working, tested implementation and passing `pnpm test`/`pnpm test:history` runs; none has yet been through a `/gsd-verify-work` pass. |
-| APP-02 | Phase 4 | Implemented — awaiting phase verification. Jointly declared by 04-06 (SAFE, REVIEW REQUIRED) and 04-07 (BLOCKED). All three real schema changes ran through the real `pnpm db:migrate` runner against the pinned development database, each matching its Phase 3 corpus prediction; the BLOCKED change was reverted and its refusal is replayed permanently by `tests/history/blocked-replay.test.ts`. |
+| RUN-01 … RUN-08 | Phase 4 | All 8 complete 2026-09-08. RUN-01 (04-01, 04-03), RUN-02 (04-01), RUN-03 (04-01, 04-04), RUN-04 (04-04), RUN-05 (04-03), RUN-06 (04-03), RUN-07 (04-07), RUN-08 (04-05). Verification passed 5/5 must-haves (`04-VERIFICATION.md`). Code review found 0 Critical / 3 Warning / 2 Info (`04-REVIEW.md`), none blocking. Open follow-ups (all advisory, none exploitable against the shipped `rules.json`): `inspectDropStmt` inspects only the first object of a multi-object `DROP`; no duplicate-`when` guard in the journal pending-filter; `apps/recipe-app/src/db/seed.ts` uses `process.exit()` against convention. A `/gsd-verify-work` UAT pass has NOT been run — the verifier reported no human-verification items were required. |
+| APP-02 | Phase 4 | Complete 2026-09-08. Jointly declared by 04-06 (SAFE, REVIEW REQUIRED) and 04-07 (BLOCKED). All three real schema changes ran through the real `pnpm db:migrate` runner against the pinned development database, each matching its Phase 3 corpus prediction; the BLOCKED change was reverted and its refusal is replayed permanently by `tests/history/blocked-replay.test.ts`. |
 | CI-01 … CI-06 | Phase 5 | Pending |
 | CONN-01 … CONN-05 | Phase 6 | Pending |
 | PROD-01 … PROD-06 | Phase 7 | Pending |
@@ -141,9 +141,10 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-08 (plan 04-07) — the RUN-01…RUN-08 and APP-02 traceability rows moved
-from `Pending` to `Implemented — awaiting phase verification`, naming the plan(s) that
-implemented each, now that every Phase 4 plan declaring one of them has its own SUMMARY.
+*Last updated: 2026-09-08 (Phase 4 completion) — RUN-01…RUN-08 and APP-02 moved from
+`Implemented — awaiting phase verification` to complete, after `04-VERIFICATION.md` passed
+5/5 must-haves against the codebase. The `APP-02` checkbox was ticked here rather than by
+`phase.complete`, which ticked the RUN-* boxes but skipped APP-02.
 No checkbox in the requirement list above was ticked by this update — implementation is not
 verification, and this repository already has a recorded instance (plan 01-08) of declining to
 claim completion on implementation alone; a `/gsd-verify-work` pass is still the authoritative
