@@ -125,7 +125,34 @@ Plans:
   4. Every classification rule lives in a schema-validated rules file; adding or changing a rule means editing that data file, not the classifier's code, and an invalid rules file fails validation rather than being silently accepted.
   5. Running the same corpus of migrations through the analyzer and through `squawk-cli` produces a comparison report, and every disagreement between the two has been examined and explained.
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Tracer: one real DROP TABLE travels parse to facts to rules to floor to verdict to CLI exit code, plus the parse-failure and empty-input contracts
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — The full fact vocabulary, the complete FEATURES.md section 1 rule catalogue as data, and context-aware classifier semantics including same-file safe-form pairing
+- [ ] 03-03-PLAN.md — The Drizzle adapter and the CLI surface: five distinct outcome codes, a complete human report, and machine JSON
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-04-PLAN.md — Recursion into DO blocks and function bodies, and unresolvable dynamic SQL blocked at the same non-weakenable floor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-05-PLAN.md — The corpus manifest schema and harness, plus fixtures for the whole BLOCKED, REVIEW REQUIRED and USUALLY SAFE catalogue
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-06-PLAN.md — Five matched adversarial pairs with a structural pairing check, the app-shaped group, the two real migrations, and the success-criterion-1 demonstration
+
+**Wave 6** *(blocked on Wave 5 completion; contains a blocking package-legitimacy checkpoint)*
+
+- [ ] 03-07-PLAN.md — The squawk-cli cross-check and committed comparison report, the widened guardrail scope, the D16 decision entry, and the coverage declaration
 
 ### Phase 4: Migration Runner & History Tests
 
@@ -194,7 +221,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
-| 3. Safety Analyzer | 0/TBD | Not started | - |
+| 3. Safety Analyzer | 0/7 | Not started | - |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
