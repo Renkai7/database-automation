@@ -282,6 +282,29 @@ export function planContainerBody(stmt: ParsedStatement): ContainerBodyPlan {
   return { inspected: false };
 }
 
+/** WR-02 fix (03-REVIEW.md): re-parses one embedded SQL statement's raw text (found by
+ * extractEmbeddedSql on a PL/pgSQL body) through the same real-parser entry point every
+ * top-level statement uses, and asserts the reparse produced EXACTLY one statement --
+ * mirroring inspect.ts's own parseTopLevel guard against a parsed-but-empty entry (D-08). The
+ * previous `const [stmt] = await parseTopLevel(...); if (!stmt) continue;` silently kept only
+ * the first statement (or silently skipped entirely on zero), with no check that exactly one
+ * was produced -- inconsistent with this codebase's own stated standard that "silently dropping
+ * a statement would remove it from classification, which is the one direction this analyzer
+ * must never fail in." No real PL/pgSQL grammar has been found that reaches more than one
+ * statement here (PL/pgSQL's own grammar separates statements at the procedural level before
+ * `entry.query` is populated), but the guard is exported and independently unit-tested (never
+ * relying on an untestable real-world path for coverage) so a violated assumption fails loud
+ * rather than silently discarding statements. */
+export async function reparseEmbeddedSql(query: string): Promise<ParsedStatement> {
+  const stmts = await parseTopLevel(`${query};`);
+  if (stmts.length !== 1) {
+    throw new AnalyzerParseError(
+      `an embedded statement's raw text reparsed to ${stmts.length} statement(s), expected exactly 1 ("${query}"); refusing to silently classify only a subset`,
+    );
+  }
+  return stmts[0];
+}
+
 /** One fact set found by recursing into a container's body, paired with its position within the
  * body being walked (relative to THIS call -- the caller prepends its own enclosing index).
  * analyze.ts turns each of these into a Finding. */
@@ -407,10 +430,10 @@ export async function inspectContainerBody(
 
       // The load-bearing recursive step (03-RESEARCH.md Pitfall 2): entry.query is raw text,
       // fed back through the SAME real-parser entry point every top-level statement uses.
-      const [stmt] = await parseTopLevel(`${entry.query};`);
-      if (!stmt) {
-        continue;
-      }
+      // WR-02: reparseEmbeddedSql fails loud (AnalyzerParseError) unless this reparses to
+      // exactly one statement -- never silently keeps only the first or skips a zero-statement
+      // result.
+      const stmt = await reparseEmbeddedSql(entry.query);
       results.push(...(await inspectParsedStatement(stmt, plan.sourceContext, depth, i)));
     }
 
