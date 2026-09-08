@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
 status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-09-08T20:15:52.724Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-09-08T20:50:05.349Z"
 last_activity: 2026-09-08
-last_activity_desc: Phase 03 complete, transitioned to Phase 4
-state_head: 1f0ff3b008df286d1ce891c757aaf7bc7f5d7dc2
+last_activity_desc: Phase 04 execution started
+state_head: fff2c1173d6715c457cc6b2b4f3f558cefd81695
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 27
-  completed_plans: 20
+  completed_plans: 21
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** A schema change reaches production without anyone hand-running SQL, and no AI mistake can destroy production data — because the architecture prevents it, not because anyone remembered to be careful.
-**Current focus:** Phase 03 — Safety Analyzer
+**Current focus:** Phase 04 — Migration Runner & History Tests
 
 ## Current Position
 
-Phase: 04 (Migration Runner & History Tests) — READY TO EXECUTE
-Plan: Not started
+Phase: 04 (Migration Runner & History Tests) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-09-08 - Completed quick task 260908-kdl: tick APP-01 and refresh the REQUIREMENTS.md footer note (Phase 03 complete, transitioned to Phase 4)
+Last activity: 2026-09-08 — Phase 04 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -80,6 +80,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P05 | 40 min | 3 tasks | 37 files |
 | Phase 03-safety-analyzer P06 | ~35min | 3 tasks | 16 files |
 | Phase 03-safety-analyzer P07 | 50min | 3 tasks | 9 files |
+| Phase 04 P01 | 31min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 03]: squawk-cli comparison found no squawk-favouring gap over the 49-file corpus, but squawk missed a real DROP TABLE hidden in a DO block that this analyzer's D-05 recursion caught
 - [Phase 03]: [Gap closure, post-03-VERIFICATION.md, no PLAN.md] 03-VERIFICATION.md found that 03-REVIEW.md's CR-01 fix (rejecting an empty `match: {}` rule) closed only the trivial zero-key case -- the SAME blanket-SAFE effect is reachable by enumerating every legal value of a field (most naturally `statementKind`) instead of leaving `match` empty, since `ruleMatches`'s array branch matches unconditionally once every legal value is listed. Reproduced live before any fix: a rule enumerating all 28 shipped `StatementKind` values with verdict SAFE passed both `parseRulesFile` and `assertFloorNotWeakened`, then `classifyFacts({statementKind:"Unrecognized"}, rules)` returned SAFE -- disabling D-06's "SAFE must be earned" default for CLUSTER/REINDEX/ALTER SYSTEM/any uncatalogued DDL, while leaving the D-02/D-07 floor untouched (worst-verdict-wins still protects the eight named floor operations). Closed by building the second load-time self-check 03-REVIEW.md's own CR-01 fix section had proposed and left unbuilt: `floor.ts` gained `D06_UNMATCHED_CANARY_FACTS`/`assertUnmatchedDefaultsToReview`, mirroring `assertFloorNotWeakened`'s re-derive-through-the-real-`classifyFacts` pattern but protecting D-06's REVIEW_REQUIRED default instead of D-02/D-07's BLOCKED floor, wired into `classify.ts`'s `loadRules` alongside it. The canary set is deliberately `EMPTY_FACTS`-based (every field at its neutral default, one field varied per canary) specifically so the check cannot itself be defeated by the same enumeration trick it exists to catch: any rule broad enough to grant blanket SAFE to every uncatalogued statement -- by enumerating any single field's legal-value domain, not just `statementKind` -- necessarily matches at least one canary. `nestingLimitExceeded` was deliberately excluded from the varied fields (a genuinely catalogued BLOCKED case via `nesting-depth-exceeded`, not an unmatched one) to avoid a false positive against the shipped rules file. TDD RED (`d41954f`) -> GREEN (`f7ff627`), one commit per phase, no PLAN.md per this gap-closure task's own instructions. The RED test derives the exploit rule's `statementKind` enumeration from the shipped `rules.json` itself (not a hardcoded 28-value snapshot) so it cannot silently rot. Regression coverage added in `rules-catalogue.test.ts`: the exploit is rejected, the shipped rules file still loads, CLUSTER/REINDEX still classify REVIEW_REQUIRED end-to-end via `analyzeSql`, and the D-02/D-07 floor stays BLOCKED. `pnpm test`: 301/301 (was 296/296); `tsc --noEmit` clean. `03-VERIFICATION.md`'s gap section updated in place (`gap_closure` frontmatter block + inline note) rather than deleted, so the original finding stays the historical record; a full `/gsd-verify-work` re-run is still the authoritative confirmation and has not yet happened.
 - [Phase 03]: [Review-fix pass, post-03-07, no PLAN.md] 03-REVIEW.md's two Criticals were both real false-SAFE paths, reproduced live against the real analyzer before any fix: (1) CR-02 -- `inspectAlterTableStmt` inspected only `cmds[0]`, so a multi-subcommand `ALTER TABLE` (e.g. `ADD COLUMN notes text, DROP COLUMN secret_data`) silently discarded every subcommand after the first; `inspectStatement`'s contract changed to `StatementFacts[]` (one entry per subcommand for ALTER TABLE, single-element elsewhere), with `analyze.ts`/`inspect-plpgsql.ts` building one Finding per subcommand and worst-verdict-wins across them. (2) CR-01 -- an empty `match: {}` rule vacuously matched every statement (`Array.prototype.every` on zero conditions), silently granting blanket SAFE to any unmatched statement kind without touching a D-02/D-07 floor rule; `FactMatchSchema` now `.refine`s to reject an empty match object at load time. Also fixed: WR-01 (fixed `$$` PL/pgSQL body-reconstruction delimiter collided with a body's own nested `$$`-tagged literal, turning valid PostgreSQL into a parse failure -- replaced with a collision-verified `$gsd_N$` tag), WR-02 (embedded-statement reparse silently kept only the first statement -- now fails loud via a new `reparseEmbeddedSql` guard unless the reparse yields exactly one statement), WR-04 (`cli.test.ts` mutated the real shipped `rules.json` on disk for its RULES_INVALID case -- removed; that behaviour is already unit-tested via `tracer.test.ts`'s in-memory `loadRules` weakening). WR-03 (pure-core imports reach outside the package boundary via `scripts/log.ts`) deliberately left open per this pass's own instructions -- a tracked Phase-7 extractability concern, not a safety issue. IN-02 (unverified suspicion of a false-SAFE variant of WR-01) investigated with a disposable probe script against the real `libpg-query` package and resolved ABSENT: `parsePlPgSQL` returns one `plpgsql_funcs` entry per embedded DO/FUNCTION construct in the reconstructed text, and `extractEmbeddedSql`'s walk is a deep, generic, unconditional tree traversal, so an injected DROP TABLE in a second embedded construct was still found and classified in every crafted case; the WR-01 fix also makes the underlying truncation mechanism structurally impossible going forward. Corpus fixtures + manifest rows added for the CR-02 case (blocked + safe halves). Every fix was TDD RED->GREEN with its own regression test file and its own atomic commit (`cd33399`, `7f4d505`, `c7e807b`, `fe3b30f`, `a282148`, `bc4c172`). Full `pnpm test`: 296/296 (was 278/278); `tsc --noEmit` clean.
+- [Phase 04]: 04-01: Two-phase classify-then-execute in runMigrations (classify all pending migrations before executing any), derived directly from D-08's own wording distinction between 'apply nothing further' (BLOCKED) and 'applying nothing at all' (parse failure). — Only reading that satisfies both D-08 sentences literally; proven via a recording fake client in packages/automation/test/run-migrations.test.ts.
+- [Phase 04]: 04-01: User checkpoint decision -- the D-02 no-second-migrate-path guardrail in tests/guardrails.test.ts is unconditional with no per-file allowlist, mirroring the existing drizzle-kit push guardrail idiom exactly. — Six prose mentions reworded (not five -- packages/automation/src/runner/timeouts.ts's own D-15 comment also carried the phrase and was found only once the unconditional whole-source-surface scan ran).
 
 ### Pending Todos
 
@@ -164,6 +167,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T19:13:17.150Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-migration-runner-history-tests/04-CONTEXT.md
+Last session: 2026-09-08T20:50:05.296Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
