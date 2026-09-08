@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "file": "packages/automation/test/corpus/blocked/drop-table.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["drop-table"],
+      "why": "DROP TABLE permanently destroys the table and every row it holds -- the floor operation D-02 protects, and the first fixture the corpus manifest schema and harness are built against."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/set-not-null.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["set-not-null"],
+      "why": "SET NOT NULL on an existing column forces a full table scan under ACCESS EXCLUSIVE -- the canonical lock-hazard REVIEW REQUIRED case."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/create-table.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["create-table"],
+      "why": "Creating a brand new table has no existing rows to lock, scan or rewrite and no application code can yet depend on it -- the simplest SAFE case."
+    }
+  ]
+}
