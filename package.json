@@ -16,6 +16,7 @@
     "db:restore:cluster": "tsx scripts/restore-cluster.ts",
     "db:drill": "tsx scripts/drill.ts",
     "db:analyze": "tsx packages/automation/src/cli.ts",
+    "db:analyze:migrations": "tsx packages/automation/src/cli.ts --migrations",
     "dev": "pnpm --filter recipe-app dev",
     "test": "vitest run",
     "test:drill": "vitest run --config vitest.drill.config.ts"
