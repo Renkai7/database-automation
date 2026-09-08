@@ -131,11 +131,24 @@ const D14_ADVERSARIAL_PAIR_IDS = [
   "quoted-identifier",
 ];
 
-// The D-02 floor's own BLOCKED rule ids (rules.json, category irreversible-data-loss). Every
-// D-14 hidden-executable fixture in this corpus hides a genuine DROP TABLE specifically, so this
-// list only needs to name floor ids in general -- kept as the general floor set, not narrowed to
-// "drop-table" alone, so a future adversarial pair hiding a different floor operation (TRUNCATE,
-// DROP COLUMN, an unscoped DELETE) is recognised by the same check without editing it.
+// 04-02-PLAN.md task 4: D-17's own matched adversarial pair, proving the timeout-disarm rule's
+// nested coverage (D-05's existing recursion) and its false-positive resistance are both proven
+// by committed fixtures -- the same "same surface text, opposite truth" construction D-14's five
+// shapes use, but proving a different rule (disarms-timeout-guc) survives nesting rather than
+// proving comments/quoting/nesting are inert for DROP TABLE specifically. Kept as its own
+// enumerated list, not folded into D14_ADVERSARIAL_PAIR_IDS, because it answers to a different
+// decision (D-17, not D-14) -- the same "name which decision each set answers to" discipline
+// floor.ts's own D02_FLOOR_FACTS/D07_FLOOR_FACTS/D17_FLOOR_FACTS split already establishes.
+const D17_ADVERSARIAL_PAIR_IDS = ["set-lock-timeout-do-block"];
+
+// The floor's own BLOCKED rule ids -- D-02's irreversible-data-loss set plus D-17's
+// analyzer-integrity disarms-timeout-guc rule (floor.ts's D02_FLOOR_FACTS/D17_FLOOR_FACTS,
+// widened by 04-02-PLAN.md task 3 to "irreversible data loss or self-disarming"). Every D-14
+// hidden-executable fixture in this corpus hides a genuine DROP TABLE specifically, and the new
+// D-17 hidden-executable fixture hides a genuine timeout disarm -- kept as the general floor set,
+// not narrowed to any one operation, so a future adversarial pair hiding a different floor
+// operation (TRUNCATE, DROP COLUMN, an unscoped DELETE, a different disarm form) is recognised by
+// the same check without editing it.
 const FLOOR_RULE_IDS = [
   "drop-table",
   "drop-schema",
@@ -145,6 +158,7 @@ const FLOOR_RULE_IDS = [
   "delete-without-where",
   "update-without-where",
   "alter-type-drop-value",
+  "disarms-timeout-guc",
 ];
 
 describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enforces the pairing", () => {
@@ -164,6 +178,12 @@ describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enf
     expect(missing, `D-14 shapes with no pairId group in the manifest at all: ${missing.join(", ")}`).toEqual([]);
   });
 
+  it("D-17's own adversarial pair (timeout-disarm nested coverage) is present in the manifest", () => {
+    const present = [...byPairId.keys()].sort();
+    const missing = D17_ADVERSARIAL_PAIR_IDS.filter((id) => !present.includes(id));
+    expect(missing, `D-17 shapes with no pairId group in the manifest at all: ${missing.join(", ")}`).toEqual([]);
+  });
+
   it("every pairId groups into exactly one hidden-executable row and one inert-text-only row -- a shape present with only one half fails here, naming the pair id and what was missing or duplicated", () => {
     const problems: string[] = [];
     for (const [pairId, entries] of byPairId) {
@@ -180,9 +200,12 @@ describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enf
     expect(problems, problems.join("\n")).toEqual([]);
   });
 
-  it("no pairId outside the five named D-14 shapes has crept into the manifest unexamined", () => {
-    const unexpected = [...byPairId.keys()].filter((id) => !D14_ADVERSARIAL_PAIR_IDS.includes(id));
-    expect(unexpected, `pairId values not in D14_ADVERSARIAL_PAIR_IDS: ${unexpected.join(", ")}`).toEqual([]);
+  it("no pairId outside the named D-14/D-17 shapes has crept into the manifest unexamined", () => {
+    const knownPairIds = [...D14_ADVERSARIAL_PAIR_IDS, ...D17_ADVERSARIAL_PAIR_IDS];
+    const unexpected = [...byPairId.keys()].filter((id) => !knownPairIds.includes(id));
+    expect(unexpected, `pairId values not in D14_ADVERSARIAL_PAIR_IDS or D17_ADVERSARIAL_PAIR_IDS: ${unexpected.join(", ")}`).toEqual(
+      [],
+    );
   });
 
   it("every hidden-executable row's manifest expectation is BLOCKED with a D-02 floor rule id, and every inert-text-only row's expectation is never BLOCKED and never carries one", () => {

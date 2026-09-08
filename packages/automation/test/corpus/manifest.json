@@ -74,6 +74,78 @@
       "why": "CR-02 regression (03-REVIEW.md): PostgreSQL's own grammar allows more than one subcommand in a single ALTER TABLE, and inspectAlterTableStmt used to inspect only the first (cmds[0]), silently discarding every later subcommand before it ever reached classification. This fixture combines a harmless ADD COLUMN with a genuinely destructive DROP COLUMN in one statement -- before the fix, analyzeSql returned file verdict SAFE with a single finding for the ADD COLUMN, and the DROP COLUMN never appeared anywhere in the result. The fix must produce one finding per subcommand and the file verdict must be BLOCKED, worst-verdict-wins."
     },
     {
+      "file": "packages/automation/test/corpus/blocked/reset-all.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "disarms-timeout-guc"
+      ],
+      "why": "D-17/Pitfall 4 (04-RESEARCH.md): RESET ALL disarms lock_timeout and statement_timeout along with every other session GUC, but its AST node (VariableSetStmt, kind VAR_RESET_ALL) carries no name field at all -- a name-matching rule would miss it entirely. disarms-timeout-guc catches it because setstmtDisarmsTimeout treats VAR_RESET_ALL as unconditionally disarming, with no name check."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/alter-system-set-statement-timeout.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "disarms-timeout-guc"
+      ],
+      "why": "ALTER SYSTEM SET statement_timeout = 0 disarms the timeout cluster-wide, persisting across every future connection until reloaded -- D-17's floor makes this BLOCKED with no rules-file override, same as any other disarming form."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/alter-database-set-lock-timeout.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "disarms-timeout-guc"
+      ],
+      "why": "ALTER DATABASE ... SET lock_timeout = 0 disarms the timeout for every future session connecting to that database, persisting beyond the migration's own session -- exactly why Task 2's checkpoint decision (cover-all-scopes) floors the database- and role-scoped forms rather than recording them as a gap: they are the MORE dangerous forms of the same act, not a lesser one."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/set-search-path.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "set-guc-non-timeout"
+      ],
+      "why": "An ordinary session-level SET that does not touch lock_timeout or statement_timeout is not a floor violation, but it is not nothing either -- set-guc-non-timeout gives it a named REVIEW_REQUIRED rule id instead of falling through to the Unrecognized default, distinguishing 'a SET the catalogue has an opinion on' from 'a statement kind the catalogue has never seen.'"
+    },
+    {
+      "file": "packages/automation/test/corpus/usually-safe/create-index-concurrently-standalone.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "create-index-concurrently"
+      ],
+      "why": "The positive half of criterion 2: a standalone CREATE INDEX CONCURRENTLY on a real recipe-core column (recipes.slug) is the statement the runner must be able to execute unwrapped -- transactionHostile true, but that is not itself a hazard the classifier flags; the existing create-index-concurrently rule already grants SAFE, so no duplicate rule row was added (rules.json's own notes field records this)."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/vacuum-analyze.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "vacuum-in-migration"
+      ],
+      "why": "VACUUM cannot run inside a transaction block and can hold locks or scan large tables for a long time depending on options and table size, so vacuum-in-migration gives it a named REVIEW_REQUIRED rule id rather than falling through to the Unrecognized default."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/create-database.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "create-database-in-migration"
+      ],
+      "why": "CREATE DATABASE cannot run inside a transaction block and creates a whole new database outside the schema this migration pipeline otherwise governs, so create-database-in-migration gives it a named REVIEW_REQUIRED rule id rather than falling through to the Unrecognized default."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/reindex-index.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "reindex-in-migration"
+      ],
+      "why": "A non-concurrent REINDEX takes ACCESS EXCLUSIVE on the indexed table for the whole rebuild, blocking reads and writes until it finishes, so reindex-in-migration gives it a named REVIEW_REQUIRED rule id rather than falling through to the Unrecognized default."
+    },
+    {
       "file": "packages/automation/test/corpus/review-required/set-not-null.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
@@ -438,6 +510,31 @@
         "create-table"
       ],
       "why": "D-14's false-positive half: a table is CREATED whose quoted name is itself the phrase \"drop table\" -- proving an identifier that reads like an entire dangerous statement is not treated as one. This is a genuine CreateStmt node classified SAFE by create-table; nothing about the identifier's text is ever inspected."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/set-lock-timeout-in-do-block.sql",
+      "group": "adversarial",
+      "pairId": "set-lock-timeout-do-block",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default",
+        "disarms-timeout-guc",
+        "do-block-container"
+      ],
+      "why": "D-17's nested coverage rides on D-05's existing recursion: a DO block whose body genuinely executes SET lock_timeout = '0' before an ALTER TABLE ADD COLUMN is still caught one level down, live-verified via analyzeSql -- the container itself earns its own SAFE finding (bodyInspected true), the disarming SET earns disarms-timeout-guc at sourceContext do-block, and the harmless ADD COLUMN earns its own SAFE finding, with worst-verdict-wins making the whole file BLOCKED."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/comment-mentions-set-lock-timeout.sql",
+      "group": "adversarial",
+      "pairId": "set-lock-timeout-do-block",
+      "half": "inert-text-only",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default",
+        "do-block-container"
+      ],
+      "why": "D-17's false-positive half: the exact words 'SET lock_timeout = ''0'';' appear only inside a -- comment and inside a dollar-quoted string literal ($msg$...$msg$) passed to RAISE NOTICE, never executed as a SET statement -- extractEmbeddedSql finds no PLpgSQL_stmt_execsql/dynexecute in the body (RAISE is neither), so no disarms-timeout-guc finding appears anywhere; live-verified via analyzeSql to classify SAFE via the container's own SAFE finding plus a genuinely harmless top-level ADD COLUMN, proving comments and inert string data are inert exactly as this project's own stated purpose requires."
     },
     {
       "file": "packages/automation/test/corpus/app-shaped/recipes-add-notes-column.sql",

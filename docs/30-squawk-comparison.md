@@ -7,7 +7,7 @@ D-15's one-time calibration: this analyzer and squawk-cli, an independent, exter
 - **Run date:** 2026-09-08T17:18:17.347Z
 - **squawk version:** squawk 2.64.0
 - **PostgreSQL version pin:** 17.0 (D9's project-wide pin)
-- **Corpus files compared:** 51
+- **Corpus files compared:** 61
 
 ## What "agreement" means here
 
@@ -15,13 +15,13 @@ The two tools do not speak the same language: squawk emits lint warnings (zero o
 
 ## Executive summary
 
-22 of 51 rows disagree under this report's agreement definition. Every one is examined below and
-resolves to one of two labels -- **19 different-by-design**, **3 analyzer-correct** -- and **zero
+27 of 61 rows disagree under this report's agreement definition. Every one is examined below and
+resolves to one of two labels -- **22 different-by-design**, **5 analyzer-correct** -- and **zero
 squawk-correct**. No row in this run showed squawk catching a hazard this catalogue's `rules.json`
-missed; that is a specific claim about this 51-file corpus on this run, not a claim that squawk
+missed; that is a specific claim about this 61-file corpus on this run, not a claim that squawk
 never catches anything this project's rules could miss on a different input.
 
-The three analyzer-correct rows matter for different reasons. `delete-without-where.sql` and
+The five analyzer-correct rows matter for different reasons. `delete-without-where.sql` and
 `update-without-where.sql` show squawk has no rule at all for an unscoped `DELETE`/`UPDATE` --
 this project's D-02 floor covers ground squawk's own catalogue does not. More significant:
 **`adversarial/do-block-drop.sql` shows squawk producing zero findings for a file containing a
@@ -34,7 +34,18 @@ exposed and fixed in this analyzer's own earlier code; seeing an independent, wi
 miss the same class of hazard entirely is the strongest evidence in this comparison that D-05's
 recursion investment was necessary, not academic.
 
-The remaining 20 different-by-design rows split into three buckets, none of them a gap in this
+Phase 4 plan 02 added two more analyzer-correct rows, both about D-17's timeout self-disarm rule
+(`disarms-timeout-guc`): squawk produced zero findings for both `blocked/reset-all.sql` (a bare
+`RESET ALL;`) and `adversarial/set-lock-timeout-in-do-block.sql` (a `SET lock_timeout = '0';`
+hidden inside a `DO` block, ahead of an `ALTER TABLE`) -- squawk's rule catalogue has no rule at
+all watching for a migration disarming its own session timeouts, only rules requiring that a
+migration *set* them (`require-lock-timeout`/`require-statement-timeout`, already excluded from
+this catalogue per D-04 for the unrelated reason that they describe session setup rather than SQL
+content). The nested case additionally reconfirms the same DO-block-recursion gap
+`do-block-drop.sql` already established: squawk did not descend into the body at all, for either
+reason.
+
+The remaining 22 different-by-design rows split into three buckets, none of them a gap in this
 catalogue's stated scope (`.planning/research/FEATURES.md` §1's migration lock/rewrite/data-loss
 hazard list, per D-04):
 - **Session properties** (`require-lock-timeout`, `require-statement-timeout`) -- D-04's two
@@ -59,11 +70,28 @@ but it does establish that the CR-02 defect was outside this comparison's reach:
 not have caught it, so the corpus and the analyzer's own unit tests are the only things standing
 between that class of bug and a false SAFE.
 
+**Audit note (Phase 4 plan 02):** ten rows are new since this report was last annotated, added by
+04-02-PLAN.md task 4 to prove D-17's timeout-disarm rule (`disarms-timeout-guc`) end to end:
+`blocked/reset-all.sql`, `blocked/alter-system-set-statement-timeout.sql`,
+`blocked/alter-database-set-lock-timeout.sql`, `review-required/set-search-path.sql`,
+`review-required/vacuum-analyze.sql`, `review-required/create-database.sql`,
+`review-required/reindex-index.sql`, `usually-safe/create-index-concurrently-standalone.sql`, and
+the matched adversarial pair `adversarial/set-lock-timeout-in-do-block.sql` /
+`adversarial/comment-mentions-set-lock-timeout.sql`. This edit was made by hand against a
+squawk run over exactly these ten files (never a full regeneration of this report, which would
+have destroyed every hand-filled disagreement above) -- appended to the end of the comparison
+table below rather than reinserted at their manifest position, matching the CR-02 precedent just
+above. Five of the ten agree (squawk flags `require-lock-timeout`/`require-statement-timeout` on
+any file containing `ALTER SYSTEM`, `ALTER DATABASE`, `VACUUM` or `REINDEX`, which this analyzer's
+own BLOCKED/REVIEW_REQUIRED verdict on those same files satisfies); the five disagreements are
+detailed individually below (two analyzer-correct, three different-by-design), already folded
+into the executive summary's totals above.
+
 ## What this comparison does and does not establish
 
 It establishes that two independently-built tools looking at the same SQL agree where they should and differ only where a reason can be given. It does **not** establish that either tool is correct -- both could share a blind spot -- and it is a one-time calibration rather than a standing check (D-15): it goes stale the moment either tool's rule catalogue changes. Anything this run could not determine is recorded as UNKNOWN below, never smoothed over and never silently dropped.
 
-## Comparison table (51 rows)
+## Comparison table (61 rows)
 
 | File | Group | Analyzer verdict | Analyzer rule ids | squawk rules | Agreement |
 |---|---|---|---|---|---|
@@ -118,8 +146,18 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `packages/automation/test/corpus/app-shaped/drop-ingredients-table.sql` | app-shaped | BLOCKED | `drop-table` | `ban-drop-table`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `apps/recipe-app/drizzle/0000_bumpy_khan.sql` | real-migration | SAFE | `create-table` | `prefer-bigint-over-int`, `prefer-robust-stmts` | **disagree** |
 | `apps/recipe-app/drizzle/0001_busy_thunderbolt.sql` | real-migration | REVIEW_REQUIRED | `add-foreign-key-validated`, `create-table` | `adding-foreign-key-constraint`, `constraint-missing-not-valid`, `prefer-bigint-over-int`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/blocked/reset-all.sql` | catalogue | BLOCKED | `disarms-timeout-guc` | (no findings) | **disagree** |
+| `packages/automation/test/corpus/blocked/alter-system-set-statement-timeout.sql` | catalogue | BLOCKED | `disarms-timeout-guc` | `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/blocked/alter-database-set-lock-timeout.sql` | catalogue | BLOCKED | `disarms-timeout-guc` | `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/review-required/set-search-path.sql` | catalogue | REVIEW_REQUIRED | `set-guc-non-timeout` | (no findings) | **disagree** |
+| `packages/automation/test/corpus/review-required/vacuum-analyze.sql` | catalogue | REVIEW_REQUIRED | `vacuum-in-migration` | `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/review-required/create-database.sql` | catalogue | REVIEW_REQUIRED | `create-database-in-migration` | `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/review-required/reindex-index.sql` | catalogue | REVIEW_REQUIRED | `reindex-in-migration` | `require-concurrent-reindex`, `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/usually-safe/create-index-concurrently-standalone.sql` | catalogue | SAFE | `create-index-concurrently` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
+| `packages/automation/test/corpus/adversarial/set-lock-timeout-in-do-block.sql` | adversarial | BLOCKED | `add-column-nullable-no-default`, `disarms-timeout-guc`, `do-block-container` | (no findings) | **disagree** |
+| `packages/automation/test/corpus/adversarial/comment-mentions-set-lock-timeout.sql` | adversarial | SAFE | `add-column-nullable-no-default`, `do-block-container` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 
-## Disagreements (22)
+## Disagreements (27)
 
 Every row below needs one of exactly three labels -- **analyzer-correct**, **squawk-correct**, or **different-by-design** -- each with a stated reason. Placeholders below are filled in by hand, not generated: this generator records *what* disagrees, not *why*.
 
@@ -299,6 +337,45 @@ Every row below needs one of exactly three labels -- **analyzer-correct**, **squ
 - **Verdict on the disagreement:** different-by-design
 - **Reason:** Same reasoning as `add-column-literal-default.sql` (`prefer-bigint-over-int`, out-of-scope design recommendation) and `create-table.sql` (`prefer-robust-stmts`, rerun-idempotency) above. This is the first of this corpus's two real, currently-deployed Drizzle migrations, and squawk raises no lock-hazard or data-loss rule against it at all -- both tools agree it is safe on the dimension this project's catalogue actually classifies.
 
+### `packages/automation/test/corpus/blocked/reset-all.sql`
+
+- **Analyzer verdict:** BLOCKED (`disarms-timeout-guc`)
+- **squawk:** (no findings)
+- **Corpus expectation:** D-17/Pitfall 4 (04-RESEARCH.md): RESET ALL disarms lock_timeout and statement_timeout along with every other session GUC, but its AST node (VariableSetStmt, kind VAR_RESET_ALL) carries no name field at all -- a name-matching rule would miss it entirely. disarms-timeout-guc catches it because setstmtDisarmsTimeout treats VAR_RESET_ALL as unconditionally disarming, with no name check.
+- **Verdict on the disagreement:** analyzer-correct
+- **Reason:** squawk's rule catalogue has no rule at all watching for a migration disarming its own session timeouts -- it ships `require-lock-timeout`/`require-statement-timeout` (requiring a migration *set* them, already excluded from this catalogue per D-04 for an unrelated reason) but nothing detecting a `RESET`/`SET`/`ALTER SYSTEM`/`ALTER DATABASE`/`ALTER ROLE` that turns them back off. This project's D-17 floor exists precisely to catch a migration disarming its own safety rail, ground squawk's own catalogue does not cover, and it fired correctly here.
+
+### `packages/automation/test/corpus/review-required/set-search-path.sql`
+
+- **Analyzer verdict:** REVIEW_REQUIRED (`set-guc-non-timeout`)
+- **squawk:** (no findings)
+- **Corpus expectation:** An ordinary session-level SET that does not touch lock_timeout or statement_timeout is not a floor violation, but it is not nothing either -- set-guc-non-timeout gives it a named REVIEW_REQUIRED rule id instead of falling through to the Unrecognized default, distinguishing "a SET the catalogue has an opinion on" from "a statement kind the catalogue has never seen."
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Same default-outcome-policy difference `dollar-quoted-string-inert.sql` above already established for an `INSERT` squawk has no rule for: squawk simply has no rule watching a plain `SET`/`RESET` statement at all (confirmed live: it stayed silent on `RESET ALL;` and on a `SET lock_timeout` hidden inside a DO block too, not just this file), so its silence reflects "no rule exists," while this analyzer's D-06 earn-SAFE default gives an uncatalogued-but-named GUC set its own explicit REVIEW_REQUIRED rule id rather than leaving it entirely unclassified. Not a hazard disagreement -- a policy-for-the-unrecognized-case disagreement.
+
+### `packages/automation/test/corpus/usually-safe/create-index-concurrently-standalone.sql`
+
+- **Analyzer verdict:** SAFE (`create-index-concurrently`)
+- **squawk:** `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout`
+- **Corpus expectation:** The positive half of criterion 2: a standalone CREATE INDEX CONCURRENTLY on a real recipe-core column (recipes.slug) is the statement the runner must be able to execute unwrapped -- transactionHostile true, but that is not itself a hazard the classifier flags; the existing create-index-concurrently rule already grants SAFE, so no duplicate rule row was added.
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Byte-identical bucket to `safe/create-index-concurrently.sql` above -- the two session-property rules plus the rerun-idempotency rule, not any lock-hazard rule. squawk again does not raise its non-concurrent-index rule here, i.e. it agrees the `CONCURRENTLY` form itself is the safe one.
+
+### `packages/automation/test/corpus/adversarial/set-lock-timeout-in-do-block.sql`
+
+- **Analyzer verdict:** BLOCKED (`add-column-nullable-no-default`, `disarms-timeout-guc`, `do-block-container`)
+- **squawk:** (no findings)
+- **Corpus expectation:** D-17's nested coverage rides on D-05's existing recursion: a DO block whose body genuinely executes SET lock_timeout = '0' before an ALTER TABLE ADD COLUMN is still caught one level down, live-verified via analyzeSql -- the container itself earns its own SAFE finding (bodyInspected true), the disarming SET earns disarms-timeout-guc at sourceContext do-block, and the harmless ADD COLUMN earns its own SAFE finding, with worst-verdict-wins making the whole file BLOCKED.
+- **Verdict on the disagreement:** analyzer-correct
+- **Reason:** A double gap for squawk, compounding the two findings recorded elsewhere in this report: squawk's static, non-recursive rule engine does not descend into a `DO` block's dollar-quoted body at all (the same defect `adversarial/do-block-drop.sql` already established), *and* even if it did, it has no rule detecting a timeout self-disarm in the first place (the same gap `blocked/reset-all.sql` above establishes). This analyzer's D-05 recursion plus D-17's widened floor catch it regardless.
+
+### `packages/automation/test/corpus/adversarial/comment-mentions-set-lock-timeout.sql`
+
+- **Analyzer verdict:** SAFE (`add-column-nullable-no-default`, `do-block-container`)
+- **squawk:** `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout`
+- **Corpus expectation:** D-17's false-positive half: the exact words "SET lock_timeout = '0';" appear only inside a -- comment and inside a dollar-quoted string literal ($msg$...$msg$) passed to RAISE NOTICE, never executed as a SET statement -- extractEmbeddedSql finds no PLpgSQL_stmt_execsql/dynexecute in the body (RAISE is neither), so no disarms-timeout-guc finding appears anywhere; live-verified via analyzeSql to classify SAFE via the container's own SAFE finding plus a genuinely harmless top-level ADD COLUMN, proving comments and inert string data are inert exactly as this project's own stated purpose requires.
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Same session-property-plus-idempotency bucket as every other SAFE-verdict row in this report (`require-lock-timeout`, `require-statement-timeout`, `prefer-robust-stmts`) -- squawk raises nothing about the comment or the dollar-quoted text itself, i.e. it agrees the mentioned text is inert; the disagreement is entirely the same three routinely-excluded rules every other SAFE row in this corpus also triggers.
 
 ## Annotation provenance (2026-09-08 Nyquist audit)
 
