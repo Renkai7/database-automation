@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "drop-table",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "DropTable" },
+      "verdict": "BLOCKED",
+      "rationale": "DROP TABLE permanently destroys the table and every row it holds; there is no automated way to recover the data afterward."
+    },
+    {
+      "id": "drop-schema",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "DropSchema" },
+      "verdict": "BLOCKED",
+      "rationale": "DROP SCHEMA permanently destroys every object inside the schema, including all of its tables and their data."
+    },
+    {
+      "id": "drop-database",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "DropDatabase" },
+      "verdict": "BLOCKED",
+      "rationale": "DROP DATABASE permanently destroys the entire database, every schema and table in it."
+    },
+    {
+      "id": "truncate",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "Truncate" },
+      "verdict": "BLOCKED",
+      "rationale": "TRUNCATE removes every row from a table in a single unrecoverable operation, bypassing per-row triggers and any WHERE-based scoping."
+    },
+    {
+      "id": "drop-column",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "DropColumn" },
+      "verdict": "BLOCKED",
+      "rationale": "DROP COLUMN permanently destroys every value stored in that column across every row."
+    },
+    {
+      "id": "delete-without-where",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "Delete", "hasWhereClause": false },
+      "verdict": "BLOCKED",
+      "rationale": "A DELETE with no WHERE clause removes every row in the table, which is almost never the intended scope of a migration."
+    },
+    {
+      "id": "update-without-where",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "Update", "hasWhereClause": false },
+      "verdict": "BLOCKED",
+      "rationale": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
+    }
+  ]
+}

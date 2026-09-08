@@ -6,7 +6,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 // someone forgets -- structural, not conventional.
 export default defineConfig({
   test: {
-    include: ["scripts/**/*.test.ts", "tests/**/*.test.ts", "apps/**/*.test.ts"],
+    include: ["scripts/**/*.test.ts", "tests/**/*.test.ts", "apps/**/*.test.ts", "packages/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "tests/drill/**"],
     testTimeout: 180000,
     hookTimeout: 180000,

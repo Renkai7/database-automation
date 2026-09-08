@@ -79,6 +79,12 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/automation:
+    dependencies:
+      libpg-query:
+        specifier: 17.7.4
+        version: 17.7.4
+
 packages:
 
   '@balena/dockerignore@1.0.2':
@@ -775,6 +781,9 @@ packages:
 
   '@oxc-project/types@0.148.0':
     resolution: {integrity: sha512-Nm4s/jB+4FpFsPhWGEC4h7rzksesmtnMXomo6rCMcg/b8zLQuOziRgkCS1fxDCXOlJB/6Q8oABOZ/OP6RIPj9A==}
+
+  '@pgsql/types@17.6.2':
+    resolution: {integrity: sha512-1UtbELdbqNdyOShhrVfSz3a1gDi0s9XXiQemx+6QqtsrXe62a6zOGU+vjb2GRfG5jeEokI1zBBcfD42enRv0Rw==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1540,6 +1549,9 @@ packages:
   lazystream@1.0.1:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
     engines: {node: '>= 0.6.3'}
+
+  libpg-query@17.7.4:
+    resolution: {integrity: sha512-hTV3LvacQgJhc6GHpu5GYZMQBOAEpJ/LF1JjkixZ8YLh2TtbuN8y0JlNiPTe8PBTV9ChFkKcZMWSYKyhJfkYaQ==}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
@@ -2595,6 +2607,8 @@ snapshots:
 
   '@oxc-project/types@0.148.0': {}
 
+  '@pgsql/types@17.6.2': {}
+
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
@@ -3222,6 +3236,10 @@ snapshots:
   lazystream@1.0.1:
     dependencies:
       readable-stream: 2.3.8
+
+  libpg-query@17.7.4:
+    dependencies:
+      '@pgsql/types': 17.6.2
 
   lightningcss-android-arm64@1.33.0:
     optional: true
