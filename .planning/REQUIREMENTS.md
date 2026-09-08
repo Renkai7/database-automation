@@ -125,8 +125,8 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | APP-01 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | BKP-01 … BKP-08 | Phase 2 | All 8 complete 2026-09-07. Runbook `docs/20-restore-runbook.md` written from the owner's performed drill. Verification passed 33/34 — the one gap (per-step timings not separately measured) accepted by the owner. Security audit SECURED, 26/26 threats closed, 0 open. Open follow-up: WR-03 (restore target pinned by call-site convention, not internal contract) — see `02-SECURITY.md`. |
 | ANLZ-01 … ANLZ-07 | Phase 3 | All 7 complete 2026-09-08. Verification passed 5/5. Code review found 2 Critical false-SAFE defects (empty-`match` blanket rule; multi-subcommand `ALTER TABLE` dropping all but the first subcommand) and verification found a third (enumerate-every-`statementKind` blanket rule) — all fixed with regression tests, plus a fourth (`LANGUAGE sql` function bodies uninspected) found by probing during execution. Analyzer cross-checked against squawk-cli over a 51-row corpus: 21 disagreements, 0 in squawk’s favour; squawk missed a `DROP TABLE` hidden in a `DO` block that this analyzer blocks. Open follow-ups: production PostgreSQL major version still UNKNOWN (`docs/decisions.md` D16); WR-03 package-boundary import deferred to Phase 7; `DROP OWNED BY` classifies REVIEW_REQUIRED — owner judgement call whether it belongs on the D-02 floor. |
-| RUN-01 … RUN-08 | Phase 4 | Pending |
-| APP-02 | Phase 4 | Pending |
+| RUN-01 … RUN-08 | Phase 4 | Implemented — awaiting phase verification. RUN-01 (04-01, 04-03), RUN-02 (04-01), RUN-03 (04-01, 04-04), RUN-04 (04-04), RUN-05 (04-03), RUN-06 (04-03), RUN-07 (04-07), RUN-08 (04-05). All eight have a working, tested implementation and passing `pnpm test`/`pnpm test:history` runs; none has yet been through a `/gsd-verify-work` pass. |
+| APP-02 | Phase 4 | Implemented — awaiting phase verification. Jointly declared by 04-06 (SAFE, REVIEW REQUIRED) and 04-07 (BLOCKED). All three real schema changes ran through the real `pnpm db:migrate` runner against the pinned development database, each matching its Phase 3 corpus prediction; the BLOCKED change was reverted and its refusal is replayed permanently by `tests/history/blocked-replay.test.ts`. |
 | CI-01 … CI-06 | Phase 5 | Pending |
 | CONN-01 … CONN-05 | Phase 6 | Pending |
 | PROD-01 … PROD-06 | Phase 7 | Pending |
@@ -141,11 +141,17 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-08 — APP-01's checkbox above was ticked to agree with the completion
-status its traceability row already carried, on the evidence of the 2026-09-07 Phase 1
-re-verification pass recorded in `01-VERIFICATION.md` (corroborated by `01-02-SUMMARY.md` and
-`01-05-SUMMARY.md`, both of which already list APP-01 as completed). No other checkbox above
-was ticked, and no traceability status prose was altered. Previously updated 2026-09-07 after
-01-08 gap-closure work, which made the two Phase 1 traceability rows agree with each other
-instead of contradicting; and 2026-09-06 after the roadmap revision that split Phase 1 into
-Phase 1 + Phase 2 and left downstream phases renumbered 3-7.*
+*Last updated: 2026-09-08 (plan 04-07) — the RUN-01…RUN-08 and APP-02 traceability rows moved
+from `Pending` to `Implemented — awaiting phase verification`, naming the plan(s) that
+implemented each, now that every Phase 4 plan declaring one of them has its own SUMMARY.
+No checkbox in the requirement list above was ticked by this update — implementation is not
+verification, and this repository already has a recorded instance (plan 01-08) of declining to
+claim completion on implementation alone; a `/gsd-verify-work` pass is still the authoritative
+confirmation for Phase 4 and has not yet run. Previously updated 2026-09-08 when APP-01's
+checkbox above was ticked to agree with the completion status its traceability row already
+carried, on the evidence of the 2026-09-07 Phase 1 re-verification pass recorded in
+`01-VERIFICATION.md` (corroborated by `01-02-SUMMARY.md` and `01-05-SUMMARY.md`, both of which
+already list APP-01 as completed). Before that: 2026-09-07 after 01-08 gap-closure work, which
+made the two Phase 1 traceability rows agree with each other instead of contradicting; and
+2026-09-06 after the roadmap revision that split Phase 1 into Phase 1 + Phase 2 and left
+downstream phases renumbered 3-7.*

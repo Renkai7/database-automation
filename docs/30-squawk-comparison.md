@@ -7,7 +7,7 @@ D-15's one-time calibration: this analyzer and squawk-cli, an independent, exter
 - **Run date:** 2026-09-08T17:18:17.347Z
 - **squawk version:** squawk 2.64.0
 - **PostgreSQL version pin:** 17.0 (D9's project-wide pin)
-- **Corpus files compared:** 64
+- **Corpus files compared:** 65
 
 ## What "agreement" means here
 
@@ -15,7 +15,7 @@ The two tools do not speak the same language: squawk emits lint warnings (zero o
 
 ## Executive summary
 
-29 of 64 rows disagree under this report's agreement definition. Every one is examined below and
+29 of 65 rows disagree under this report's agreement definition. Every one is examined below and
 resolves to one of two labels -- **24 different-by-design**, **5 analyzer-correct** -- and **zero
 squawk-correct**. No row in this run showed squawk catching a hazard this catalogue's `rules.json`
 missed; that is a specific claim about this 64-file corpus on this run, not a claim that squawk
@@ -91,7 +91,7 @@ into the executive summary's totals above.
 
 It establishes that two independently-built tools looking at the same SQL agree where they should and differ only where a reason can be given. It does **not** establish that either tool is correct -- both could share a blind spot -- and it is a one-time calibration rather than a standing check (D-15): it goes stale the moment either tool's rule catalogue changes. Anything this run could not determine is recorded as UNKNOWN below, never smoothed over and never silently dropped.
 
-## Comparison table (64 rows)
+## Comparison table (65 rows)
 
 | File | Group | Analyzer verdict | Analyzer rule ids | squawk rules | Agreement |
 |---|---|---|---|---|---|
@@ -159,6 +159,7 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `apps/recipe-app/drizzle/0002_oval_maelstrom.sql` | real-migration | SAFE | `add-column-nullable-no-default` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql` | real-migration | REVIEW_REQUIRED | (none) | (no findings) | **disagree** |
 | `apps/recipe-app/drizzle/0004_redundant_apocalypse.sql` | real-migration | REVIEW_REQUIRED | `set-not-null` | `adding-not-nullable-field`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/app-shaped/generated-drop-ingredients-table.sql` | app-shaped | BLOCKED | `drop-table` | `ban-drop-table`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 
 ## Disagreements (29)
 
@@ -434,6 +435,26 @@ every hand-filled disagreement above) -- appended to the end of the comparison t
 the CR-02 and Phase 4 plan 02 precedents above. Two of the three disagree (`0002_oval_maelstrom.sql`
 and `0003_backfill_steps_timer_label.sql`, both different-by-design, detailed individually above);
 `0004_redundant_apocalypse.sql` agrees. Already folded into the executive summary's totals above.
+
+## Audit note (Phase 4 plan 07)
+
+One row is new since this report was last annotated, added when 04-07-PLAN.md spent
+`01-CONTEXT.md` D-11's third and final reserved recipe-app churn row for real:
+`packages/automation/test/corpus/app-shaped/generated-drop-ingredients-table.sql` -- the exact
+bytes `drizzle-kit generate` produced (`DROP TABLE "ingredients" CASCADE;`) when `ingredients`
+was removed from `schema.ts` for real, refused BLOCKED by the runner, then reverted (D-32). This
+edit was made by hand against a squawk run over exactly this one file (never a full regeneration
+of this report, which would have destroyed every hand-filled disagreement above) -- appended to
+the end of the comparison table, matching the CR-02, Phase 4 plan 02, and Phase 4 plan 06
+precedents above. The row agrees: squawk's `ban-drop-table`, `prefer-robust-stmts`,
+`require-lock-timeout`, and `require-statement-timeout` findings are byte-identical in rule-id
+set to the Phase 3 hand-written mirror's own row
+(`packages/automation/test/corpus/app-shaped/drop-ingredients-table.sql`), even though the SQL
+text itself differs (quoted identifier, added `CASCADE` -- see `docs/30-migration-runner.md`'s
+own "Anything surprising" section) -- squawk's `ban-drop-table` rule matches on the statement
+kind, the same way this analyzer's `drop-table` rule does, so the textual difference changes
+neither tool's verdict. No new disagreement to add; already folded into the executive summary's
+totals above (still 29 disagreements, now over 65 rows instead of 64).
 
 ## Rows this run could not establish (0)
 

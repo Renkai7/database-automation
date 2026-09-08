@@ -509,3 +509,117 @@ than invented.
 runner's own concern (`packages/automation/src/runner/`, `scripts/db-migrate.ts`) — this entry
 records the decision made in phase planning so it is discoverable without reopening
 `04-CONTEXT.md`, mirroring D16's own "durable summary" role for the safety analyzer's contract.
+
+---
+
+## D20 — The runner executes SQL itself; it does not wrap drizzle's own migrator
+**Status:** ACCEPTED · 2026-09-08
+
+`packages/automation`'s migration runner (`04-CONTEXT.md` D-01) reads each migration file once,
+hands that exact in-memory buffer to the in-process safety analyzer for classification, and then
+executes that same buffer statement by statement itself, through `pg` — never a second read of
+the file, and never a call into `drizzle-orm`'s own programmatic `migrate()`.
+
+**Why:** wrapping drizzle's own migrator was considered and rejected on two independent grounds.
+First, it re-reads the migration files itself, which means the bytes the analyzer classified and
+the bytes actually executed are not provably the same object — reopening exactly the gap D12
+(re-derive classification at execution time) exists to close. Second, it wraps each migration
+file in its own transaction unconditionally, which breaks RUN-04's requirement that statements
+are not forced into a transaction that would break `CREATE INDEX CONCURRENTLY` and similar safe
+forms. A hybrid that borrowed drizzle-kit's own journal-reading internals was also rejected, as a
+dependency on internals that are not a stable public API.
+
+**Consequence:** the runner owns statement splitting (derived from the same `libpg-query` AST the
+classifier already parses, `04-CONTEXT.md` D-03), the transaction wrap/unwrap decision
+(`04-CONTEXT.md` D-09/D-11), and the ledger write (`drizzle.__drizzle_migrations`, kept
+byte-compatible with drizzle's own format so `drizzle-kit generate`/`check` keep working
+unchanged, D-04) — all built on top of owning execution rather than delegating it.
+
+---
+
+## D21 — `drizzle-kit migrate` is structurally unreachable from this repository
+**Status:** ACCEPTED · 2026-09-08
+
+`db:migrate` is the gated runner (D20 above); nothing in the repository invokes `drizzle-kit`'s
+own `migrate` sub-command, and a guardrail test (`tests/guardrails.test.ts`) asserts no package
+script or code path reaches it, scanning the whole tracked source surface with no per-file
+allowlist. `drizzle-kit generate` and `drizzle-kit check` are untouched and remain in use for
+authoring and validating migrations.
+
+**Why:** the same reasoning `01-CONTEXT.md` D-14 used to reject a `docker-entrypoint-initdb.d`
+init script — a second, ungated path by which schema state can arrive is precisely the drift this
+system exists to detect, and it must not exist inside the system's own repository. A renamed
+escape hatch (e.g. `db:migrate:raw`) was considered and rejected: it is an override path under a
+different name, exactly the pattern `PITFALLS.md` §C2 identifies as the start of a slide toward
+routine overriding.
+
+**Reversibility:** one-way in intent. Restoring a raw migrate path later reintroduces the ungated
+route this decision closes — a future pull request that adds one, under any name, is a
+safety-relevant change and should be reviewed as such, not merged as ordinary configuration.
+
+---
+
+## D22 — The runner-owned `runner.migration_runs` table is bootstrapped imperatively, not by a Drizzle migration
+**Status:** ACCEPTED · 2026-09-08
+
+The runner records its in-flight marker, failure state, and per-migration run report in a
+separate, runner-owned Postgres table (`runner.migration_runs`, `04-CONTEXT.md` D-19), created
+with `CREATE ... IF NOT EXISTS` at first connect — never as a committed Drizzle migration.
+`drizzle.__drizzle_migrations` stays byte-compatible with drizzle's own format (D-04); this table
+holds only what that schema has no room for.
+
+**Why imperative bootstrap, not a migration, for three reasons:**
+1. **Chicken-and-egg.** The table has to exist in order to record the very run that would create
+   it if it were itself a migration — the first run that applies it would have nothing to record
+   its own outcome into until after it committed.
+2. **It is runner infrastructure, not application schema.** `drizzle-kit generate` diffs
+   `apps/recipe-app/src/db/schema.ts` against the database; `runner.migration_runs` is not part
+   of that application schema and should not appear in that diff.
+3. **RUN-05/RUN-06's schema assertions must stay a statement about the application's schema.**
+   Folding runner infrastructure into the migration history would make "the migration history
+   produces the expected schema" a claim about two different things at once.
+
+**Consequence:** this table is the substrate Phase 7's audit log is built on top of, rendering an
+existing artifact rather than inventing one from scratch.
+
+---
+
+## D23 — Recovery reports and resolves; it never repairs
+**Status:** ACCEPTED · 2026-09-08
+
+`pnpm db:migrate:recover` (`04-CONTEXT.md` D-21) is a report-and-clear command, and nothing more.
+It names the exact state of every unresolved marker it finds — which migration, which statement
+(of how many), and any `INVALID` index the database currently holds — then clears (resolves) the
+marker so `db:migrate` can proceed again. It never edits `_journal.json` and never drops or
+rebuilds anything itself.
+
+**Why:** automatic repair was considered and rejected. Putting destructive capability (for
+example, dropping an `INVALID` index on its own initiative) inside the one component whose entire
+job is refusing destructive operations has the wrong shape — it would mean the safety tool and
+the thing it protects against share a code path. The operator's own action, taken with full
+knowledge of what the report named, is what resolves the underlying state; the recovery command's
+job ends at making that state visible and un-stuck.
+
+---
+
+## D24 — Two Testcontainers-vs-real-container harnesses for the history tests, deliberately
+**Status:** ACCEPTED · 2026-09-08
+
+RUN-05 and RUN-06 (full history against a genuinely empty database; the newest migration against
+an already-migrated one) run against `@testcontainers/postgresql` instances. RUN-07 (the
+application boots against the resulting schema) runs `tests/smoke.test.ts` against the real,
+pinned local development container, after a full-history `pnpm db:reset` (`04-CONTEXT.md` D-22).
+
+**Why two harnesses, not one:** neither can honestly do the other's job. Testcontainers gives
+"genuinely empty" by construction, with a dynamically assigned port — exactly what RUN-05/RUN-06
+need to prove, and exactly what the application's own connection cannot be, because
+`01-CONTEXT.md` D-16's `assertLocalDevelopmentTarget` pins the app to
+`127.0.0.1:5432/recipe_dev` specifically so that guard cannot be silently loosened into a
+remotely-pointable one. Loosening that pin to let the app boot against a Testcontainers instance
+was considered and declined — it is the exact collision `02-CONTEXT.md` D-14 already declined to
+solve by loosening the pin, and doing so here would weaken the single guard that makes the whole
+workspace structurally local.
+
+**Consequence:** RUN-07's proof is necessarily against the one real container this repository
+runs, reusing the smoke test built for exactly this purpose (`01-CONTEXT.md` D-08, D-26) rather
+than against a disposable stand-in.
