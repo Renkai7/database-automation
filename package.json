@@ -8,6 +8,7 @@
     "db:down": "docker compose down -v",
     "db:generate": "pnpm --filter recipe-app exec drizzle-kit generate",
     "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:migrate:recover": "tsx scripts/db-migrate-recover.ts",
     "db:seed": "tsx apps/recipe-app/src/db/seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
     "db:query": "tsx scripts/db-query.ts",

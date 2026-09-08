@@ -231,23 +231,26 @@ describe("structural guardrails", () => {
     ).toEqual(["127.0.0.1", "::1", "[::1]", "localhost"].sort());
   });
 
-  it("no Phase 2 command script reads process.argv, stdin, or an interactive prompt library (D-06)", () => {
+  it("no command script reads process.argv, stdin, or an interactive prompt library (D-06)", () => {
     // 02-03-PLAN.md Task 3: makes "no command in this phase can be pointed at another database"
     // permanent rather than plan-time -- a command that accepts an argument is the command that
     // later accepts a target. Needles are built at runtime, matching this file's own convention
     // (CONNECTION_STRING_SCHEME_PREFIX above), so this assertion's own source never contains the
-    // literal expressions it searches for.
-    const phase2CommandScripts = [
+    // literal expressions it searches for. Widened beyond Phase 2 (04-05-PLAN.md Task 2) to cover
+    // `scripts/db-migrate-recover.ts` too -- the same no-target rule applies to every command
+    // script in this repository, not just the ones Phase 2 happened to introduce first.
+    const commandScripts = [
       "scripts/backup.ts",
       "scripts/restore.ts",
       "scripts/restore-cluster.ts",
       "scripts/drill.ts",
+      "scripts/db-migrate-recover.ts",
     ];
     const argvNeedle = ["process", ".argv"].join("");
     const stdinNeedle = ["process", ".stdin"].join("");
     const promptLibraries = ["readline", "prompts", "inquirer"];
 
-    for (const file of phase2CommandScripts) {
+    for (const file of commandScripts) {
       // Comment-only lines removed before scanning, so a doc comment describing this very
       // constraint (as this file's own comments do) cannot trip the check it is documenting.
       const content = readFileSync(file, "utf-8")
@@ -275,6 +278,40 @@ describe("structural guardrails", () => {
         ).not.toContain(lib);
       }
     }
+  });
+
+  it("scripts/db-migrate-recover.ts never touches _journal.json, never issues DROP INDEX, and never forces process.exit (D-20/D-21)", () => {
+    // Needles built at runtime, matching this file's own convention, so this test's own source
+    // never contains the literal expressions it searches for. Comment-only lines removed first,
+    // same as the test above, so this file's own module-comment prose describing exactly these
+    // three constraints (D-20/D-21's "never edits _journal.json", "never drops an index", "never
+    // forces a synchronous process exit") cannot trip the check that proves the code holds them.
+    const journalNeedle = ["_journal", ".json"].join("");
+    const dropIndexNeedle = ["DROP", " INDEX"].join(" ");
+    const exitNeedle = ["process", ".exit("].join("");
+    const content = readFileSync("scripts/db-migrate-recover.ts", "utf-8")
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
+
+    expect(
+      content,
+      `D-20/D-21: scripts/db-migrate-recover.ts must not reference "${journalNeedle}" -- the ` +
+        "recovery command never edits, rewrites, or deletes the migration journal",
+    ).not.toContain(journalNeedle);
+
+    expect(
+      content,
+      `D-20/D-21: scripts/db-migrate-recover.ts must not reference "${dropIndexNeedle}" -- the ` +
+        "recovery command never repairs the schema on its own initiative",
+    ).not.toContain(dropIndexNeedle);
+
+    expect(
+      content,
+      `D-20/D-21: scripts/db-migrate-recover.ts must not reference "${exitNeedle}" -- never a ` +
+        "forced synchronous process exit after a libpg-query WASM parse (Windows libuv crash " +
+        "avoidance, packages/automation/src/cli.ts's own header comment)",
+    ).not.toContain(exitNeedle);
   });
 
   it("no file in the source surface references drizzle-kit's own migrate sub-command (D-02, Phase 4)", async () => {
