@@ -24,7 +24,13 @@ export type { SplitStatement } from "./runner/split-statements";
 export { decideTransactionPolicy, MixedTransactionFileError } from "./runner/transaction-policy";
 export type { TransactionPolicy } from "./runner/transaction-policy";
 export { ensureDrizzleLedger, migrationHash } from "./runner/ledger";
-export { ensureRunnerTable } from "./runner/runner-table";
-export type { RunEntryState } from "./runner/runner-table";
+export {
+  ensureRunnerTable,
+  readInvalidIndexes,
+  readUnresolvedMarkers,
+  resolveMarker,
+  UnresolvedMarkerError,
+} from "./runner/runner-table";
+export type { InvalidIndex, RunEntryState, UnresolvedMarker } from "./runner/runner-table";
 export { MigrationRefusedError, runMigrations } from "./runner/run-migrations";
 export type { RunMigrationsOptions, RunReport, RunReportEntry } from "./runner/run-migrations";

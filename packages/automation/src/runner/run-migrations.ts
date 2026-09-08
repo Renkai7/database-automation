@@ -17,6 +17,12 @@
 // same run. A BLOCKED verdict, discovered only once execution begins (phase B), stops the run
 // but does not undo migrations already applied earlier in that same phase (D-02: "apply nothing
 // further").
+//
+// D-18/D-20 (plan 04-05): before anything else -- before even Phase A's classification -- this
+// module refuses the WHOLE run if the runner-owned table already holds an unresolved marker.
+// Continuing past an unknown database state is how a partial failure becomes a silent one, and
+// applying later migrations on top of it is precisely the drift the history tests exist to
+// catch. The only way past this refusal is a human running `pnpm db:migrate:recover`.
 import { randomUUID } from "node:crypto";
 import { safeErrorMessage } from "../../../../scripts/log";
 import type { MigrationFile } from "../adapter/drizzle-migrations";
@@ -26,7 +32,15 @@ import { AnalyzerParseError, VERDICT_SEVERITY, type AnalysisResult, type Finding
 import type { RunnerClient } from "./client";
 import { RUNNER_EXIT_CODES } from "./exit-codes";
 import { insertLedgerRow, migrationHash, readLastAppliedMillis } from "./ledger";
-import { recordRunEntry, type RunEntryState } from "./runner-table";
+import {
+  markMarkerApplied,
+  markMarkerFailed,
+  readUnresolvedMarkers,
+  recordRunEntry,
+  UnresolvedMarkerError,
+  writeInFlightMarker,
+  type RunEntryState,
+} from "./runner-table";
 import { splitStatements } from "./split-statements";
 import { decideTransactionPolicy, MixedTransactionFileError } from "./transaction-policy";
 
@@ -126,6 +140,27 @@ async function applyMigration(
   const statements = await splitStatements(file.sql);
   let currentStatementIndex: number | null = null;
 
+  // D-18: for the unwrapped branch, an in-flight marker is written BEFORE the single statement
+  // executes and resolved (in place, the SAME row) only once the ledger row has landed. There is
+  // deliberately no marker for the wrapped branch (`markerId` stays null) -- a wrapped failure
+  // rolls its statements and its ledger row back together in the same transaction (D-12), so
+  // nothing is left behind that a marker would need to describe.
+  let markerId: number | null = null;
+  if (!wrap) {
+    markerId = await writeInFlightMarker(client, {
+      runId,
+      migrationTag: file.tag,
+      migrationIdx: file.idx,
+      sqlSha256: hash,
+      verdict: result.verdict,
+      findings: result.findings,
+      statementIndex: 0,
+      statementCount: statements.length,
+      rulesVersion: result.rulesVersion,
+      startedAt: startedAt.toISOString(),
+    });
+  }
+
   try {
     if (wrap) {
       await client.query("BEGIN");
@@ -149,23 +184,30 @@ async function applyMigration(
       await client.query("ROLLBACK");
     }
     const finishedAt = now();
-    await recordRunEntry(client, {
-      runId,
-      migrationTag: file.tag,
-      migrationIdx: file.idx,
-      sqlSha256: hash,
-      verdict: result.verdict,
-      findings: result.findings,
-      wrapped: wrap,
-      state: "failed",
-      statementIndex: currentStatementIndex,
-      statementCount: statements.length,
-      errorMessage: safeErrorMessage(error),
-      startedAt: startedAt.toISOString(),
-      finishedAt: finishedAt.toISOString(),
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      rulesVersion: result.rulesVersion,
-    });
+    if (markerId !== null) {
+      // D-18/D-20: leave the marker row itself as the unresolved record of this failure -- never
+      // insert a second row for the same migration, and never resolve it. The next run's
+      // readUnresolvedMarkers finds this exact row.
+      await markMarkerFailed(client, markerId, safeErrorMessage(error), finishedAt.toISOString());
+    } else {
+      await recordRunEntry(client, {
+        runId,
+        migrationTag: file.tag,
+        migrationIdx: file.idx,
+        sqlSha256: hash,
+        verdict: result.verdict,
+        findings: result.findings,
+        wrapped: wrap,
+        state: "failed",
+        statementIndex: currentStatementIndex,
+        statementCount: statements.length,
+        errorMessage: safeErrorMessage(error),
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        rulesVersion: result.rulesVersion,
+      });
+    }
     throw new MigrationRefusedError(
       `${file.tag}: execution failed -- ${safeErrorMessage(error)}`,
       RUNNER_EXIT_CODES.EXECUTION_FAILED,
@@ -174,23 +216,32 @@ async function applyMigration(
 
   const finishedAt = now();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
-  await recordRunEntry(client, {
-    runId,
-    migrationTag: file.tag,
-    migrationIdx: file.idx,
-    sqlSha256: hash,
-    verdict: result.verdict,
-    findings: result.findings,
-    wrapped: wrap,
-    state: "applied",
-    statementIndex: null,
-    statementCount: statements.length,
-    errorMessage: null,
-    startedAt: startedAt.toISOString(),
-    finishedAt: finishedAt.toISOString(),
-    durationMs,
-    rulesVersion: result.rulesVersion,
-  });
+  if (markerId !== null) {
+    // D-18: the marker is only resolved once the migration's ledger row has landed -- the SAME
+    // row transitions in_flight -> applied, so a successful unwrapped migration ends up with
+    // exactly one row, exactly like every other successful branch
+    // (tests/history/empty-db-full-history.test.ts already asserts every row for a run is
+    // "applied" after a clean run).
+    await markMarkerApplied(client, markerId, finishedAt.toISOString(), durationMs);
+  } else {
+    await recordRunEntry(client, {
+      runId,
+      migrationTag: file.tag,
+      migrationIdx: file.idx,
+      sqlSha256: hash,
+      verdict: result.verdict,
+      findings: result.findings,
+      wrapped: wrap,
+      state: "applied",
+      statementIndex: null,
+      statementCount: statements.length,
+      errorMessage: null,
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      durationMs,
+      rulesVersion: result.rulesVersion,
+    });
+  }
 
   return {
     tag: file.tag,
@@ -213,6 +264,21 @@ export async function runMigrations(
   options: RunMigrationsOptions,
 ): Promise<RunReport> {
   const { migrations, rules, now = () => new Date() } = options;
+
+  // D-18/D-20: before anything is enumerated or classified, refuse the whole run if the
+  // database is in a state a prior run left unresolved -- a process killed mid-flight
+  // (`in_flight`) or an unwrapped statement that genuinely failed (`failed`, `wrapped: false`).
+  // Applying nothing here is deliberate: continuing past an unknown database state is how a
+  // partial failure becomes a silent one, and applying later migrations on top of it is
+  // precisely the drift the history tests exist to catch. There is no parameter, flag, or
+  // environment read that can let a run proceed past this -- only a human running
+  // `pnpm db:migrate:recover` clears it.
+  const unresolvedMarkers = await readUnresolvedMarkers(client);
+  if (unresolvedMarkers.length > 0) {
+    const markerError = new UnresolvedMarkerError(unresolvedMarkers);
+    throw new MigrationRefusedError(markerError.message, RUNNER_EXIT_CODES.REFUSED_STALE_MARKER);
+  }
+
   const runId = randomUUID();
   const ordered = [...migrations].sort((a, b) => a.idx - b.idx);
 

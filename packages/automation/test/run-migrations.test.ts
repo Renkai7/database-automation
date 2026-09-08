@@ -13,24 +13,46 @@ import type { RulesFile } from "../src/classifier/rules-schema";
 import type { RunnerClient } from "../src/runner/client";
 import { RUNNER_EXIT_CODES } from "../src/runner/exit-codes";
 import { MigrationRefusedError, runMigrations, type RunMigrationsOptions } from "../src/runner/run-migrations";
+import { RUNNER_RUNS_TABLE } from "../src/runner/runner-table";
 
 const rules: RulesFile = loadDefaultRules();
 const fixedNow = () => new Date("2026-01-01T00:00:00.000Z");
 
-/** Records every query text it was asked to run -- never simulates a real Postgres server. Only
- * `readLastAppliedMillis`'s SELECT is given a canned answer (the ledger's current state); every
- * other query resolves with an empty row set, which is all applyMigration/recordRunEntry need
- * from a client they never read the return value of besides that one SELECT. */
+/** Records every query text it was asked to run -- never simulates a real Postgres server.
+ * `readLastAppliedMillis`'s SELECT is given a canned answer (the ledger's current state);
+ * `readUnresolvedMarkers`'s SELECT (04-05: called at the very top of every `runMigrations` call)
+ * is given `unresolvedMarkerRows` (empty by default, so every pre-existing test in this file --
+ * none of which constructs a stale marker -- proceeds exactly as before); `RETURNING id`
+ * (`writeInFlightMarker`) gets an incrementing fake id; `failingCallPredicate` lets a single test
+ * simulate one specific statement throwing (a real Postgres error), without which the unwrapped
+ * failure path (D-18) could never be exercised against a fake client that never itself fails.
+ * Every other query resolves with an empty row set. */
 class RecordingFakeClient implements RunnerClient {
   readonly calls: string[] = [];
-  constructor(private readonly lastAppliedMillis: number | null = null) {}
+  private nextId = 1;
+  constructor(
+    private readonly lastAppliedMillis: number | null = null,
+    private readonly unresolvedMarkerRows: Record<string, unknown>[] = [],
+    private readonly failingCallPredicate?: (text: string) => boolean,
+  ) {}
 
   async query<R = Record<string, unknown>>(text: string): Promise<{ rows: R[] }> {
     this.calls.push(text);
+    if (this.failingCallPredicate?.(text)) {
+      throw new Error("simulated statement failure");
+    }
     if (text.startsWith("SELECT created_at FROM drizzle.__drizzle_migrations")) {
       const rows =
         this.lastAppliedMillis === null ? [] : [{ created_at: this.lastAppliedMillis }];
       return { rows: rows as unknown as R[] };
+    }
+    if (text.includes(`FROM ${RUNNER_RUNS_TABLE} WHERE state = 'in_flight'`)) {
+      return { rows: this.unresolvedMarkerRows as unknown as R[] };
+    }
+    if (text.includes("RETURNING id")) {
+      const row = { id: this.nextId };
+      this.nextId += 1;
+      return { rows: [row] as unknown as R[] };
     }
     return { rows: [] as unknown as R[] };
   }
@@ -120,10 +142,12 @@ describe("runMigrations refusal branches (D-02/D-08/RUN-02)", () => {
     );
 
     // Phase A (classify-all) runs before Phase B (execute-any) precisely so a parse failure
-    // anywhere in the pending set aborts before a single statement runs. The ONE legitimate call
-    // is the up-front ledger read (the D-08-preceding "what is already applied?" skip-check) --
-    // proven here by asserting no BEGIN, no statement text, and no INSERT reached the client.
+    // anywhere in the pending set aborts before a single statement runs. The two legitimate
+    // calls are the up-front unresolved-marker check (D-18/D-20, always first) and the ledger
+    // read (the D-08-preceding "what is already applied?" skip-check) -- proven here by
+    // asserting no BEGIN, no statement text, and no INSERT reached the client.
     expect(client.calls).toEqual([
+      `SELECT id, run_id, migration_tag, migration_idx, verdict, statement_index, statement_count, wrapped, state, error_message, started_at FROM ${RUNNER_RUNS_TABLE} WHERE state = 'in_flight' OR (state = 'failed' AND wrapped = false) ORDER BY id ASC`,
       "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC NULLS LAST LIMIT 1",
     ]);
   });
@@ -299,5 +323,138 @@ describe("runMigrations transaction policy (D-09/D-11/RUN-03/RUN-04)", () => {
       const createTableOccurrences = (call.match(/CREATE TABLE/g) ?? []).length;
       expect(createTableOccurrences).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+// 04-05-PLAN.md Task 1: the in-flight marker lifecycle (D-18/D-20/RUN-08). Every genuine partial
+// failure is proven end to end against a real database in
+// tests/history/partial-failure-recovery.test.ts (Task 3); this suite proves the exact call
+// ordering and the refusal path against the fake client, which a real-database test cannot
+// isolate as cleanly (a real Postgres connection cannot be told to fail one specific statement
+// without genuinely breaking something).
+describe("runMigrations partial-failure marker lifecycle (D-18/D-20/RUN-08)", () => {
+  it("unwrapped branch issues, in order, the marker insert, the single statement, the ledger insert, and the marker resolve -- with no BEGIN anywhere in it", async () => {
+    const client = new RecordingFakeClient();
+    const file = migrationFile({
+      tag: "0000_concurrent_index",
+      idx: 0,
+      when: 1,
+      sql: "CREATE INDEX CONCURRENTLY idx_t_c ON t (c);",
+    });
+
+    await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+
+    const relevantCalls = client.calls.filter(
+      (call) =>
+        (call.includes(`INSERT INTO ${RUNNER_RUNS_TABLE}`) && call.includes("'in_flight'")) ||
+        call === "CREATE INDEX CONCURRENTLY idx_t_c ON t (c)" ||
+        call.includes("INSERT INTO drizzle.__drizzle_migrations") ||
+        (call.includes(`UPDATE ${RUNNER_RUNS_TABLE}`) && call.includes("'applied'")),
+    );
+    expect(relevantCalls).toHaveLength(4);
+    expect(relevantCalls[0]).toContain(`INSERT INTO ${RUNNER_RUNS_TABLE}`);
+    expect(relevantCalls[0]).toContain("'in_flight'");
+    expect(relevantCalls[1]).toBe("CREATE INDEX CONCURRENTLY idx_t_c ON t (c)");
+    expect(relevantCalls[2]).toContain("INSERT INTO drizzle.__drizzle_migrations");
+    expect(relevantCalls[3]).toContain(`UPDATE ${RUNNER_RUNS_TABLE}`);
+    expect(relevantCalls[3]).toContain("'applied'");
+    expect(client.calls).not.toContain("BEGIN");
+  });
+
+  it("wrapped branch issues no marker insert and no marker resolve at all", async () => {
+    const client = new RecordingFakeClient();
+    const sql = ["CREATE TABLE w1 (id int);", "CREATE TABLE w2 (id int);"].join("\n");
+    const file = migrationFile({ tag: "0000_wrapped", idx: 0, when: 1, sql });
+
+    await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+
+    expect(
+      client.calls.some(
+        (call) => call.includes(`INSERT INTO ${RUNNER_RUNS_TABLE}`) && call.includes("'in_flight'"),
+      ),
+    ).toBe(false);
+    expect(
+      client.calls.some(
+        (call) => call.includes(`UPDATE ${RUNNER_RUNS_TABLE}`) && call.includes("'applied'"),
+      ),
+    ).toBe(false);
+  });
+
+  it("when the unwrapped statement throws, the marker row is left unresolved: state failed, wrapped false, and no ledger insert reaches the client", async () => {
+    const failingStatement = "CREATE INDEX CONCURRENTLY idx_fail ON t (c)";
+    const client = new RecordingFakeClient(null, [], (text) => text === failingStatement);
+    const file = migrationFile({
+      tag: "0000_concurrent_index_fail",
+      idx: 0,
+      when: 1,
+      sql: `${failingStatement};`,
+    });
+
+    await expectRefused(
+      runMigrations(client, { migrations: [file], rules, now: fixedNow }),
+      RUNNER_EXIT_CODES.EXECUTION_FAILED,
+    );
+
+    expect(
+      client.calls.some((call) => call.includes("INSERT INTO drizzle.__drizzle_migrations")),
+    ).toBe(false);
+    const failedUpdate = client.calls.find(
+      (call) => call.includes(`UPDATE ${RUNNER_RUNS_TABLE}`) && call.includes("'failed'"),
+    );
+    expect(failedUpdate).toBeDefined();
+    expect(failedUpdate).toContain("simulated statement failure");
+    expect(
+      client.calls.some(
+        (call) => call.includes(`UPDATE ${RUNNER_RUNS_TABLE}`) && call.includes("'resolved'"),
+      ),
+    ).toBe(false);
+    // Exactly one INSERT into runner.migration_runs for this migration (the marker itself) --
+    // never a second row for the same failure.
+    expect(
+      client.calls.filter((call) => call.includes(`INSERT INTO ${RUNNER_RUNS_TABLE}`)),
+    ).toHaveLength(1);
+  });
+
+  it("refuses the whole run before classifying anything when the table already holds an unresolved marker, naming the migration tag and the recovery command, with no BEGIN, no statement, and no ledger insert reaching the client", async () => {
+    const unresolvedRow = {
+      id: 9,
+      run_id: "22222222-2222-2222-2222-222222222222",
+      migration_tag: "9999_stuck",
+      migration_idx: 5,
+      verdict: "SAFE",
+      statement_index: 0,
+      statement_count: 1,
+      wrapped: false,
+      state: "in_flight",
+      error_message: null,
+      started_at: "2026-01-01T00:00:00.000Z",
+    };
+    const client = new RecordingFakeClient(null, [unresolvedRow]);
+    const file = migrationFile({
+      tag: "0001_fresh",
+      idx: 0,
+      when: 1,
+      sql: "CREATE TABLE fresh (id int);",
+    });
+
+    let caught: unknown;
+    try {
+      await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(MigrationRefusedError);
+    expect((caught as MigrationRefusedError).code).toBe(RUNNER_EXIT_CODES.REFUSED_STALE_MARKER);
+    expect((caught as Error).message).toContain("9999_stuck");
+    expect((caught as Error).message).toContain("pnpm db:migrate:recover");
+    expect(client.calls).not.toContain("BEGIN");
+    expect(client.calls.some((call) => call.includes("CREATE TABLE fresh"))).toBe(false);
+    expect(
+      client.calls.some((call) => call.includes("INSERT INTO drizzle.__drizzle_migrations")),
+    ).toBe(false);
+    // The unresolved-marker check is the ONLY call this run makes -- it never even reaches the
+    // ledger read that decides which migrations are pending.
+    expect(client.calls).toHaveLength(1);
   });
 });
