@@ -15,6 +15,13 @@
       "when": 1788742285126,
       "tag": "0001_busy_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788906778821,
+      "tag": "0002_oval_maelstrom",
+      "breakpoints": true
     }
   ]
 }

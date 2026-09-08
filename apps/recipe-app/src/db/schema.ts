@@ -3,8 +3,10 @@ import { integer, numeric, pgTable, text, timestamp, unique, uuid } from "drizzl
 
 // D-09: this task creates the recipes table only — ingredients and steps are added by
 // plan 01-03, which exercises the generate -> inspect -> migrate loop a second time.
-// D-10/D-11: no `notes` column and no tags table here; both are reserved churn material
-// for Phase 4.
+// D-10/D-11 (Phase 4, 04-06/D-30): `notes` is now spent -- a nullable, no-default column
+// generated and applied through the real runner, landing SAFE as predicted. The `tags`
+// table alternative remains reserved and unspent. The expand-and-contract row
+// (01-CONTEXT.md D-11's fourth row) stays reserved for Phase 7.
 export const recipes = pgTable("recipes", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
@@ -15,6 +17,7 @@ export const recipes = pgTable("recipes", {
   effort: text("effort").notNull(),
   baseKcal: integer("base_kcal").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  notes: text("notes"),
 });
 
 // D-09 (plan 01-03): the two remaining recipe-core tables. Quantities are stored as

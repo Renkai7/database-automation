@@ -39,13 +39,15 @@ describe("enumerateMigrationFiles (D-11)", () => {
     expect(typeof enumerateMigrationFiles).toBe("function");
   });
 
-  it("with no arguments returns exactly two entries for this repository, tagged 0000_bumpy_khan then 0001_busy_thunderbolt", () => {
+  it("with no arguments returns exactly three entries for this repository, tagged 0000_bumpy_khan, 0001_busy_thunderbolt, then 0002_oval_maelstrom", () => {
     const files = enumerateMigrationFiles();
-    expect(files).toHaveLength(2);
+    expect(files).toHaveLength(3);
     expect(files[0].tag).toBe("0000_bumpy_khan");
     expect(files[0].idx).toBe(0);
     expect(files[1].tag).toBe("0001_busy_thunderbolt");
     expect(files[1].idx).toBe(1);
+    expect(files[2].tag).toBe("0002_oval_maelstrom");
+    expect(files[2].idx).toBe(2);
     for (const file of files) {
       expect(file.sql.length).toBeGreaterThan(0);
     }
