@@ -330,3 +330,102 @@ that config instead of adding a fourth hardcoding site. This is a recommendation
   dependency — is UNKNOWN; it has not been decided.
 - Whether these are even the right seams to extract along is UNKNOWN, because no second
   consuming project exists yet to test them against.
+
+---
+
+## D16 — The safety analyzer's classification contract
+**Status:** ACCEPTED · 2026-09-08
+
+Phase 3 built `packages/automation`, a PostgreSQL migration-safety classifier. Its contract,
+carried here from phase planning (`03-CONTEXT.md`) as a project-level decision rather than
+something that lives only in one phase's planning documents:
+
+- **Three verdicts plus a distinct fourth outcome for a parse failure.** Every classified
+  migration file gets exactly one of SAFE, REVIEW_REQUIRED, or BLOCKED. A file libpg-query
+  cannot parse produces none of those three — it is a thrown, distinct error, never silently
+  folded into BLOCKED or any other verdict. Collapsing a parse failure into a verdict would make
+  "the analyzer is broken" indistinguishable from "the migration is dangerous" in any later
+  audit record, and PostgreSQL itself would reject the same SQL — the honest statement is that
+  the input is unparseable, not that it is borderline-dangerous.
+- **Classification is derived from a real PostgreSQL parse tree, never from pattern matching.**
+  The classifier is built on `libpg-query`, the actual PostgreSQL grammar compiled to
+  WebAssembly, not a regex or string-matching approximation of it. A hand-rolled parser drifts
+  from real Postgres grammar on edge cases (comments, dollar-quoting, quoted identifiers);
+  `libpg-query` **is** the grammar, so the resulting AST is authoritative by construction.
+- **Rules are a schema-validated JSON data file with a required rationale per rule.** The rules
+  catalogue (`packages/automation/src/rules/rules.json`) is data, not code, validated by zod on
+  every load — a rule with no stated reason for its verdict is a schema violation, not a
+  permitted entry.
+- **A code floor fixes BLOCKED for the named irreversible-data-loss operations and for
+  unresolvable dynamic SQL, self-checked at load time.** `DROP TABLE`, `DROP SCHEMA`,
+  `DROP DATABASE`, `TRUNCATE`, `DROP COLUMN`, `DELETE`/`UPDATE` without a row-scoping `WHERE`,
+  and an `EXECUTE` argument the analyzer cannot statically resolve can never be classified
+  weaker than BLOCKED — a rules file that tries fails schema validation loudly, and the analyzer
+  refuses to run rather than falling back to a silently weaker floor. Because the rules file is
+  data an agent can edit, this is the one property that must not be data-configurable: a
+  one-line diff to "downgrade DROP TABLE to SAFE" would otherwise disarm the entire system.
+- **An unmatched operation resolves to REVIEW REQUIRED because SAFE must be earned.** A
+  PostgreSQL feature the catalogue has never heard of stops for a human rather than sailing
+  through un-reviewed. This default was load-bearing evidence in the phase's own squawk
+  comparison (`docs/30-squawk-comparison.md`): every adversarial destructive operation probed
+  outside the `DROP TABLE`-shaped set (`DROP OWNED BY`, unscoped `DELETE`/`UPDATE`,
+  `COPY ... FROM PROGRAM`, `CREATE RULE ... DO INSTEAD DELETE`, `ALTER TABLE ... DETACH
+  PARTITION`, `REASSIGN OWNED BY`) landed BLOCKED or REVIEW_REQUIRED, never SAFE — the
+  earn-SAFE default, not catalogue completeness, is the analyzer's real safety property.
+- **A one-migration-file window for safe-form pairing.** Two-statement safe forms (`ADD
+  CONSTRAINT ... NOT VALID` followed by `VALIDATE CONSTRAINT`, `CREATE UNIQUE INDEX
+  CONCURRENTLY` followed by `ADD CONSTRAINT ... UNIQUE USING INDEX`, and the three-step
+  validated-check-then-`SET NOT NULL` form) are only recognized when both halves appear in the
+  same file. Nothing outside that file's own text ever raises a verdict.
+- **Distinct exit codes chosen so a crashed analyzer can never be read as a verdict.** The CLI's
+  process exit code space is partitioned so a non-zero exit from an internal analyzer failure
+  cannot land on the same number as a BLOCKED or REVIEW_REQUIRED verdict — a script driving the
+  analyzer from its exit code alone cannot mistake "the tool crashed" for "the tool disapproved."
+
+**Two deliberate exclusions, recorded so a later reader does not restore them as oversights:**
+
+1. **The session-timeout rules** (`require-lock-timeout`, `require-statement-timeout` in
+   squawk's own catalogue) are not part of this project's rules. They describe how the runner
+   opens its database session, not what a given SQL statement does — flagging every migration
+   for a property the Phase 4 runner is already responsible for setting (RUN-02) would be a
+   false positive by construction, and would manufacture exactly the review-fatigue this
+   catalogue's REVIEW REQUIRED tier exists to avoid.
+2. **Constant folding of dynamic SQL arguments.** An `EXECUTE`d statement built from string
+   concatenation that could, in principle, be resolved to a static value at analysis time is not
+   attempted — any unresolvable dynamic SQL argument is BLOCKED outright (the code floor above),
+   accepting that any legitimate need for dynamic SQL in a migration must be rewritten as static
+   statements. For this project's actual migrations that is not a real loss; asking a human to
+   approve SQL nobody — not the analyzer, not the reviewer — can actually read would be the
+   weakest possible form of the gate.
+
+**Open item, not done:** `packages/automation/src/classifier/rules-schema.ts` and
+`packages/automation/test/corpus-manifest-schema.ts` both `import { z } from "zod"` without
+`packages/automation/package.json` declaring `zod` as a dependency of its own — it resolves only
+because Node's module resolution walks up to the workspace root, where the root `package.json`
+declares it (`03-01-SUMMARY.md`'s own recorded note). This is fine today under this repository's
+established resolution precedent (the same pattern this phase's `squawk-comparison.ts` script
+also relies on for `execa`), but it is a real gap, not a decision: `packages/automation` is not
+yet independently installable outside this workspace. **This is a named, undone task for Phase
+7's extraction** (D15 above) — `zod` (and, if the squawk-comparison script or its equivalent
+survives extraction, `execa`) must become an explicit declared dependency of
+`packages/automation/package.json` before that package is published or consumed anywhere
+outside this monorepo.
+
+**Open question, status UNKNOWN — the production PostgreSQL major version.** This gap was
+flagged in the project's original stack research and was never closed; it is recorded again here
+rather than left to go stale silently. It governs three things: the `libpg-query` PG-version
+dist-tag, the `postgres:*-alpine` client image tag used for backup/restore (D9), and whether
+Phase 3's parser choice needs revisiting. Phase 3 shipped on `libpg-query`'s default (pg18) dist
+line — an upgrade from the 17.7.4 originally installed, needed because `parsePlPgSQL` (D-05's
+recursion into DO-block and function bodies) ships only on that line — while dev/CI stays pinned
+to PostgreSQL 17 (D9). That mismatch does not block on the unresolved production version:
+parsing with a newer grammar than the target server is the safe direction for a safety analyzer,
+because a newer grammar is a near-superset of an older one, so the only failure mode is accepting
+syntax an older server would reject — never missing a real hazard such as `DROP TABLE`. This
+reasoning is why the still-unknown production version did not block this phase, not a reason to
+stop tracking it as an open question.
+
+**Why this belongs in the project decision log, not only in phase planning:** `03-CONTEXT.md`'s
+decisions (D-01 through D-16 there) are phase-scoped planning artifacts. This entry is the
+durable summary a later phase — most concretely, Phase 4's runner and Phase 7's extraction — can
+read without reopening Phase 3's full planning history.

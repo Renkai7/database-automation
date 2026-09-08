@@ -55,6 +55,13 @@ async function sourceSurfaceFiles(): Promise<string[]> {
       if (file.startsWith("apps/recipe-app/") && !file.startsWith("apps/recipe-app/design/")) {
         return true;
       }
+      // 03-07-PLAN.md Task 3: packages/ did not exist when this enumeration was written, so it
+      // was never in scope -- an oversight, not a deliberate exclusion like .planning/ and
+      // docs/ below. Phase 7's planned extraction of packages/automation into its own published
+      // package makes an uncovered package directory more of a problem over time, not less: the
+      // connection-string, direct-sync, and direct-environment-read checks below should cover
+      // this source the same way they cover scripts/ and tests/.
+      if (file.startsWith("packages/")) return true;
       // Deliberately excluded: .planning/ and docs/ are prose ABOUT these constraints and
       // would otherwise match every assertion below that they describe.
       return false;
