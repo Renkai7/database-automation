@@ -26,7 +26,7 @@ import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadDefaultRules } from "../src/adapter/default-rules";
 import { analyzeSql } from "../src/analyze";
-import { loadCorpusManifest } from "./corpus-manifest-schema";
+import { loadCorpusManifest, type CorpusEntry } from "./corpus-manifest-schema";
 
 const CORPUS_DIR = "packages/automation/test/corpus";
 const MANIFEST_PATH = "packages/automation/test/corpus/manifest.json";
@@ -56,8 +56,11 @@ const RULE_COVERAGE_EXCEPTIONS: string[] = [
   // catalogue" -- the BLOCKED set, every REVIEW REQUIRED form, and the USUALLY SAFE set
   // including the three safe-form pairings -- not PL/pgSQL recursion or dynamic SQL, which are
   // different, already-covered concerns.
-  "do-block-container",
-  "create-function-container",
+  //
+  // do-block-container and create-function-container are NOT listed here (plan 03-06 closed
+  // that gap): the D-14 adversarial pairs (do-block, dollar-quoted-string, function-body pairIds
+  // below) exercise both rules directly, since a container whose body is genuinely safe is
+  // exactly the inert half of those pairs.
   "container-body-not-inspected",
   "nesting-depth-exceeded",
   "unresolvable-dynamic-sql",
@@ -114,6 +117,96 @@ describe("structural integrity: the manifest and the corpus directory must name 
   it("every manifest row names a file that exists on disk", () => {
     const missing = manifest.entries.filter((entry) => !existsSync(entry.file)).map((entry) => entry.file);
     expect(missing, `manifest rows naming files that do not exist: ${missing.join(", ")}`).toEqual([]);
+  });
+});
+
+// D-14: the five adversarial evasion shapes PITFALLS.md section C1 names. Enumerated explicitly
+// (not just "however many pairId groups happen to exist") so a shape silently missing entirely --
+// not just missing one half -- also fails the suite, naming exactly which one.
+const D14_ADVERSARIAL_PAIR_IDS = [
+  "inline-comment",
+  "dollar-quoted-string",
+  "do-block",
+  "function-body",
+  "quoted-identifier",
+];
+
+// The D-02 floor's own BLOCKED rule ids (rules.json, category irreversible-data-loss). Every
+// D-14 hidden-executable fixture in this corpus hides a genuine DROP TABLE specifically, so this
+// list only needs to name floor ids in general -- kept as the general floor set, not narrowed to
+// "drop-table" alone, so a future adversarial pair hiding a different floor operation (TRUNCATE,
+// DROP COLUMN, an unscoped DELETE) is recognised by the same check without editing it.
+const FLOOR_RULE_IDS = [
+  "drop-table",
+  "drop-schema",
+  "drop-database",
+  "truncate",
+  "drop-column",
+  "delete-without-where",
+  "update-without-where",
+  "alter-type-drop-value",
+];
+
+describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enforces the pairing", () => {
+  const byPairId = new Map<string, CorpusEntry[]>();
+  for (const entry of manifest.entries) {
+    if (!entry.pairId) {
+      continue;
+    }
+    const group = byPairId.get(entry.pairId) ?? [];
+    group.push(entry);
+    byPairId.set(entry.pairId, group);
+  }
+
+  it("all five D-14 shapes named in PITFALLS.md section C1 are present in the manifest", () => {
+    const present = [...byPairId.keys()].sort();
+    const missing = D14_ADVERSARIAL_PAIR_IDS.filter((id) => !present.includes(id));
+    expect(missing, `D-14 shapes with no pairId group in the manifest at all: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("every pairId groups into exactly one hidden-executable row and one inert-text-only row -- a shape present with only one half fails here, naming the pair id and what was missing or duplicated", () => {
+    const problems: string[] = [];
+    for (const [pairId, entries] of byPairId) {
+      const halves = entries.map((entry) => entry.half ?? "(missing half)");
+      const hiddenCount = halves.filter((half) => half === "hidden-executable").length;
+      const inertCount = halves.filter((half) => half === "inert-text-only").length;
+      if (entries.length !== 2 || hiddenCount !== 1 || inertCount !== 1) {
+        problems.push(
+          `pairId "${pairId}": expected exactly one hidden-executable row and one inert-text-only row, ` +
+            `found ${entries.length} row(s) with halves [${halves.join(", ")}]`,
+        );
+      }
+    }
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+
+  it("no pairId outside the five named D-14 shapes has crept into the manifest unexamined", () => {
+    const unexpected = [...byPairId.keys()].filter((id) => !D14_ADVERSARIAL_PAIR_IDS.includes(id));
+    expect(unexpected, `pairId values not in D14_ADVERSARIAL_PAIR_IDS: ${unexpected.join(", ")}`).toEqual([]);
+  });
+
+  it("every hidden-executable row's manifest expectation is BLOCKED with a D-02 floor rule id, and every inert-text-only row's expectation is never BLOCKED and never carries one", () => {
+    const problems: string[] = [];
+    for (const entry of manifest.entries) {
+      if (!entry.half) {
+        continue;
+      }
+      const hasFloorRuleId = entry.expectedRuleIds.some((id) => FLOOR_RULE_IDS.includes(id));
+      if (entry.half === "hidden-executable") {
+        if (entry.expectedVerdict !== "BLOCKED" || !hasFloorRuleId) {
+          problems.push(
+            `${entry.file}: hidden-executable half must expect BLOCKED with a floor rule id among expectedRuleIds`,
+          );
+        }
+      } else {
+        if (entry.expectedVerdict === "BLOCKED" || hasFloorRuleId) {
+          problems.push(
+            `${entry.file}: inert-text-only half must never expect BLOCKED or carry a floor rule id`,
+          );
+        }
+      }
+    }
+    expect(problems, problems.join("\n")).toEqual([]);
   });
 });
 
