@@ -446,6 +446,25 @@
         "drop-table"
       ],
       "why": "D-16: mirrors 01-CONTEXT.md D-11's reserved churn -- dropping the real ingredients table, which both it and steps cascade-delete from recipes, is the closest thing this repository has to the actual disaster this whole project exists to prevent. The D-02 floor makes this BLOCKED unconditionally, with no rules-file override possible."
+    },
+    {
+      "file": "apps/recipe-app/drizzle/0000_bumpy_khan.sql",
+      "group": "real-migration",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "create-table"
+      ],
+      "why": "The repository's first genuine Drizzle-generated migration, referenced in place rather than copied (the same bytes the runner would execute): a single CREATE TABLE statement for recipes. New tables have no existing rows to lock, scan or rewrite -- create-table matches unconditionally, regardless of the uuid/now() column defaults inside it, which only matter for ADD COLUMN, not table creation."
+    },
+    {
+      "file": "apps/recipe-app/drizzle/0001_busy_thunderbolt.sql",
+      "group": "real-migration",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "add-foreign-key-validated",
+        "create-table"
+      ],
+      "why": "The repository's second genuine Drizzle migration, referenced in place: two CREATE TABLE statements (SAFE, create-table) followed by two ADD CONSTRAINT ... FOREIGN KEY statements with no NOT VALID flag. A plainly added foreign key scans and locks both the altering and the referenced table while validating every existing row (PITFALLS.md A6) -- a correct REVIEW_REQUIRED classification of real Drizzle-generated SQL, not a defect: the safe form would have added the constraint NOT VALID and validated it in a separate statement, which this migration does not do. Live-verified against the installed analyzer (a disposable probe script, then discarded) before being written here, per this plan's own corpus_integrity instruction to reason about correctness rather than copy an unexamined actual value."
     }
   ]
 }
