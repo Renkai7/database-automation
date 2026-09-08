@@ -52,10 +52,20 @@ export interface MigrationFile {
  * overrides so a test can drive both mismatch directions against a temporary directory instead
  * of mutating the real migrations directory.
  *
- * A journal entry with no matching file, a `.sql` file with no matching journal entry, or two
- * journal entries sharing the same `idx`, is a hard error naming the offending tag, filename, or
- * duplicated `idx` -- never a silent skip. Ordering must be total, not merely sorted: a journal
- * with a duplicated `idx` has no single unambiguous application order, so nothing is applied.
+ * A journal entry with no matching file, a `.sql` file with no matching journal entry, two
+ * journal entries sharing the same `idx`, or two journal entries sharing the same `when`, is a
+ * hard error naming the offending tag, filename, duplicated `idx`, or duplicated `when` -- never
+ * a silent skip. Ordering must be total, not merely sorted: a journal with a duplicated `idx` has
+ * no single unambiguous application order, so nothing is applied.
+ *
+ * WR-02 FIX (04-REVIEW.md): `runMigrations`'s own pending-migration filter
+ * (`packages/automation/src/runner/run-migrations.ts`) compares each file's `when` against the
+ * ledger's last-applied timestamp with a strict inequality -- if two journal entries ever shared
+ * a `when` value (most plausibly via a hand-edited or copy-pasted `--custom` journal entry), the
+ * second one to share that timestamp would never again compare `< lastAppliedMillis` once the
+ * first applies, so it would be silently skipped on every future run. That is the same category
+ * of ordering ambiguity the duplicate-`idx` guard above already refuses to tolerate, so it gets
+ * the identical hard-fail treatment: applying nothing rather than silently omitting a migration.
  */
 export function enumerateMigrationFiles(
   migrationsDir: string = DEFAULT_MIGRATIONS_DIR,
@@ -65,16 +75,27 @@ export function enumerateMigrationFiles(
   const entries = [...journal.entries].sort((a, b) => a.idx - b.idx);
 
   const seenIdx = new Map<number, string>();
+  const seenWhen = new Map<number, string>();
   for (const entry of entries) {
-    const priorTag = seenIdx.get(entry.idx);
-    if (priorTag !== undefined) {
+    const priorTagByIdx = seenIdx.get(entry.idx);
+    if (priorTagByIdx !== undefined) {
       throw new Error(
-        `Migration journal integrity error: idx ${entry.idx} is shared by both "${priorTag}" ` +
+        `Migration journal integrity error: idx ${entry.idx} is shared by both "${priorTagByIdx}" ` +
           `and "${entry.tag}" in "${journalPath}". Ordering must be total -- applying nothing ` +
           "until the journal names each migration a single, unambiguous position.",
       );
     }
     seenIdx.set(entry.idx, entry.tag);
+
+    const priorTagByWhen = seenWhen.get(entry.when);
+    if (priorTagByWhen !== undefined) {
+      throw new Error(
+        `Migration journal integrity error: when ${entry.when} is shared by both "${priorTagByWhen}" ` +
+          `and "${entry.tag}" in "${journalPath}". Ordering must be total -- applying nothing ` +
+          "until the journal names each migration a single, unambiguous position.",
+      );
+    }
+    seenWhen.set(entry.when, entry.tag);
   }
 
   const files: MigrationFile[] = entries.map((entry) => {

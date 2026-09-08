@@ -231,6 +231,37 @@ describe("runMigrations refusal branches (D-02/D-08/RUN-02)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // WR-02 (04-REVIEW.md): the duplicate-idx guard above only covers one half of the ordering
+  // ambiguity enumerateMigrationFiles must reject -- a duplicated `when` is the same category of
+  // "no single unambiguous position" ambiguity for the one comparison runMigrations actually uses
+  // to decide what still needs to run (lastAppliedMillis < file.when). Mirrors the duplicate-idx
+  // test exactly, just with distinct idx values and a shared when instead.
+  it("a journal with two entries sharing a when value makes enumerateMigrationFiles throw, naming the duplicated when, before any classification happens", () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-migrations-duplicate-when-"));
+    try {
+      const metaDir = join(dir, "meta");
+      mkdirSync(metaDir);
+      const journalPath = join(metaDir, "_journal.json");
+      writeFileSync(
+        journalPath,
+        JSON.stringify({
+          version: "7",
+          dialect: "postgresql",
+          entries: [
+            { idx: 0, version: "7", when: 1700000000000, tag: "0000_first", breakpoints: true },
+            { idx: 1, version: "7", when: 1700000000000, tag: "0001_duplicate_when", breakpoints: true },
+          ],
+        }),
+      );
+      writeFileSync(join(dir, "0000_first.sql"), "CREATE TABLE a (id int);");
+      writeFileSync(join(dir, "0001_duplicate_when.sql"), "CREATE TABLE b (id int);");
+
+      expect(() => enumerateMigrationFiles(dir, journalPath)).toThrowError(/when 1700000000000/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // 04-04-PLAN.md Task 1: the wrap-or-refuse decision (D-09/D-11) is proven at the runMigrations
