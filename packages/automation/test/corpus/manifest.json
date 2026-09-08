@@ -64,6 +64,16 @@
       "why": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
     },
     {
+      "file": "packages/automation/test/corpus/blocked/multi-subcommand-alter-table.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default",
+        "drop-column"
+      ],
+      "why": "CR-02 regression (03-REVIEW.md): PostgreSQL's own grammar allows more than one subcommand in a single ALTER TABLE, and inspectAlterTableStmt used to inspect only the first (cmds[0]), silently discarding every later subcommand before it ever reached classification. This fixture combines a harmless ADD COLUMN with a genuinely destructive DROP COLUMN in one statement -- before the fix, analyzeSql returned file verdict SAFE with a single finding for the ADD COLUMN, and the DROP COLUMN never appeared anywhere in the result. The fix must produce one finding per subcommand and the file verdict must be BLOCKED, worst-verdict-wins."
+    },
+    {
       "file": "packages/automation/test/corpus/review-required/set-not-null.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
@@ -308,6 +318,15 @@
         "create-index-concurrently"
       ],
       "why": "Near-miss control proving the pairing match is exact name equality, never a fuzzy or approximate match: an index built CONCURRENTLY as orders_customer_id_idx, paired against a unique constraint whose USING INDEX names a DIFFERENT index (orders_other_idx) -- one character or one whole word different is still a different index, not a typo to forgive, so pair-concurrent-index-unique never fires and the constraint statement falls through to D-06's unmatched REVIEW_REQUIRED. (The literal 'unvalidated-then-validate pair with a mismatched constraint name' shape the plan text originally described does NOT produce this outcome under the real analyzer -- see 03-05-SUMMARY.md's Deviations section for why this shape was substituted.)"
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/multi-subcommand-alter-table-all-safe.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default"
+      ],
+      "why": "CR-02's completeness counterpart: two subcommands in one ALTER TABLE, both harmless nullable ADD COLUMNs with no default. Proves the multi-subcommand fix produces a finding for EVERY subcommand (not just the first, and not just when one is dangerous) -- both findings carry the same add-column-nullable-no-default rule id, so the corpus harness's set-based expectedRuleIds comparison would not by itself catch a regression that dropped one of the two identical findings; test/multi-subcommand-alter-table.test.ts's own length-2 assertion covers that gap directly."
     },
     {
       "file": "packages/automation/test/corpus/adversarial/inline-comment-drop.sql",
