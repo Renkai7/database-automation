@@ -8,7 +8,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "libpg-query": "17.7.4"
+    "libpg-query": "18.1.4"
   },
   "devDependencies": {
     "@types/node": "^24.13.3"

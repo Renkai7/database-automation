@@ -53,9 +53,12 @@ export type ParsedStatement = Record<string, unknown>;
  * rejection (observed directly this session).
  */
 export async function parseTopLevel(sql: string): Promise<ParsedStatement[]> {
-  let result: { version: number; stmts: Array<{ stmt: ParsedStatement }> };
+  // libpg-query 18.x (pg18 line) ships real @pgsql/types typings where `stmts` and each
+  // entry's `stmt` are optional; the 17.x line returned `any`. Only `stmts` is consumed here,
+  // so describe just that, and cast through unknown rather than widen ParsedStatement.
+  let result: { version?: number; stmts?: Array<{ stmt?: ParsedStatement }> };
   try {
-    result = await parse(sql);
+    result = (await parse(sql)) as unknown as typeof result;
   } catch (error) {
     const cursorPosition = (error as { sqlDetails?: { cursorPosition?: number } }).sqlDetails
       ?.cursorPosition;
@@ -65,7 +68,20 @@ export async function parseTopLevel(sql: string): Promise<ParsedStatement[]> {
         : `${safeErrorMessage(error)} (at character ${cursorPosition})`;
     throw new AnalyzerParseError(message);
   }
-  return result.stmts.map((entry) => entry.stmt);
+  // A missing `stmts` degrades to zero statements, which analyze.ts classifies REVIEW_REQUIRED
+  // via its empty-input branch -- never SAFE, so the default is fail-safe.
+  //
+  // An entry that is PRESENT but carries no `stmt` is a different matter: silently dropping it
+  // would remove a real statement from classification, which is the one direction this analyzer
+  // must never fail in. Treat it as a parse failure instead (D-08) so it can never pass as SAFE.
+  return (result.stmts ?? []).map((entry, index) => {
+    if (entry.stmt === undefined) {
+      throw new AnalyzerParseError(
+        `statement at index ${index} parsed to an empty node; refusing to classify it`,
+      );
+    }
+    return entry.stmt;
+  });
 }
 
 /** Extracts the last (unqualified) name and, if a schema-qualifier is present, the schema name,
