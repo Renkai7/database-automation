@@ -124,7 +124,7 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 | ENV-01 … ENV-05 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | APP-01 | Phase 1 | Complete — verified 2026-09-07 (UAT 5/5, security threats_open: 0) |
 | BKP-01 … BKP-08 | Phase 2 | All 8 complete 2026-09-07. Runbook `docs/20-restore-runbook.md` written from the owner's performed drill. Verification passed 33/34 — the one gap (per-step timings not separately measured) accepted by the owner. Security audit SECURED, 26/26 threats closed, 0 open. Open follow-up: WR-03 (restore target pinned by call-site convention, not internal contract) — see `02-SECURITY.md`. |
-| ANLZ-01 … ANLZ-07 | Phase 3 | Pending |
+| ANLZ-01 … ANLZ-07 | Phase 3 | All 7 complete 2026-09-08. Verification passed 5/5. Code review found 2 Critical false-SAFE defects (empty-`match` blanket rule; multi-subcommand `ALTER TABLE` dropping all but the first subcommand) and verification found a third (enumerate-every-`statementKind` blanket rule) — all fixed with regression tests, plus a fourth (`LANGUAGE sql` function bodies uninspected) found by probing during execution. Analyzer cross-checked against squawk-cli over a 51-row corpus: 21 disagreements, 0 in squawk’s favour; squawk missed a `DROP TABLE` hidden in a `DO` block that this analyzer blocks. Open follow-ups: production PostgreSQL major version still UNKNOWN (`docs/decisions.md` D16); WR-03 package-boundary import deferred to Phase 7; `DROP OWNED BY` classifies REVIEW_REQUIRED — owner judgement call whether it belongs on the D-02 floor. |
 | RUN-01 … RUN-08 | Phase 4 | Pending |
 | APP-02 | Phase 4 | Pending |
 | CI-01 … CI-06 | Phase 5 | Pending |
