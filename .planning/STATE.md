@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Safety Analyzer
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-09-08T12:11:47.345Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-09-08T12:43:21.544Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 03 execution started
-state_head: d0caacc3deefea789be772b31c40e1e7f730f109
+state_head: 73c00fdf014a0027df314cdd6cd654b7c7ad7760
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 20
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 03 (Safety Analyzer) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 03 execution started
 
@@ -73,6 +73,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P04 | 55min | 3 tasks | 9 files |
 | Phase 02 P05 | 25min | 3 tasks | 6 files |
 | Phase 03 P01 | 35min | 3 tasks | 19 files |
+| Phase 03 P02 | 29min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 03]: [Phase 03] 03-01: libpg-query@17.7.4 exports no PL/pgSQL parsing function at all (no parsePlPgSQL) -- a divergence from 03-RESEARCH.md Pattern 4/Assumption A4, pinned by test/libpg-query-contract.test.ts. Plan 04's D-05 recursion into DO blocks/function bodies must resolve this differently than the research sketched.
 - [Phase 03]: [Phase 03] 03-01: analyzeSql checks sql.trim().length === 0 before calling libpg-query's parse(), because parse() rejects empty/whitespace-only text with "Query cannot be empty" rather than resolving with zero statements -- otherwise D-06's empty-input contract would be misreported as a D-08 parse failure.
 - [Phase 03]: [Phase 03] 03-01: packages/automation needed its own @types/node devDependency plus an explicit tsconfig "types": ["node"] -- TypeScript 7.0.2's automatic @types walk-up did not resolve node:fs/process in this nested workspace package without it (Rule 3 deviation).
+- [Phase 03]: AlterTypeDropValue is permanently unreachable via real SQL -- PostgreSQL's own grammar rejects ALTER TYPE ... DROP VALUE unconditionally at parse time — Confirmed live against libpg-query@17.7.4; kept in StatementKind/rules.json as documentation of FEATURES.md's BLOCKED entry, excluded (with citation) from the per-kind coverage test rather than faked with a hand-built AST
+- [Phase 03]: FactMatchSchema extended to accept null as a match value, and RulesFileSchema gained an optional top-level notes field — Rule 2/3 deviations: add-unique-constraint needs usingIndexName:null to distinguish safe forms, and the lock_timeout/statement_timeout exclusion needed a schema-validated place to live rather than being silently stripped
 
 ### Pending Todos
 
@@ -144,6 +147,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T12:11:47.300Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-09-08T12:43:21.472Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None

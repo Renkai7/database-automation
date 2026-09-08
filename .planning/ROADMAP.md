@@ -125,7 +125,7 @@ Plans:
   4. Every classification rule lives in a schema-validated rules file; adding or changing a rule means editing that data file, not the classifier's code, and an invalid rules file fails validation rather than being silently accepted.
   5. Running the same corpus of migrations through the analyzer and through `squawk-cli` produces a comparison report, and every disagreement between the two has been examined and explained.
 
-**Plans**: 1/7 plans executed
+**Plans**: 2/7 plans executed
 
 Plans:
 
@@ -135,7 +135,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — The full fact vocabulary, the complete FEATURES.md section 1 rule catalogue as data, and context-aware classifier semantics including same-file safe-form pairing
+- [x] 03-02-PLAN.md — The full fact vocabulary, the complete FEATURES.md section 1 rule catalogue as data, and context-aware classifier semantics including same-file safe-form pairing
 - [ ] 03-03-PLAN.md — The Drizzle adapter and the CLI surface: five distinct outcome codes, a complete human report, and machine JSON
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -221,7 +221,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
-| 3. Safety Analyzer | 1/7 | In Progress|  |
+| 3. Safety Analyzer | 2/7 | In Progress|  |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
