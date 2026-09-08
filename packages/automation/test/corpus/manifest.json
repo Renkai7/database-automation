@@ -564,6 +564,15 @@
       "why": "D-16: mirrors 01-CONTEXT.md D-11's reserved churn -- dropping the real ingredients table, which both it and steps cascade-delete from recipes, is the closest thing this repository has to the actual disaster this whole project exists to prevent. The D-02 floor makes this BLOCKED unconditionally, with no rules-file override possible."
     },
     {
+      "file": "packages/automation/test/corpus/app-shaped/generated-drop-ingredients-table.sql",
+      "group": "app-shaped",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "drop-table"
+      ],
+      "why": "04-07/D-32: the REAL bytes `drizzle-kit generate` produced when `ingredients` and its relations were removed from schema.ts for real -- `DROP TABLE \"ingredients\" CASCADE;`, quoting the identifier and adding CASCADE, neither of which the Phase 3 hand-written mirror (drop-ingredients-table.sql, unquoted, no CASCADE) predicted verbatim. Run live through `pnpm db:migrate` against the real pinned development database: refused BLOCKED, rule drop-table, exit code 21 (RUNNER_EXIT_CODES.REFUSED_BLOCKED), zero ledger rows added, the live `ingredients` table and its 8 seeded rows confirmed still present afterward. The schema edit, the generated migration, and the journal entry were then fully reverted (git status --porcelain apps/recipe-app empty, journal byte-identical via git hash-object) -- this fixture is what makes that refusal permanent, regression-tested against the exact bytes drizzle actually produces rather than only the Phase 3 prediction."
+    },
+    {
       "file": "apps/recipe-app/drizzle/0000_bumpy_khan.sql",
       "group": "real-migration",
       "expectedVerdict": "SAFE",
