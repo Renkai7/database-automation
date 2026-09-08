@@ -200,6 +200,27 @@ export type ContainerBodyPlan =
   | { inspected: true; kind: "sql-text"; text: string; sourceContext: SourceContext }
   | { inspected: true; kind: "sql-atomic"; stmts: ParsedStatement[]; sourceContext: SourceContext };
 
+/** WR-01 fix (03-REVIEW.md): the plpgsql reconstruction below must re-wrap `body` in a
+ * dollar-quote delimiter that is GUARANTEED not to occur anywhere inside `body` itself.
+ * Reconstructing with a hardcoded `$$` (the empty tag) collides with a common, entirely legal
+ * PL/pgSQL idiom -- a body whose OWN outer quote uses a distinct tag (e.g. `$outer$`) and which
+ * embeds a `$$`-tagged string literal internally (e.g. `quote_literal($$safe$$)`), which is
+ * ordinary valid SQL syntax usable anywhere a string literal is valid. A fixed `$$` truncates
+ * the reconstruction at the body's own first embedded `$$`, turning valid PostgreSQL into a
+ * parse failure (confirmed live against the installed libpg-query package this session).
+ * Starts from a fixed, namespaced prefix and appends an incrementing counter until the
+ * resulting `$tag$` delimiter does not appear anywhere in `body` -- generic and correct for any
+ * body content, never assuming one collision attempt is enough. */
+function pickDollarQuoteTag(body: string): string {
+  let counter = 0;
+  let tag = `$gsd_${counter}$`;
+  while (body.includes(tag)) {
+    counter += 1;
+    tag = `$gsd_${counter}$`;
+  }
+  return tag;
+}
+
 /** Dispatches a text body by its declared language: `plpgsql` reconstructs a minimal full
  * statement for `parsePlPgSQL` (the same reconstruct-not-slice approach 03-04 verified is
  * byte-identical to the original statement's own parse output); `sql` re-parses the raw body
@@ -235,7 +256,10 @@ export function planContainerBody(stmt: ParsedStatement): ContainerBodyPlan {
     if (!textBody) {
       return { inspected: false };
     }
-    return planFromTextBody(textBody, "do-block", (body) => `DO $$${body}$$ LANGUAGE plpgsql;`);
+    return planFromTextBody(textBody, "do-block", (body) => {
+      const tag = pickDollarQuoteTag(body);
+      return `DO ${tag}${body}${tag} LANGUAGE plpgsql;`;
+    });
   }
   if ("CreateFunctionStmt" in stmt) {
     const createFn = stmt.CreateFunctionStmt as {
@@ -250,11 +274,10 @@ export function planContainerBody(stmt: ParsedStatement): ContainerBodyPlan {
     if (!textBody) {
       return { inspected: false };
     }
-    return planFromTextBody(
-      textBody,
-      "function-body",
-      (body) => `CREATE FUNCTION anon() RETURNS void AS $$${body}$$ LANGUAGE plpgsql;`,
-    );
+    return planFromTextBody(textBody, "function-body", (body) => {
+      const tag = pickDollarQuoteTag(body);
+      return `CREATE FUNCTION anon() RETURNS void AS ${tag}${body}${tag} LANGUAGE plpgsql;`;
+    });
   }
   return { inspected: false };
 }
