@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 import { describe, expect, it } from "vitest";
-import { analyzeSql, loadDefaultRules } from "../src/analyze";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
 import { loadRules } from "../src/classifier/classify";
 import { RulesFileError } from "../src/types";
 

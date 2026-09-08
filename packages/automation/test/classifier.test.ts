@@ -1,7 +1,8 @@
 // 03-02-PLAN.md Task 3: severity resolution, ordering-independence, and completeness.
 import { describe, expect, it } from "vitest";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
 import { classifyFacts } from "../src/classifier/classify";
-import { loadDefaultRules, analyzeSql } from "../src/analyze";
 import type { Rule } from "../src/classifier/rules-schema";
 import { EMPTY_FACTS, type StatementFacts } from "../src/types";
 

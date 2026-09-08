@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
-import { analyzeSql, loadDefaultRules } from "../src/analyze";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
 import { AnalyzerParseError } from "../src/types";
 
 const UNPARSEABLE_SQL = "ALTER TABLE ;";

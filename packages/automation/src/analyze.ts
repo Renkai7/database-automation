@@ -1,12 +1,12 @@
 // D-11/D-12: analyzeSql, the importable pure entry point Phase 4's runner calls in-process
 // immediately before executing a migration. Takes SQL text and a loaded rules object -- no
 // filesystem, no Drizzle knowledge, no database connection -- so the runner can hand it the
-// exact bytes it is about to execute rather than a path it would have to trust separately.
-// loadDefaultRules is exported alongside it but kept clearly separate: it is the one function
-// in this module that touches the filesystem, so analyzeSql itself stays pure.
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { applySafeFormPairing, classifyFacts, loadRules } from "./classifier/classify";
+// exact bytes it is about to execute rather than a path it would have to trust separately. This
+// module deliberately imports nothing filesystem-touching, not even transitively: a test in
+// test/adapter.test.ts asserts this file never imports a filesystem module. Loading the bundled
+// default rules catalogue from disk lives in ./adapter/default-rules.ts instead (see that
+// module's header comment for why it moved there rather than staying alongside analyzeSql).
+import { applySafeFormPairing, classifyFacts } from "./classifier/classify";
 import type { ClassificationOutcome } from "./classifier/classify";
 import type { RulesFile } from "./classifier/rules-schema";
 import { inspectStatement, parseTopLevel, type ParsedStatement } from "./inspector/inspect";
@@ -57,7 +57,7 @@ function compareFindings(a: Finding, b: Finding): number {
  * the complete AnalysisResult. D-10: the file verdict is the most severe finding verdict, and
  * `findings` is always the complete list -- classification never short-circuits on the first
  * BLOCKED finding. `rules` must already be a loaded (schema-validated, floor-checked) rules
- * object -- see loadRules/loadDefaultRules.
+ * object -- see classify.ts's loadRules or adapter/default-rules.ts's loadDefaultRules.
  *
  * Empty/whitespace-only input is checked BEFORE calling the parser: libpg-query's own `parse()`
  * rejects a zero-length or whitespace-only string with "Query cannot be empty" (observed
@@ -101,16 +101,4 @@ export async function analyzeSql(sql: string, rules: RulesFile): Promise<Analysi
     statementCount: statements.length,
     rulesVersion: rules.version,
   };
-}
-
-/** Repository-relative path (from this module's own directory) to the bundled default rules
- * catalogue -- resolved via import.meta.url so it works regardless of the caller's cwd. */
-const DEFAULT_RULES_PATH = fileURLToPath(new URL("./rules/rules.json", import.meta.url));
-
-/** Reads and loads (parses, schema-validates, floor-checks) the bundled default rules
- * catalogue. The only filesystem access in this module -- deliberately separated from
- * analyzeSql so the pure function stays pure. */
-export function loadDefaultRules(): RulesFile {
-  const raw = JSON.parse(readFileSync(DEFAULT_RULES_PATH, "utf-8"));
-  return loadRules(raw);
 }

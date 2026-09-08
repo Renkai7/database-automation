@@ -3,7 +3,8 @@
 // that adjacent statements -- separated only by a semicolon, or by Drizzle's
 // `--> statement-breakpoint` marker -- stay separate operations against the real parser.
 import { describe, expect, it } from "vitest";
-import { analyzeSql, loadDefaultRules } from "../src/analyze";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
 
 describe("empty-input contract (D-06)", () => {
   it.each([

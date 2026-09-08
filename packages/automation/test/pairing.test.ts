@@ -3,7 +3,8 @@
 // importing applySafeFormPairing directly, matching this repo's established end-to-end test
 // style (tracer.test.ts).
 import { describe, expect, it } from "vitest";
-import { analyzeSql, loadDefaultRules } from "../src/analyze";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
 
 describe("same-file safe-form pairing (03-02-PLAN.md task 3, D-09)", () => {
   it("an unvalidated foreign key add paired with a later VALIDATE CONSTRAINT of the exact same name sets pairedWith on both", async () => {

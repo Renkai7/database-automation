@@ -5,7 +5,8 @@
 // never touches a database.
 import { readFileSync } from "node:fs";
 import { safeErrorMessage } from "../../../scripts/log";
-import { analyzeSql, loadDefaultRules } from "./analyze";
+import { loadDefaultRules } from "./adapter/default-rules";
+import { analyzeSql } from "./analyze";
 import { AnalyzerParseError, EXIT_CODES, VERDICT_SEVERITY, type AnalysisResult, type Verdict } from "./types";
 
 function usageAndExit(): never {
