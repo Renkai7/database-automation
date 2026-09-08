@@ -4,7 +4,7 @@ slug: "safety-analyzer"
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
 status: validated
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: true
 created: "2026-09-08"
 populated: "2026-09-08"
@@ -25,13 +25,19 @@ directly off the plans' `<verify>` blocks.
 `❌ W0` file the plan-time draft was waiting on now exists, so `wave_0_complete` is `true`. The
 frontmatter therefore moves `draft → validated`.
 
-**`nyquist_compliant` stays `false`, deliberately.** Not because a mapped command failed — none
-did — but because the audit found one requirement whose stated behavior no command was checking
-at all (GAP-1 below: the ANLZ-06 comparison report had silently drifted out of sync with the
-corpus, and nothing detected it). The gap-fill test that now checks it is **red against the
-committed report**, which is the correct state: the finding is real and the fix is a human
-re-annotation, not a test edit. `nyquist_compliant` flips to `true` once that report is
-refreshed and the two new disagreements are explained.
+**`nyquist_compliant: true`, set 2026-09-08 after GAP-1 was closed.** The audit opened two gaps
+(below). Both now have a passing automated check: GAP-2's guardrail non-vacuity assertion, and
+GAP-1's report-sync test, which went from red to green once `docs/30-squawk-comparison.md` was
+regenerated and re-annotated. Every requirement in this phase now has automated verification that
+passes.
+
+**One manual item remains outstanding, and it is not a Nyquist gap.** GAP-1's fix introduced a
+single newly-written disagreement explanation
+(`safe/multi-subcommand-alter-table-all-safe.sql`) that has **not** had 03-07 Task 2's
+`<human-check>` read. It is drafted, not confirmed. That is tracked in Manual-Only below, where
+it belongs — an automated command can prove the explanation exists; only a human can judge that
+it is a real reason rather than a plausible-sounding one, which is the whole point of that
+check.
 
 **Plan-time Nyquist assertion (still true, now also executed).** Across the phase's 19
 implementation tasks plus 1 blocking checkpoint, the plans carry **43 `<automated>` verify
@@ -143,7 +149,7 @@ but checked by nothing.
 
 | Gap | Requirement | Secure Behavior | Test Type | Automated Command | Status |
 |-----|-------------|-----------------|-----------|-------------------|--------|
-| GAP-1 | ANLZ-06 | The committed comparison report cannot silently drift from the corpus: every manifest entry appears as a table row, no generator `_TBD_` placeholder survives into a committed report, and the report's own stated row count matches the rows it actually holds | unit | `pnpm exec vitest run packages/automation/test/squawk-comparison-report.test.ts` | ❌ red — **finding, not a defect in the test** (see Manual-Only) |
+| GAP-1 | ANLZ-06 | The committed comparison report cannot silently drift from the corpus: every manifest entry appears as a table row, no unfilled generator placeholder survives into a committed report, and the report's own stated row count matches the rows it actually holds | unit | `pnpm exec vitest run packages/automation/test/squawk-comparison-report.test.ts` | ✅ green (3/3) — red when written, closed 2026-09-08 |
 | GAP-2 | ANLZ-06 | `sourceSurfaceFiles()` provably enumerates `packages/` (and `scripts/`, `tests/`, `apps/recipe-app/`), so the three source-surface checks cannot pass having examined nothing | guard | `pnpm exec vitest run tests/guardrails.test.ts` | ✅ green (11/11) |
 
 **Why GAP-2 existed.** The plan's own guard command for 03-07-03 was
@@ -202,9 +208,9 @@ Already present and reused as-is: `vitest` 5.x, `zod` 4.5.4, `execa` 10, `tsx`,
 |----------|-------------|------------|-------------------|
 | Every disagreement in the squawk comparison report is explained with a real reason, deliberate exclusions read as exclusions rather than omissions, and anything unestablished reads UNKNOWN | ANLZ-06 (phase success criterion 5) | The criterion asks for a human-read explanation. A command can assert the report exists and has a row per corpus entry; it cannot assert that the prose in each row is a genuine reason rather than a plausible-sounding one. | 03-07 Task 2 `<human-check>`: read `docs/30-squawk-comparison.md` end to end and confirm each disagreement carries one of the three explanations with a real reason, that any gap squawk found was closed in the same commit, and that anything unestablished says UNKNOWN. |
 | `squawk-cli`'s npm listing resolves to the canonical `sbdchd/squawk` project, at the expected download scale and version, with the `win32-x64` binary present | ANLZ-06 | Package-legitimacy gate. The research flagged `squawk-cli` `[SUS]` on the recency signal; the gate's rule is mechanical — a human confirms before any suspicious package installs, and the checkpoint is never auto-approvable. | 03-07 leading `checkpoint:human-verify`: open the npm page, check repository link, weekly downloads, version ≥ 2.64.0 from the same publisher, description, and the Windows x64 optional dependency. Reply "approved", or describe what did not match. |
-| **OPEN — GAP-1.** `docs/30-squawk-comparison.md` must be regenerated and the two new disagreements hand-annotated | ANLZ-06 | The two new rows need a *judgement* — which of `analyzer-correct` / `squawk-correct` / `different-by-design` applies, and why. A test can prove the rows are present and unexplained; it cannot write the explanation, and a generated-sounding reason would defeat the purpose of the check. | See the procedure below. `pnpm exec vitest run packages/automation/test/squawk-comparison-report.test.ts` goes green when this is done. |
+| **OPEN — one drafted reason needs its human read.** `safe/multi-subcommand-alter-table-all-safe.sql`'s disagreement explanation in `docs/30-squawk-comparison.md` was written during the 2026-09-08 audit and has not been confirmed by the owner | ANLZ-06 | Same reason the parent row above is manual: a test can prove an explanation is present, not that it is a real reason. This one is flagged specifically because it was agent-drafted during a validation pass rather than written as part of 03-07 Task 2's own human read. | Read that one section of `docs/30-squawk-comparison.md` (the provenance note at the end names it). Confirm `different-by-design` is the right label and the reason is genuine, or correct it. The other 21 explanations were carried across byte-identical from the pre-existing report and keep whatever sign-off they already had. |
 
-### GAP-1 — the open finding, and how to close it
+### GAP-1 — the finding, and how it was closed (2026-09-08)
 
 **What is wrong.** The committed report was hand-annotated at commit `ed47eb1` when the corpus
 yielded 49 rows. Commit `c7e807b` ("test(03): add corpus fixtures for the multi-subcommand ALTER
@@ -226,20 +232,30 @@ and *Reason* fields; the committed report's prose is hand-written on top. So re-
 without re-annotating would leave a report that looks refreshed and explains nothing — which is
 exactly what assertion (b) of the new test now blocks.
 
-**Procedure.**
+**What was done.** The report was regenerated at 51 rows / 22 disagreements, and the 21 existing
+explanations were carried back onto their matching rows **programmatically, matched by file path
+and verified byte-identical afterwards** — not retyped, so no wording drifted. The regenerated
+analyzer verdict and squawk findings under each carried reason were compared against the values
+that reason was originally written for; none had changed, so no carried explanation was
+invalidated by the new run. The *Executive summary* and bucket sections the generator does not
+emit were reinstated, and a provenance note was appended to the report recording all of this.
 
-1. Save the current `docs/30-squawk-comparison.md` (its 21 hand-written reasons are the thing to
-   preserve).
-2. Run `pnpm analyze:squawk-comparison` — this rewrites the file at 51 rows / 22 disagreements
-   with every reason reset to `_TBD_`.
-3. Restore the 21 explanations that still apply, verbatim, onto their matching rows.
-4. Write the reason for the one genuinely new disagreement
-   (`safe/multi-subcommand-alter-table-all-safe.sql`), labelled `analyzer-correct`,
-   `squawk-correct` or `different-by-design`, and re-check the `blocked/` counterpart's row.
-5. Restore the hand-written *Executive summary* and *different-by-design bucket* sections the
-   generator does not emit, updating their counts.
-6. `pnpm exec vitest run packages/automation/test/squawk-comparison-report.test.ts` → green.
-7. Set `nyquist_compliant: true` in this file's frontmatter.
+Only **one** genuinely new explanation was needed. The `blocked/` counterpart turned out to be an
+*agree* row needing none, and `safe/multi-subcommand-alter-table-all-safe.sql` fell squarely into
+the already-established `different-by-design` bucket (D-04's excluded session properties plus
+D11 rerun-idempotency). It is drafted, not owner-confirmed — see Manual-Only above.
+
+**Two things worth keeping.**
+
+1. **The Executive summary's counts were already wrong before this pass**, independently of the
+   drift. It claimed *19 different-by-design / 2 analyzer-correct* over 21 rows while the file
+   actually carried *18 / 3*, and its own prose named three analyzer-correct files while calling
+   them "two". The per-row labels were right; only the tally over them was off. Corrected to
+   *19 / 3* over 22 rows, which now matches a count of the verdict lines.
+2. **The report's own prose tripped its new test.** The first draft of the provenance note
+   described the placeholder check by naming the placeholder token literally, which the check
+   then matched — the same self-matching problem `tests/guardrails.test.ts` solves by building
+   its needles at runtime. The note now describes the token without spelling it.
 
 ---
 
@@ -254,15 +270,14 @@ exactly what assertion (b) of the new test now blocks.
 - [x] No watch-mode flags — every vitest invocation is `vitest run`
 - [x] Feedback latency < 1 task — no task defers verification to a later task
 - [x] All 43 mapped commands re-run against the executed repository and green (2026-09-08)
-- [ ] `nyquist_compliant: true` set in frontmatter — **blocked on GAP-1 only.** Every mapped
-      command is green and every plan-time property above holds. What is not yet true is that
-      *every* ANLZ-06 behavior has an automated check passing: the report-sync test is red
-      against a stale committed report. Ticking this box now would assert coverage the repository
-      does not have. Close GAP-1 per the procedure above, then tick it.
+- [x] `nyquist_compliant: true` set in frontmatter — every mapped command is green, both gap-fill
+      tests are green, and no requirement in this phase now lacks a passing automated check. The
+      one outstanding item is a human read of a single drafted explanation, tracked in
+      Manual-Only, which is a confirmation task rather than missing coverage.
 
-**Approval:** PARTIAL — plan-time contract populated 2026-09-08; execution-time sign-off given
-2026-09-08 with one open finding (GAP-1). 43/43 mapped commands green, 1 gap closed (GAP-2),
-1 gap open and correctly red (GAP-1).
+**Approval:** VALIDATED — plan-time contract populated 2026-09-08; execution-time sign-off given
+2026-09-08. 43/43 mapped commands green, 2 gaps found, 2 gaps closed. Full suite 31 files /
+305 tests, all passing. One manual confirmation outstanding (see Manual-Only).
 
 ---
 
@@ -273,14 +288,25 @@ exactly what assertion (b) of the new test now blocks.
 | Mapped commands re-run | 43 |
 | Mapped commands green | 43 |
 | Gaps found | 2 |
-| Resolved | 1 (GAP-2 — guardrail non-vacuity assertion) |
-| Escalated | 1 (GAP-1 — comparison-report drift; test written and red, fix is a human re-annotation) |
+| Resolved | 2 (GAP-2 guardrail non-vacuity; GAP-1 report drift) |
+| Escalated | 0 |
+| Manual confirmations outstanding | 1 (one drafted disagreement explanation) |
 
-**Full suite after the audit:** `pnpm test` → 305 tests, 304 passed, 1 failed. The single
-failure is GAP-1's report-sync test naming the two drifted fixtures. That red is the finding, not
-a defect in the test — it must not be weakened or skipped to make the suite green.
+**Full suite after the audit:** `pnpm test` → 31 files, 305 tests, all passing.
 
-**Files added/changed by this audit (tests only; no implementation file was touched):**
+GAP-1 was escalated when first found — the report-sync test was written red on purpose and the
+suite stood at 304/305 — and was closed in a follow-up pass in the same session, once it was
+established that only one new explanation was actually needed and that it fell into an
+already-established bucket rather than requiring a novel judgement.
 
-- `packages/automation/test/squawk-comparison-report.test.ts` (new — GAP-1)
+**Files added/changed by this audit:**
+
+- `packages/automation/test/squawk-comparison-report.test.ts` (new — GAP-1's check)
 - `tests/guardrails.test.ts` (one `it()` added — GAP-2)
+- `docs/30-squawk-comparison.md` (regenerated to 51 rows, 21 explanations carried across
+  byte-identical, 1 new explanation drafted, Executive summary reinstated with corrected counts,
+  provenance note appended)
+
+No implementation file was modified: `packages/automation/src/**`,
+`packages/automation/scripts/squawk-comparison.ts`, the corpus fixtures and the corpus manifest
+are all untouched by this audit.
