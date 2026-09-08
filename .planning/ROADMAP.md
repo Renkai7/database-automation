@@ -125,13 +125,13 @@ Plans:
   4. Every classification rule lives in a schema-validated rules file; adding or changing a rule means editing that data file, not the classifier's code, and an invalid rules file fails validation rather than being silently accepted.
   5. Running the same corpus of migrations through the analyzer and through `squawk-cli` produces a comparison report, and every disagreement between the two has been examined and explained.
 
-**Plans**: 7 plans
+**Plans**: 1/7 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Tracer: one real DROP TABLE travels parse to facts to rules to floor to verdict to CLI exit code, plus the parse-failure and empty-input contracts
+- [x] 03-01-PLAN.md — Tracer: one real DROP TABLE travels parse to facts to rules to floor to verdict to CLI exit code, plus the parse-failure and empty-input contracts
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -221,7 +221,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
-| 3. Safety Analyzer | 0/7 | Not started | - |
+| 3. Safety Analyzer | 1/7 | In Progress|  |
 | 4. Migration Runner & History Tests | 0/TBD | Not started | - |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
