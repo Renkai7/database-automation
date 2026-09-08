@@ -110,6 +110,8 @@ export const EXPECTED_FULL_HISTORY_COLUMNS: Record<(typeof RECIPE_CORE_TABLES)[n
     "effort:text:NO",
     "base_kcal:integer:NO",
     "created_at:timestamp with time zone:NO",
+    // 04-06/D-30: nullable, no default -- the reserved SAFE churn row, spent for real.
+    "notes:text:YES",
   ],
   ingredients: [
     "id:uuid:NO",
@@ -124,6 +126,8 @@ export const EXPECTED_FULL_HISTORY_COLUMNS: Record<(typeof RECIPE_CORE_TABLES)[n
     "recipe_id:uuid:NO",
     "position:integer:NO",
     "body:text:NO",
-    "timer_label:text:YES",
+    // 04-06/D-31: backfilled then SET NOT NULL with a '' default -- the reserved REVIEW
+    // REQUIRED churn row, spent for real.
+    "timer_label:text:NO",
   ],
 };

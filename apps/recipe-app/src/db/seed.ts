@@ -53,9 +53,12 @@ export async function seed(): Promise<void> {
       { recipeId: recipe.id, name: "Sesame oil", quantity: "10", unit: "ml", position: 7 },
     ]);
 
-    // Recipe Page.dc.html's `STEPS` array, transcribed verbatim. A step with no timer
-    // omits `timerLabel` (SQL NULL), preserving the same absent/present distinction as the
-    // source's `hasTimer: !!st[1]` conditional — never an empty string.
+    // Recipe Page.dc.html's `STEPS` array, transcribed verbatim. A step with no timer omits
+    // `timerLabel`; Drizzle omits the column from the INSERT entirely rather than sending an
+    // explicit NULL, so the column's own default (`''`, 04-06/D-31) applies. The empty string
+    // is now the "no timer" value, preserving the same absent/present distinction as the
+    // source's `hasTimer: !!st[1]` conditional — the same reasoning `ingredients.unit`'s own
+    // comment gives for its empty-string sentinel.
     await db.insert(steps).values([
       {
         recipeId: recipe.id,

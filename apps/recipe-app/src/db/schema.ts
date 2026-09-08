@@ -40,9 +40,15 @@ export const ingredients = pgTable(
   (table) => [unique().on(table.recipeId, table.position)],
 );
 
-// `position` is D-09's required ordering column. `timerLabel` is nullable because the
-// source design already renders the timer chip conditionally per step (`hasTimer: !!st[1]`) —
-// a step with no timer stores SQL null, not an empty string, to preserve that distinction.
+// `position` is D-09's required ordering column. `timerLabel` was nullable through Phase 1-3,
+// with a step with no timer storing SQL null to preserve the source design's conditional timer
+// chip (`hasTimer: !!st[1]`). Phase 4 (04-06/D-31) spent that reserved churn row: the
+// absent/present distinction is now carried by an empty string rather than SQL NULL, following
+// `ingredients.unit`'s own precedent above -- it survives because `StepsList.tsx`'s
+// `step.timerLabel && ...` conditional treats `''` as falsy exactly as it treated `null`. The
+// `NOT NULL` was enforced by a real, generated migration preceded by a backfill
+// (`0003_backfill_steps_timer_label.sql`), never applied naively against the seed's real
+// pre-existing NULL rows.
 export const steps = pgTable(
   "steps",
   {
@@ -52,7 +58,7 @@ export const steps = pgTable(
       .references(() => recipes.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     body: text("body").notNull(),
-    timerLabel: text("timer_label"),
+    timerLabel: text("timer_label").notNull().default(""),
   },
   (table) => [unique().on(table.recipeId, table.position)],
 );
