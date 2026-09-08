@@ -32,6 +32,7 @@ const VALID_FACT_NAMES = new Set([
   "sourceContext",
   "nestingDepth",
   "nestingLimitExceeded",
+  "bodyInspected",
 ]);
 
 // Boolean-typed StatementFacts fields -- a rule matching one of these with a string (or vice
@@ -43,6 +44,7 @@ const BOOLEAN_FACTS = new Set([
   "hasWhereClause",
   "dynamicSqlUnresolved",
   "nestingLimitExceeded",
+  "bodyInspected",
 ]);
 
 // String-or-null-typed StatementFacts fields (nullable identifiers).

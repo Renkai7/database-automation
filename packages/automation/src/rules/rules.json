@@ -201,16 +201,23 @@
     {
       "id": "do-block-container",
       "category": "usually-safe",
-      "match": { "statementKind": "DoBlock" },
+      "match": { "statementKind": "DoBlock", "bodyInspected": true },
       "verdict": "SAFE",
-      "rationale": "The DO block container itself is not the hazard -- its dollar-quoted body is re-parsed and every statement inside it is classified on its own findings (D-05). Without this rule every DO block would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
+      "rationale": "The DO block container itself is not the hazard once its body has genuinely been re-parsed and every statement inside it classified on its own findings (D-05) -- this rule only matches when that inspection actually happened (bodyInspected). Without this rule every inspectable DO block would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
     },
     {
       "id": "create-function-container",
       "category": "usually-safe",
-      "match": { "statementKind": "CreateFunction" },
+      "match": { "statementKind": "CreateFunction", "bodyInspected": true },
       "verdict": "SAFE",
-      "rationale": "The function creation itself is not the hazard -- its dollar-quoted body is re-parsed and every statement inside it is classified on its own findings (D-05). Without this rule every legitimate trigger-function migration would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
+      "rationale": "The function creation itself is not the hazard once its body has genuinely been re-parsed and every statement inside it classified on its own findings (D-05) -- this rule only matches when that inspection actually happened (bodyInspected). Without this rule every legitimate, inspectable trigger-function migration would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
+    },
+    {
+      "id": "container-body-not-inspected",
+      "category": "analyzer-integrity",
+      "match": { "statementKind": ["DoBlock", "CreateFunction"], "bodyInspected": false },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "This DO block or function body was not re-parsed by the analyzer at all -- its declared language is not one the analyzer can currently read (anything other than plpgsql or sql), or its body was not in a shape the analyzer recognises -- so nothing inside it has been classified. A body the analyzer could not read cannot be called SAFE (D-06), and it is not a certain hazard either, so a human must review what it actually contains rather than the analyzer guessing either way."
     },
     {
       "id": "nesting-depth-exceeded",

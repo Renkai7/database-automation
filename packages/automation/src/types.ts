@@ -97,6 +97,18 @@ export interface StatementFacts {
    * way it matches any other fact: by exact equality, never a computed depth comparison (D-01
    * still applies one level down into PL/pgSQL). */
   nestingLimitExceeded: boolean;
+  /** Gap-closure fix (post-03-04): true only on a DoBlock/CreateFunction container's OWN fact
+   * set, and only when its body was genuinely re-parsed and every statement inside it
+   * classified on its own findings (LANGUAGE plpgsql via parsePlPgSQL, or LANGUAGE sql -- text
+   * or the BEGIN ATOMIC standard-SQL-body form -- via parseTopLevel/inspectStatement). Set
+   * truthfully at the single place the recursion decision is made
+   * (inspect-plpgsql.ts's planContainerBody), never inferred elsewhere. Defaults to `false`
+   * (EMPTY_FACTS) so a container this fact is never explicitly set `true` for fails closed:
+   * do-block-container/create-function-container only match when it is `true`, and
+   * container-body-not-inspected (REVIEW_REQUIRED, never SAFE) matches when it is `false` --
+   * generic across ANY language the analyzer cannot currently read (plperl, c, python, or any
+   * future language), not special-cased to one. */
+  bodyInspected: boolean;
 }
 
 /** Every field at its neutral default, so any consumer that needs a complete StatementFacts
@@ -119,6 +131,7 @@ export const EMPTY_FACTS: StatementFacts = {
   sourceContext: "top-level",
   nestingDepth: 0,
   nestingLimitExceeded: false,
+  bodyInspected: false,
 };
 
 /**

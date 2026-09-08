@@ -10,7 +10,7 @@ import { applySafeFormPairing, classifyFacts } from "./classifier/classify";
 import type { ClassificationOutcome } from "./classifier/classify";
 import type { RulesFile } from "./classifier/rules-schema";
 import { inspectStatement, parseTopLevel, type ParsedStatement } from "./inspector/inspect";
-import { inspectPlPgSqlBody, reconstructPlPgSqlStatement } from "./inspector/inspect-plpgsql";
+import { inspectContainerBody, planContainerBody } from "./inspector/inspect-plpgsql";
 import type { AnalysisResult, Finding, StatementFacts } from "./types";
 import { EMPTY_FACTS, VERDICT_SEVERITY } from "./types";
 
@@ -44,28 +44,35 @@ function emptyInputFinding(rules: RulesFile): Finding {
   return buildFinding(0, [], facts, classifyFacts(facts, rules.rules));
 }
 
-/** D-05: inspects and classifies one top-level statement, and -- when it is a DO block or
- * function creation whose body is PL/pgSQL -- recurses into that body via inspectPlPgSqlBody,
- * turning every fact set the recursion finds into its own Finding. The container statement
- * always gets its own finding (facts from inspectStatement, nestedPath []) regardless of whether
- * recursion happens at all; a container whose body could not be recursed into (see
- * inspect-plpgsql.ts's KNOWN LIMITATION on non-plpgsql languages) still earns SAFE by its own
- * container rule (do-block-container/create-function-container), it simply has no nested
- * findings alongside it. */
+/** D-05/gap closure: inspects and classifies one top-level statement, and -- when it is a DO
+ * block or function creation -- decides via planContainerBody, ONCE, whether and how its body
+ * gets recursed into, turning every fact set the recursion finds into its own Finding. The
+ * container statement always gets its own finding (facts from inspectStatement plus the
+ * truthfully-set `bodyInspected`, nestedPath []) regardless of whether recursion happens at all.
+ * A container whose body could not be inspected (planContainerBody returned `inspected: false`
+ * -- any declared language other than plpgsql or sql) carries `bodyInspected: false` on its own
+ * finding and has no nested findings alongside it; rules.json's container-body-not-inspected
+ * rule, not an unconditional SAFE, is what classifies it (gap closure: the previous
+ * unconditional-SAFE behavior this replaces is exactly the false-SAFE defect this fix closes). */
 async function inspectAndClassifyStatement(
   stmt: ParsedStatement,
   statementIndex: number,
   rules: RulesFile,
 ): Promise<Finding[]> {
   const facts = inspectStatement(stmt);
-  const containerFinding = buildFinding(statementIndex, [], facts, classifyFacts(facts, rules.rules));
+  const isContainer = facts.statementKind === "DoBlock" || facts.statementKind === "CreateFunction";
+  if (!isContainer) {
+    return [buildFinding(statementIndex, [], facts, classifyFacts(facts, rules.rules))];
+  }
 
-  const nestedContainer = reconstructPlPgSqlStatement(stmt);
-  if (!nestedContainer) {
+  const bodyPlan = planContainerBody(stmt);
+  const containerFacts: StatementFacts = { ...facts, bodyInspected: bodyPlan.inspected };
+  const containerFinding = buildFinding(statementIndex, [], containerFacts, classifyFacts(containerFacts, rules.rules));
+  if (!bodyPlan.inspected) {
     return [containerFinding];
   }
 
-  const nested = await inspectPlPgSqlBody(nestedContainer.sql, nestedContainer.sourceContext, 0);
+  const nested = await inspectContainerBody(bodyPlan, 0);
   const nestedFindings = nested.map((entry) =>
     buildFinding(statementIndex, [statementIndex, ...entry.path], entry.facts, classifyFacts(entry.facts, rules.rules)),
   );
