@@ -8,11 +8,137 @@
       "why": "DROP TABLE permanently destroys the table and every row it holds -- the floor operation D-02 protects, and the first fixture the corpus manifest schema and harness are built against."
     },
     {
+      "file": "packages/automation/test/corpus/blocked/drop-schema.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["drop-schema"],
+      "why": "DROP SCHEMA permanently destroys every object inside the schema, including all of its tables and their data."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/drop-database.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["drop-database"],
+      "why": "DROP DATABASE permanently destroys the entire database, every schema and table in it."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/truncate.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["truncate"],
+      "why": "TRUNCATE removes every row from a table in a single unrecoverable operation, bypassing per-row triggers and any WHERE-based scoping."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/drop-column.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["drop-column"],
+      "why": "DROP COLUMN permanently destroys every value stored in that column across every row."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/delete-without-where.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["delete-without-where"],
+      "why": "A DELETE with no WHERE clause removes every row in the table, which is almost never the intended scope of a migration."
+    },
+    {
+      "file": "packages/automation/test/corpus/blocked/update-without-where.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": ["update-without-where"],
+      "why": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
+    },
+    {
       "file": "packages/automation/test/corpus/review-required/set-not-null.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
       "expectedRuleIds": ["set-not-null"],
       "why": "SET NOT NULL on an existing column forces a full table scan under ACCESS EXCLUSIVE -- the canonical lock-hazard REVIEW REQUIRED case."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/add-column-volatile-default.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["add-column-volatile-default"],
+      "why": "clock_timestamp() is genuinely volatile -- a different value on every call -- so PostgreSQL cannot store it as a single metadata entry and must rewrite the whole table."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/alter-column-type.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["alter-column-type"],
+      "why": "ALTER COLUMN TYPE always takes ACCESS EXCLUSIVE, and this analyzer has no database connection to tell a safe widening from a lossy narrowing, so the question goes to a human."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/add-unique-constraint.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["add-unique-constraint"],
+      "why": "Adding a UNIQUE constraint without USING INDEX builds its backing index while holding ACCESS EXCLUSIVE for the entire build, blocking reads and writes."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/create-index-not-concurrently.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["create-index-not-concurrently"],
+      "why": "Building an index without CONCURRENTLY takes a SHARE lock on the table for the whole build, blocking every INSERT, UPDATE and DELETE until it finishes."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/drop-index-not-concurrently.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["drop-index-not-concurrently"],
+      "why": "Dropping an index without CONCURRENTLY takes ACCESS EXCLUSIVE on the table for the drop, which can queue behind and then block every other lock request on it."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/add-foreign-key-validated.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["add-foreign-key-validated"],
+      "why": "A plainly added foreign key scans and locks both the altering table and the referenced table while validating every existing row, unlike the NOT VALID plus VALIDATE CONSTRAINT two-step form."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/rename-column.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["rename-column"],
+      "why": "Renaming a column is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/rename-table.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["rename-table"],
+      "why": "Renaming a table is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/drop-not-null.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["drop-not-null"],
+      "why": "Dropping a NOT NULL constraint is metadata-only with no lock hazard, but it silently changes what application code can rely on being present."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/drop-constraint.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["drop-constraint"],
+      "why": "Dropping a constraint is metadata-only with no lock hazard, but whether any application code depends on the guarantee it enforced is an application-level fact this analyzer cannot verify."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/add-column-unknown-default-function.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [],
+      "why": "generate_external_ref() is absent from the curated function-volatility table, so its defaultVolatility is unknown-function and no rule matches -- D-06's 'SAFE must be earned' proven for a default the analyzer genuinely cannot classify, never guessed SAFE by omission."
+    },
+    {
+      "file": "packages/automation/test/corpus/review-required/unfamiliar-statement-create-sequence.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [],
+      "why": "CREATE SEQUENCE is a perfectly ordinary, harmless PostgreSQL statement the catalogue has no rule for at all -- it resolves to statementKind Unrecognized and D-06's no-match default, proving an unfamiliar-but-harmless statement stops for a human instead of sailing through as SAFE by default."
     },
     {
       "file": "packages/automation/test/corpus/safe/create-table.sql",

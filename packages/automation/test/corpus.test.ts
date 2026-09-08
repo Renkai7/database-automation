@@ -65,33 +65,16 @@ const PERMANENTLY_EXCEPTED_RULE_IDS: string[] = [
   "empty-input",
 ];
 
-/** Temporary scaffolding, task 1 only: this plan's own catalogue corpus is built across three
- * tasks in this one plan, and this file's rule-coverage check runs after every task's own
- * <verify> step -- so a rule id this plan WILL cover, but has not yet, needs to sit here
- * (with this shared justification) rather than fail the suite mid-plan. Every id below is
- * removed the moment task 2/3 adds its own fixture; by the end of this plan's final task this
- * array is empty and deleted, leaving only PERMANENTLY_EXCEPTED_RULE_IDS above (mirrors
- * 03-04-SUMMARY.md's own "RED commit with some cases already passing" incremental-build
- * precedent -- an honest snapshot of an in-progress plan, not a permanent exemption). */
+/** Temporary scaffolding: this plan's own catalogue corpus is built across three tasks in this
+ * one plan, and this file's rule-coverage check runs after every task's own <verify> step -- so
+ * a rule id this plan WILL cover, but has not yet, needs to sit here (with this shared
+ * justification) rather than fail the suite mid-plan. Every id below is removed the moment its
+ * own fixture lands; by the end of this plan's final task this array is empty and deleted,
+ * leaving only PERMANENTLY_EXCEPTED_RULE_IDS above (mirrors 03-04-SUMMARY.md's own "RED commit
+ * with some cases already passing" incremental-build precedent -- an honest snapshot of an
+ * in-progress plan, not a permanent exemption). Task 2 (blocked/ and review-required/) has now
+ * landed; only task 3's safe/ fixtures remain pending. */
 const PENDING_FIXTURES_RULE_IDS: string[] = [
-  // blocked/ -- task 2 adds these six (drop-table is already seeded by task 1)
-  "drop-schema",
-  "drop-database",
-  "truncate",
-  "drop-column",
-  "delete-without-where",
-  "update-without-where",
-  // review-required/ -- task 2 adds these ten (set-not-null is already seeded by task 1)
-  "add-column-volatile-default",
-  "alter-column-type",
-  "add-unique-constraint",
-  "create-index-not-concurrently",
-  "drop-index-not-concurrently",
-  "add-foreign-key-validated",
-  "rename-column",
-  "rename-table",
-  "drop-not-null",
-  "drop-constraint",
   // safe/ -- task 3 adds these eight (create-table is already seeded by task 1)
   "add-column-nullable-no-default",
   "add-column-nonvolatile-default",
