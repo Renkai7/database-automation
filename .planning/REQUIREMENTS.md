@@ -43,7 +43,7 @@
 - [x] **RUN-05**: An empty database plus the full migration history produces the expected schema, verified automatically
 - [x] **RUN-06**: An existing database plus only the new migration applies cleanly, verified automatically
 - [ ] **RUN-07**: The application starts successfully against the resulting schema
-- [ ] **RUN-08**: A partially failed migration leaves a recoverable, clearly reported state — no silent journal manipulation
+- [x] **RUN-08**: A partially failed migration leaves a recoverable, clearly reported state — no silent journal manipulation
 
 ### Pipeline Gate (CI)
 

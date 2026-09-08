@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-09-08T21:57:02.303Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-09-08T22:28:23.639Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 04 execution started
-state_head: e7fa6841c9c19b1da5a1cad18193a6c6df4d859e
+state_head: cdeef8e342c64bc24ab22f50607b320b8d159c6e
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 27
-  completed_plans: 24
+  completed_plans: 25
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 04 (Migration Runner & History Tests) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 04 execution started
 
@@ -84,6 +84,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04-migration-runner-history-tests P02 | 20min | 3 tasks | 22 files |
 | Phase 04 P03 | 20min | 3 tasks | 11 files |
 | Phase 04 P04 | 17min | 2 tasks | 7 files |
+| Phase 04 P05 | 55min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 04]: [Phase 04] 04-03: scripts/history-suite.ts uses stdio: "inherit" on the vitest child process -- execa does not forward a child's stdout/stderr to the parent by default (verified live), so pnpm test:history was silent without it.
 - [Phase 04]: [Phase 04] 04-04: decideTransactionPolicy counts hostile findings across the whole array (top-level and nested D-05 findings alike) and refuses on any combination beyond exactly one finding that is hostile -- including two hostile findings sharing one file, since a file is one unit.
 - [Phase 04]: [Phase 04] 04-04: applyMigration computes the transaction policy before splitStatements/execution, so a mixed-file refusal is provably zero-statement (proven on the recorded client call sequence, not merely on the thrown error type).
+- [Phase 04]: [Phase 04] 04-05: resolveMarker (state -> resolved) is reserved exclusively for db:migrate:recover's own outcome -- the ordinary run-migrations.ts success/failure paths use two new helpers (markMarkerApplied/markMarkerFailed) instead, so a normal successful unwrapped migration still ends up applied. — Required because tests/history/empty-db-full-history.test.ts (04-03, unmodified) asserts every row for a clean run's run_id is applied -- calling resolveMarker on every ordinary success would have broken that pre-existing assertion.
+- [Phase 04]: [Phase 04] 04-05: Case A's fixture inserts two steps rows sharing one recipe_id at DIFFERENT positions (0 and 1) so the pre-existing UNIQUE(recipe_id, position) constraint does not block the insert, while the new CREATE UNIQUE INDEX CONCURRENTLY (recipe_id) still genuinely fails. — Real duplicate data is what makes criterion 4's failure genuine rather than artificial fault injection.
+- [Phase 04]: [Phase 04] 04-05: Added a direct real-database test for must-have truth 6 (a wrapped failure is self-cleaning and does not block the next run) ahead of Case A, rather than resting only on the implicit proof already present in 04-04's own timeouts-and-concurrently.test.ts Case B/C sequence. — The must-have truth is explicit in the plan; giving it its own direct proof avoids depending on a sibling file's test never being edited or removed.
 
 ### Pending Todos
 
@@ -176,6 +180,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T21:57:02.249Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-09-08T22:28:23.584Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
