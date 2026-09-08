@@ -54,6 +54,13 @@ export type StatementKind =
   | "DoBlock"
   | "CreateFunction"
   | "ExecuteDynamic"
+  | "Vacuum"
+  | "AlterSystem"
+  | "CreateDatabase"
+  | "Reindex"
+  | "SetGuc"
+  | "AlterDatabaseSet"
+  | "AlterRoleSet"
   | "Unrecognized";
 
 /**
@@ -109,6 +116,22 @@ export interface StatementFacts {
    * generic across ANY language the analyzer cannot currently read (plperl, c, python, or any
    * future language), not special-cased to one. */
   bodyInspected: boolean;
+  /** D-10 (04-CONTEXT.md): true only when PostgreSQL itself refuses to run this statement inside
+   * a transaction block -- CREATE/DROP INDEX CONCURRENTLY, REINDEX CONCURRENTLY, VACUUM, CREATE
+   * DATABASE and ALTER SYSTEM. The Phase 4 runner reads this fact to decide whether a migration
+   * file must run unwrapped (D-09/D-11); it must never keep its own second list of statement
+   * kinds that cannot run in a transaction, which is exactly the analyzer-vocabulary-drift D-10
+   * exists to prevent. Independent of `concurrently` -- VACUUM/CREATE DATABASE/ALTER SYSTEM carry
+   * no `concurrently` flag at all, so this is never derived from that field. */
+  transactionHostile: boolean;
+  /** D-17 (04-CONTEXT.md): true only when the statement sets, resets or defaults
+   * `lock_timeout` or `statement_timeout` at any scope -- session (`SET`/`SET LOCAL`/`RESET`),
+   * cluster-wide (`ALTER SYSTEM SET`), database-wide (`ALTER DATABASE ... SET`) or role-wide
+   * (`ALTER ROLE ... SET`). A migration that disarms its own safety rail is architecturally
+   * identical to a rules file downgrading DROP TABLE -- this fact is what D17_FLOOR_FACTS
+   * (floor.ts) makes un-editable by any rules file. `RESET ALL` sets this true unconditionally
+   * even though its AST node carries no GUC name to match on (Pitfall 4, 04-RESEARCH.md). */
+  disarmsTimeout: boolean;
 }
 
 /** Every field at its neutral default, so any consumer that needs a complete StatementFacts
@@ -132,6 +155,8 @@ export const EMPTY_FACTS: StatementFacts = {
   nestingDepth: 0,
   nestingLimitExceeded: false,
   bodyInspected: false,
+  transactionHostile: false,
+  disarmsTimeout: false,
 };
 
 /**

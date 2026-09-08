@@ -310,7 +310,17 @@ function inspectDropStmt(dropStmt: Record<string, unknown>): StatementFacts {
       // branch returns it as `name` with `schema: null`; the schema being dropped IS that name.
       return { ...EMPTY_FACTS, statementKind: "DropSchema", schema: name };
     case "OBJECT_INDEX":
-      return { ...EMPTY_FACTS, statementKind: "DropIndex", schema, indexName: name, concurrently };
+      // D-10: DROP INDEX CONCURRENTLY is transaction-hostile the same way CREATE INDEX
+      // CONCURRENTLY is -- derived from the same `concurrent` flag read above, never a second
+      // independent check.
+      return {
+        ...EMPTY_FACTS,
+        statementKind: "DropIndex",
+        schema,
+        indexName: name,
+        concurrently,
+        transactionHostile: concurrently,
+      };
     default:
       return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
   }
@@ -352,13 +362,18 @@ function inspectUpdateStmt(updateStmt: Record<string, unknown>): StatementFacts 
 
 function inspectIndexStmt(indexStmt: Record<string, unknown>): StatementFacts {
   const { schema, table } = readRangeVar(indexStmt.relation);
+  const concurrently = Boolean(indexStmt.concurrent);
   return {
     ...EMPTY_FACTS,
     statementKind: "CreateIndex",
     schema,
     table,
     indexName: (indexStmt.idxname as string | undefined) ?? null,
-    concurrently: Boolean(indexStmt.concurrent),
+    concurrently,
+    // D-10: CREATE INDEX CONCURRENTLY is the one CreateIndex form PostgreSQL forbids inside a
+    // transaction block -- derived from the same `concurrent` flag already read above, never a
+    // second independent check.
+    transactionHostile: concurrently,
   };
 }
 
@@ -398,6 +413,89 @@ function inspectCommentStmt(commentStmt: Record<string, unknown>): StatementFact
  * on. */
 function inspectAlterEnumStmt(_alterEnumStmt: Record<string, unknown>): StatementFacts {
   return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
+}
+
+/** D-10: `VACUUM`/`VACUUM ANALYZE` -- always transaction-hostile (PostgreSQL rejects it inside a
+ * transaction block unconditionally). `rels[0].VacuumRelation.relation.relname` is read into
+ * `table` when a specific table was named (a bare `VACUUM;` with no table has no `rels` key at
+ * all -- read this session). */
+function inspectVacuumStmt(vacuumStmt: Record<string, unknown>): StatementFacts {
+  const rels = vacuumStmt.rels as Array<{ VacuumRelation?: { relation?: unknown } }> | undefined;
+  const { table } = readRangeVar(rels?.[0]?.VacuumRelation?.relation);
+  return { ...EMPTY_FACTS, statementKind: "Vacuum", table, transactionHostile: true };
+}
+
+/** D-17's shared GUC-disarm test, used by `VariableSetStmt` directly and by the `setstmt` node
+ * nested inside `AlterSystemStmt`/`AlterDatabaseSetStmt`/`AlterRoleSetStmt` (all four wrap the
+ * identical shape, verified live this session). `kind: "VAR_RESET_ALL"` disarms unconditionally,
+ * with NO name check at all (Pitfall 4, 04-RESEARCH.md) -- that node carries no `name` field, and
+ * resetting everything resets both timeouts. For every other kind (`VAR_SET_VALUE`,
+ * `VAR_SET_DEFAULT`, `VAR_RESET`), disarming depends only on `name` being `lock_timeout` or
+ * `statement_timeout` -- `is_local` (the `SET LOCAL` form) never changes the answer. */
+function setstmtDisarmsTimeout(setstmt: { kind?: string; name?: string } | undefined): boolean {
+  if (!setstmt) {
+    return false;
+  }
+  if (setstmt.kind === "VAR_RESET_ALL") {
+    return true;
+  }
+  return setstmt.name === "lock_timeout" || setstmt.name === "statement_timeout";
+}
+
+/** D-17: `ALTER SYSTEM SET`/`ALTER SYSTEM RESET` -- always transaction-hostile (PostgreSQL
+ * rejects it inside a transaction block unconditionally); `disarmsTimeout` from its own
+ * `setstmt` via the shared helper above. */
+function inspectAlterSystemStmt(alterSystemStmt: Record<string, unknown>): StatementFacts {
+  const setstmt = alterSystemStmt.setstmt as { kind?: string; name?: string } | undefined;
+  return {
+    ...EMPTY_FACTS,
+    statementKind: "AlterSystem",
+    transactionHostile: true,
+    disarmsTimeout: setstmtDisarmsTimeout(setstmt),
+  };
+}
+
+/** D-10: `CREATE DATABASE` -- always transaction-hostile. */
+function inspectCreatedbStmt(_createdbStmt: Record<string, unknown>): StatementFacts {
+  return { ...EMPTY_FACTS, statementKind: "CreateDatabase", transactionHostile: true };
+}
+
+/** D-10: `REINDEX` -- transaction-hostile only when `CONCURRENTLY` is present. The `params` key
+ * is absent ENTIRELY for a plain `REINDEX` (verified live this session, not an empty array), so
+ * this guards for undefined rather than checking array length. */
+function inspectReindexStmt(reindexStmt: Record<string, unknown>): StatementFacts {
+  const params = reindexStmt.params as Array<{ DefElem?: { defname?: string } }> | undefined;
+  const concurrently = (params ?? []).some((entry) => entry.DefElem?.defname === "concurrently");
+  return {
+    ...EMPTY_FACTS,
+    statementKind: "Reindex",
+    concurrently,
+    transactionHostile: concurrently,
+  };
+}
+
+/** D-17: `SET`/`SET LOCAL`/`SET ... TO DEFAULT`/`RESET`/`RESET ALL` -- never transaction-hostile
+ * on its own (a `VariableSetStmt` is not one of the six statement kinds D-10 names); its only
+ * observable fact here is `disarmsTimeout`, via the shared helper above. */
+function inspectVariableSetStmt(variableSetStmt: Record<string, unknown>): StatementFacts {
+  const setstmt = variableSetStmt as { kind?: string; name?: string };
+  return { ...EMPTY_FACTS, statementKind: "SetGuc", disarmsTimeout: setstmtDisarmsTimeout(setstmt) };
+}
+
+/** D-17: `ALTER DATABASE ... SET` -- wraps the identical `setstmt` shape `VariableSetStmt` uses
+ * (verified live this session); this form persists beyond the migration's own session, which is
+ * why it is covered by the same disarm rule rather than left as a gap (04-CONTEXT.md's deferred
+ * discretion item, resolved via Task 2's checkpoint decision). */
+function inspectAlterDatabaseSetStmt(alterDatabaseSetStmt: Record<string, unknown>): StatementFacts {
+  const setstmt = alterDatabaseSetStmt.setstmt as { kind?: string; name?: string } | undefined;
+  return { ...EMPTY_FACTS, statementKind: "AlterDatabaseSet", disarmsTimeout: setstmtDisarmsTimeout(setstmt) };
+}
+
+/** D-17: `ALTER ROLE ... SET` -- wraps the identical `setstmt` shape `VariableSetStmt` uses
+ * (verified live this session); same reasoning as `AlterDatabaseSetStmt` above. */
+function inspectAlterRoleSetStmt(alterRoleSetStmt: Record<string, unknown>): StatementFacts {
+  const setstmt = alterRoleSetStmt.setstmt as { kind?: string; name?: string } | undefined;
+  return { ...EMPTY_FACTS, statementKind: "AlterRoleSet", disarmsTimeout: setstmtDisarmsTimeout(setstmt) };
 }
 
 /**
@@ -453,6 +551,29 @@ export function inspectStatement(stmt: ParsedStatement): StatementFacts[] {
   }
   if ("AlterEnumStmt" in stmt) {
     return [inspectAlterEnumStmt(stmt.AlterEnumStmt as Record<string, unknown>)];
+  }
+  // D-10/D-17 (04-CONTEXT.md): seven statement kinds the inspector had never named before this
+  // phase -- each resolved to "Unrecognized" (REVIEW_REQUIRED via D-06's default) until now.
+  if ("VacuumStmt" in stmt) {
+    return [inspectVacuumStmt(stmt.VacuumStmt as Record<string, unknown>)];
+  }
+  if ("AlterSystemStmt" in stmt) {
+    return [inspectAlterSystemStmt(stmt.AlterSystemStmt as Record<string, unknown>)];
+  }
+  if ("CreatedbStmt" in stmt) {
+    return [inspectCreatedbStmt(stmt.CreatedbStmt as Record<string, unknown>)];
+  }
+  if ("ReindexStmt" in stmt) {
+    return [inspectReindexStmt(stmt.ReindexStmt as Record<string, unknown>)];
+  }
+  if ("VariableSetStmt" in stmt) {
+    return [inspectVariableSetStmt(stmt.VariableSetStmt as Record<string, unknown>)];
+  }
+  if ("AlterDatabaseSetStmt" in stmt) {
+    return [inspectAlterDatabaseSetStmt(stmt.AlterDatabaseSetStmt as Record<string, unknown>)];
+  }
+  if ("AlterRoleSetStmt" in stmt) {
+    return [inspectAlterRoleSetStmt(stmt.AlterRoleSetStmt as Record<string, unknown>)];
   }
   // D-05 (plan 03-04): the container statement's own fact set. No schema/table/column -- a DO
   // block and a function creation are not scoped to a single relation the way every other

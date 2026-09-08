@@ -390,4 +390,23 @@ describe("inspector facts (03-02-PLAN.md task 1, ANLZ-02/ANLZ-04)", () => {
       /dropping an enum value is not implemented/i,
     );
   });
+
+  // 04-02-PLAN.md task 1: transactionHostile and disarmsTimeout are new StatementFacts fields
+  // (D-10/D-17). Every existing statement kind above defaults disarmsTimeout to false (none of
+  // them is one of the four new disarm-capable kinds), and transactionHostile to false EXCEPT
+  // the pre-existing CREATE/DROP INDEX CONCURRENTLY rows -- D-10 correctly makes those two
+  // transaction-hostile too (04-02-PLAN.md's own extension of the existing IndexStmt/DropStmt
+  // paths), so they are excluded from the "stays false" assertion rather than the assertion
+  // being weakened to ignore them silently.
+  it("every existing statement kind carries disarmsTimeout:false by default, and transactionHostile:false except the pre-existing CONCURRENTLY forms", async () => {
+    for (const row of rows) {
+      const facts = await factsFor(row.sql);
+      expect(facts.disarmsTimeout, `${row.name}: expected disarmsTimeout false`).toBe(false);
+      if (facts.concurrently) {
+        expect(facts.transactionHostile, `${row.name}: expected transactionHostile true (CONCURRENTLY)`).toBe(true);
+      } else {
+        expect(facts.transactionHostile, `${row.name}: expected transactionHostile false`).toBe(false);
+      }
+    }
+  });
 });
