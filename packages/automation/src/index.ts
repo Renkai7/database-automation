@@ -21,6 +21,8 @@ export { RUNNER_EXIT_CODES } from "./runner/exit-codes";
 export type { RunnerExitCode } from "./runner/exit-codes";
 export { splitStatements } from "./runner/split-statements";
 export type { SplitStatement } from "./runner/split-statements";
+export { decideTransactionPolicy, MixedTransactionFileError } from "./runner/transaction-policy";
+export type { TransactionPolicy } from "./runner/transaction-policy";
 export { ensureDrizzleLedger, migrationHash } from "./runner/ledger";
 export { ensureRunnerTable } from "./runner/runner-table";
 export type { RunEntryState } from "./runner/runner-table";

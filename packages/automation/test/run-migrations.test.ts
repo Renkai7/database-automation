@@ -208,3 +208,96 @@ describe("runMigrations refusal branches (D-02/D-08/RUN-02)", () => {
     }
   });
 });
+
+// 04-04-PLAN.md Task 1: the wrap-or-refuse decision (D-09/D-11) is proven at the runMigrations
+// level too -- not just decideTransactionPolicy in isolation -- by asserting on the recorded call
+// sequence, so "no BEGIN was issued" is proven rather than inferred.
+describe("runMigrations transaction policy (D-09/D-11/RUN-03/RUN-04)", () => {
+  it("issues no BEGIN and no COMMIT for a single-statement CREATE INDEX CONCURRENTLY migration, and issues the ledger insert as its own separate call", async () => {
+    const client = new RecordingFakeClient();
+    const file = migrationFile({
+      tag: "0000_concurrent_index",
+      idx: 0,
+      when: 1,
+      sql: "CREATE INDEX CONCURRENTLY idx_t_c ON t (c);",
+    });
+
+    await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+
+    expect(client.calls).not.toContain("BEGIN");
+    expect(client.calls).not.toContain("COMMIT");
+    expect(client.calls).toContain("CREATE INDEX CONCURRENTLY idx_t_c ON t (c)");
+    const ledgerCall = client.calls.find((call) =>
+      call.includes("INSERT INTO drizzle.__drizzle_migrations"),
+    );
+    expect(ledgerCall).toBeDefined();
+    expect(ledgerCall).not.toBe("CREATE INDEX CONCURRENTLY idx_t_c ON t (c)");
+  });
+
+  it("refuses a file mixing CREATE INDEX CONCURRENTLY with an ALTER TABLE with REFUSED_MIXED_FILE, executing no statement from that file at all", async () => {
+    const client = new RecordingFakeClient();
+    const file = migrationFile({
+      tag: "0000_mixed",
+      idx: 0,
+      when: 1,
+      sql: "CREATE INDEX CONCURRENTLY idx_t_c ON t (c); ALTER TABLE t ADD COLUMN foo text;",
+    });
+
+    await expectRefused(
+      runMigrations(client, { migrations: [file], rules, now: fixedNow }),
+      RUNNER_EXIT_CODES.REFUSED_MIXED_FILE,
+    );
+
+    // Checked as an EXACT executed statement, not a substring -- the refused run-report row's
+    // own findings legitimately carry rule rationale prose that mentions "CREATE INDEX
+    // CONCURRENTLY" (rules.json's create-index-concurrently rule text), which a plain substring
+    // check would false-positive against.
+    expect(client.calls).not.toContain("CREATE INDEX CONCURRENTLY idx_t_c ON t (c)");
+    expect(client.calls).not.toContain("ALTER TABLE t ADD COLUMN foo text");
+    expect(
+      client.calls.some((call) => call.includes("INSERT INTO drizzle.__drizzle_migrations")),
+    ).toBe(false);
+    expect(client.calls.some((call) => call.includes("INSERT INTO runner.migration_runs"))).toBe(
+      true,
+    );
+  });
+
+  it("still issues exactly one BEGIN, one client.query per split statement, the ledger insert, and one COMMIT, in order, for an ordinary multi-statement migration", async () => {
+    const client = new RecordingFakeClient();
+    const sql = ["CREATE TABLE t1 (id int);", "CREATE TABLE t2 (id int);"].join("\n");
+    const file = migrationFile({ tag: "0000_ordinary", idx: 0, when: 1, sql });
+
+    await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+
+    const relevantCalls = client.calls.filter(
+      (call) =>
+        call === "BEGIN" ||
+        call === "COMMIT" ||
+        call.includes("CREATE TABLE t1") ||
+        call.includes("CREATE TABLE t2") ||
+        call.includes("INSERT INTO drizzle.__drizzle_migrations"),
+    );
+    expect(relevantCalls).toHaveLength(5);
+    expect(relevantCalls[0]).toBe("BEGIN");
+    expect(relevantCalls[1]).toContain("CREATE TABLE t1");
+    expect(relevantCalls[2]).toContain("CREATE TABLE t2");
+    expect(relevantCalls[3]).toContain("INSERT INTO drizzle.__drizzle_migrations");
+    expect(relevantCalls[4]).toBe("COMMIT");
+  });
+
+  it("never sends the fake client a single call whose text contains more than one statement (Pitfall 1)", async () => {
+    const client = new RecordingFakeClient();
+    const sql = ["CREATE TABLE p1 (id int);", "CREATE TABLE p2 (id int);"].join("\n");
+    const file = migrationFile({ tag: "0000_no_multi_statement", idx: 0, when: 1, sql });
+
+    await runMigrations(client, { migrations: [file], rules, now: fixedNow });
+
+    for (const call of client.calls) {
+      // Pitfall 1: sending the whole file as one client.query() call would silently reintroduce
+      // PostgreSQL's own implicit multi-statement transaction wrapping. No single recorded call
+      // may name more than one CREATE TABLE.
+      const createTableOccurrences = (call.match(/CREATE TABLE/g) ?? []).length;
+      expect(createTableOccurrences).toBeLessThanOrEqual(1);
+    }
+  });
+});

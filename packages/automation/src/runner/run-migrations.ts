@@ -28,6 +28,7 @@ import { RUNNER_EXIT_CODES } from "./exit-codes";
 import { insertLedgerRow, migrationHash, readLastAppliedMillis } from "./ledger";
 import { recordRunEntry, type RunEntryState } from "./runner-table";
 import { splitStatements } from "./split-statements";
+import { decideTransactionPolicy, MixedTransactionFileError } from "./transaction-policy";
 
 export interface RunMigrationsOptions {
   migrations: MigrationFile[];
@@ -63,14 +64,6 @@ export class MigrationRefusedError extends Error {
   }
 }
 
-/** Plan 04-04 replaces this with the real fact-driven module (`./transaction-policy`) once the
- * `transactionHostile` fact exists on `StatementFacts` (D-10). For this task every file is
- * wrapped unconditionally -- the call site below is already shaped so that swap is a body
- * change, not a restructure. */
-function decideTransactionPolicy(_findings: Finding[]): { wrap: true } {
-  return { wrap: true };
-}
-
 /** D-05/D-06: the complete findings list printed BEFORE executing a REVIEW_REQUIRED migration --
  * every rule id and every rationale, never a summary. */
 function printReviewRequiredFindings(tag: string, findings: Finding[]): void {
@@ -91,10 +84,46 @@ async function applyMigration(
   result: AnalysisResult,
   now: () => Date,
 ): Promise<RunReportEntry> {
-  const { wrap } = decideTransactionPolicy(result.findings);
-  const statements = await splitStatements(file.sql);
   const hash = migrationHash(file.sql);
   const startedAt = now();
+
+  // D-09/D-11: the wrap-or-refuse decision, derived only from the analyzer's own facts
+  // (transaction-policy.ts). A mixed file is refused here, BEFORE splitStatements/execution --
+  // record a "refused" run entry with the complete findings and stop the run, exactly as the
+  // BLOCKED branch above does. No statement from this file ever reaches the client.
+  let wrap: boolean;
+  try {
+    const policy = decideTransactionPolicy(result.findings);
+    wrap = policy.wrap;
+  } catch (error) {
+    if (!(error instanceof MixedTransactionFileError)) {
+      throw error;
+    }
+    const finishedAt = now();
+    await recordRunEntry(client, {
+      runId,
+      migrationTag: file.tag,
+      migrationIdx: file.idx,
+      sqlSha256: hash,
+      verdict: result.verdict,
+      findings: result.findings,
+      wrapped: false,
+      state: "refused",
+      statementIndex: null,
+      statementCount: 0,
+      errorMessage: safeErrorMessage(error),
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      rulesVersion: result.rulesVersion,
+    });
+    throw new MigrationRefusedError(
+      `${file.tag}: ${safeErrorMessage(error)}`,
+      RUNNER_EXIT_CODES.REFUSED_MIXED_FILE,
+    );
+  }
+
+  const statements = await splitStatements(file.sql);
   let currentStatementIndex: number | null = null;
 
   try {
