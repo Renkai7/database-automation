@@ -31,12 +31,15 @@ import { loadCorpusManifest } from "./corpus-manifest-schema";
 const CORPUS_DIR = "packages/automation/test/corpus";
 const MANIFEST_PATH = "packages/automation/test/corpus/manifest.json";
 
-/** Permanent: rule ids that can never be exercised by any corpus fixture, or that are
- * deliberately out of this plan's own scope and already covered end to end elsewhere. Each
- * entry requires a comment justifying why -- adding one is a deliberate, reviewable decision,
- * exactly as tests/guardrails.test.ts's own two allowlists (FIXTURE_FILES_WITH_CONNECTION_STRINGS
- * / FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE) are, never routine maintenance. */
-const PERMANENTLY_EXCEPTED_RULE_IDS: string[] = [
+/** A small, explicitly enumerated exception list for rule ids that legitimately cannot appear
+ * as an expected outcome anywhere in this corpus. Each entry requires a comment justifying why
+ * -- adding an entry here is a deliberate, reviewable decision, exactly as
+ * tests/guardrails.test.ts's own two allowlists (FIXTURE_FILES_WITH_CONNECTION_STRINGS /
+ * FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE) are, never routine maintenance. Every other
+ * rule id in the shipped catalogue is exercised by at least one fixture below -- this list is
+ * the complete, final set (task 1/2's own intermediate PENDING_FIXTURES_RULE_IDS scaffold has
+ * been folded away now that every task's fixtures have landed). */
+const RULE_COVERAGE_EXCEPTIONS: string[] = [
   // PostgreSQL's own grammar rejects `ALTER TYPE ... DROP VALUE` unconditionally at parse
   // time -- confirmed live against the installed libpg-query package (03-02-SUMMARY.md's
   // key-decisions, re-confirmed live against the pg18 line this plan inherited): parse()
@@ -64,33 +67,6 @@ const PERMANENTLY_EXCEPTED_RULE_IDS: string[] = [
   // (tests/guardrails-style precedent for "already covered, don't duplicate").
   "empty-input",
 ];
-
-/** Temporary scaffolding: this plan's own catalogue corpus is built across three tasks in this
- * one plan, and this file's rule-coverage check runs after every task's own <verify> step -- so
- * a rule id this plan WILL cover, but has not yet, needs to sit here (with this shared
- * justification) rather than fail the suite mid-plan. Every id below is removed the moment its
- * own fixture lands; by the end of this plan's final task this array is empty and deleted,
- * leaving only PERMANENTLY_EXCEPTED_RULE_IDS above (mirrors 03-04-SUMMARY.md's own "RED commit
- * with some cases already passing" incremental-build precedent -- an honest snapshot of an
- * in-progress plan, not a permanent exemption). Task 2 (blocked/ and review-required/) has now
- * landed; only task 3's safe/ fixtures remain pending. */
-const PENDING_FIXTURES_RULE_IDS: string[] = [
-  // safe/ -- task 3 adds these eight (create-table is already seeded by task 1)
-  "add-column-nullable-no-default",
-  "add-column-nonvolatile-default",
-  "create-index-concurrently",
-  "drop-index-concurrently",
-  "comment-on",
-  "add-check-constraint-not-valid",
-  "add-foreign-key-not-valid",
-  "validate-constraint",
-  // safe/ pairing fixtures -- task 3 adds all three
-  "pair-not-valid-validated",
-  "pair-concurrent-index-unique",
-  "pair-validated-check-set-not-null",
-];
-
-const RULE_COVERAGE_EXCEPTIONS: string[] = [...PERMANENTLY_EXCEPTED_RULE_IDS, ...PENDING_FIXTURES_RULE_IDS];
 
 const manifest = loadCorpusManifest(MANIFEST_PATH);
 const rules = loadDefaultRules();

@@ -1,0 +1,1 @@
+DROP INDEX CONCURRENTLY orders_status_idx;

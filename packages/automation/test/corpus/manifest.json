@@ -146,6 +146,103 @@
       "expectedVerdict": "SAFE",
       "expectedRuleIds": ["create-table"],
       "why": "Creating a brand new table has no existing rows to lock, scan or rewrite and no application code can yet depend on it -- the simplest SAFE case."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/add-column-nullable-no-default.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-column-nullable-no-default"],
+      "why": "Adding a nullable column with no default is a metadata-only change that requires no table rewrite and no scan of existing rows."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/add-column-literal-default.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-column-nonvolatile-default"],
+      "why": "A literal default is evaluated once and stored in the table's own metadata, so PostgreSQL's fast add-column path applies and no rewrite is required."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/add-column-now-default.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-column-nonvolatile-default"],
+      "why": "now() is catalogued STABLE, not VOLATILE (03-RESEARCH.md's Pitfall 1 correction) -- it is evaluated once at ALTER TABLE time and stored in metadata exactly like a literal, so PostgreSQL's fast add-column path applies. Expecting REVIEW_REQUIRED here would be a false positive on a genuinely safe migration, the exact review-fatigue anti-pattern this catalogue exists to avoid; its counterpart (a clock_timestamp() default, review-required/add-column-volatile-default.sql) is genuinely VOLATILE and correctly expects REVIEW_REQUIRED -- the two fixtures together make the STABLE-vs-VOLATILE distinction visible in the corpus, not only in a unit test."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/create-index-concurrently.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["create-index-concurrently"],
+      "why": "CREATE INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire build."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/drop-index-concurrently.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["drop-index-concurrently"],
+      "why": "DROP INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire drop."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/comment-on.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["comment-on"],
+      "why": "COMMENT ON only updates catalog metadata text, taking no meaningful lock and touching no row in the table it describes."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/add-check-constraint-not-valid.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-check-constraint-not-valid"],
+      "why": "A check constraint added NOT VALID is instant and enforces only on new or changed rows, deferring the table scan to a separate, weaker-locked VALIDATE CONSTRAINT step."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/add-foreign-key-not-valid.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-foreign-key-not-valid"],
+      "why": "A foreign key added NOT VALID is instant and enforces only on new or changed rows, deferring the scan of both tables to a separate, weaker-locked VALIDATE CONSTRAINT step."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/validate-constraint.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["validate-constraint"],
+      "why": "VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE on the altered table, letting concurrent reads and writes continue while it scans for constraint violations -- true on its own regardless of what statement (if any) preceded it in the same file."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/pairing-not-valid-then-validate.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["add-check-constraint-not-valid", "pair-not-valid-validated", "validate-constraint"],
+      "why": "The complete two-step safe form for adding a validated constraint without a table-scanning lock: a check constraint added NOT VALID, then validated by its own VALIDATE CONSTRAINT naming the exact same constraint on the exact same table in this same file -- the applySafeFormPairing pass adds pair-not-valid-validated to both statements' findings alongside each half's own already-SAFE rule id."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/pairing-concurrent-index-then-unique.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": ["create-index-concurrently", "pair-concurrent-index-unique"],
+      "why": "The complete two-step safe form for adding a unique constraint without blocking writes during the index build: an index built CONCURRENTLY, then attached via ADD CONSTRAINT ... UNIQUE USING INDEX naming that exact index -- without the pairing, the second statement would be an unmatched D-06 REVIEW_REQUIRED (no ordinary rule matches AddUniqueConstraint with a non-null usingIndexName), so pair-concurrent-index-unique is the only thing that resolves it to SAFE."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/pairing-validated-check-then-set-not-null.sql",
+      "group": "catalogue",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-check-constraint-not-valid",
+        "pair-not-valid-validated",
+        "pair-validated-check-set-not-null",
+        "set-not-null",
+        "validate-constraint"
+      ],
+      "why": "The complete three-step safe form for enforcing NOT NULL without an ACCESS EXCLUSIVE scan: a CHECK (col IS NOT NULL) constraint added NOT VALID, validated (itself pairing via pair-not-valid-validated), then SET NOT NULL on that same column -- PostgreSQL 12+ detects the validated check constraint and skips SET NOT NULL's own table scan, which pair-validated-check-set-not-null is what lowers the naive REVIEW_REQUIRED set-not-null finding to SAFE."
+    },
+    {
+      "file": "packages/automation/test/corpus/safe/near-miss-index-name-mismatch.sql",
+      "group": "catalogue",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": ["create-index-concurrently"],
+      "why": "Near-miss control proving the pairing match is exact name equality, never a fuzzy or approximate match: an index built CONCURRENTLY as orders_customer_id_idx, paired against a unique constraint whose USING INDEX names a DIFFERENT index (orders_other_idx) -- one character or one whole word different is still a different index, not a typo to forgive, so pair-concurrent-index-unique never fires and the constraint statement falls through to D-06's unmatched REVIEW_REQUIRED. (The literal 'unvalidated-then-validate pair with a mismatched constraint name' shape the plan text originally described does NOT produce this outcome under the real analyzer -- see 03-05-SUMMARY.md's Deviations section for why this shape was substituted.)"
     }
   ]
 }
