@@ -20,7 +20,8 @@
     "analyze:squawk-comparison": "tsx packages/automation/scripts/squawk-comparison.ts",
     "dev": "pnpm --filter recipe-app dev",
     "test": "vitest run",
-    "test:drill": "vitest run --config vitest.drill.config.ts"
+    "test:drill": "vitest run --config vitest.drill.config.ts",
+    "test:history": "tsx scripts/history-suite.ts"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "12.1.0",
