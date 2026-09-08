@@ -419,6 +419,33 @@
         "create-table"
       ],
       "why": "D-14's false-positive half: a table is CREATED whose quoted name is itself the phrase \"drop table\" -- proving an identifier that reads like an entire dangerous statement is not treated as one. This is a genuine CreateStmt node classified SAFE by create-table; nothing about the identifier's text is ever inspected."
+    },
+    {
+      "file": "packages/automation/test/corpus/app-shaped/recipes-add-notes-column.sql",
+      "group": "app-shaped",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default"
+      ],
+      "why": "D-16: mirrors 01-CONTEXT.md D-11's reserved 'nullable notes column' churn on the real recipes table without touching apps/recipe-app/src/db/schema.ts -- a metadata-only ADD COLUMN with no default requires no table rewrite and no scan, so Phase 4 already knows this lands SAFE before spending the real change."
+    },
+    {
+      "file": "packages/automation/test/corpus/app-shaped/steps-timer-label-set-not-null.sql",
+      "group": "app-shaped",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "set-not-null"
+      ],
+      "why": "D-16: mirrors 01-CONTEXT.md D-11's reserved churn by enforcing NOT NULL on the real, existing nullable steps.timer_label column directly (the naive one-liner, not the NOT VALID/VALIDATE/SET NOT NULL three-step form) -- PITFALLS.md A5's canonical lock hazard: SET NOT NULL must scan the whole table under ACCESS EXCLUSIVE to prove no existing row violates the constraint, which the analyzer has no database connection to skip, so this correctly lands REVIEW_REQUIRED rather than SAFE."
+    },
+    {
+      "file": "packages/automation/test/corpus/app-shaped/drop-ingredients-table.sql",
+      "group": "app-shaped",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "drop-table"
+      ],
+      "why": "D-16: mirrors 01-CONTEXT.md D-11's reserved churn -- dropping the real ingredients table, which both it and steps cascade-delete from recipes, is the closest thing this repository has to the actual disaster this whole project exists to prevent. The D-02 floor makes this BLOCKED unconditionally, with no rules-file override possible."
     }
   ]
 }
