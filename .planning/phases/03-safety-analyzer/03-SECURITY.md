@@ -101,6 +101,7 @@ once below with the union of its evidence.
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-09-08 | 31 | 31 | 0 | `/gsd-secure-phase 3` (orchestrator, ASVS L1 short-circuit — no auditor subagent spawned) |
+| 2026-09-08 | 31 | 31 | 0 | `/gsd-secure-phase 3` re-audit (State A, ASVS L1 short-circuit — register re-derived from plans, high-severity evidence re-checked) |
 
 ### Audit 2026-09-08
 
@@ -129,6 +130,55 @@ the boundary (L2) or trace a hostile input end to end (L3). Raise
 `workflow.security_asvs_level` to 2 via `/gsd-settings` if Phase 5's CI integration should be
 audited at boundary-placement depth.
 
+### Re-Audit 2026-09-08 (State A)
+
+| Metric | Count |
+|--------|-------|
+| Threats found | 31 |
+| Closed | 31 |
+| Open | 0 |
+
+**Method.** State A — a prior `03-SECURITY.md` existed, so this run audited it rather than
+authoring it. The register was re-derived independently from the `<threat_model>` blocks of all
+seven plan files rather than read back from the existing document: **31 unique threats**
+confirmed, with `T-03-04` again appearing in `03-02` and `03-05` and `T-03-SC` in `03-01` and
+`03-07`. No threat present in a plan is missing from the register, and no register row lacks a
+plan-file origin. `register_authored_at_plan_time` re-confirmed **true**.
+
+**Re-checked evidence.** Every threat at or above the blocking threshold
+(`workflow.security_block_on: high` — 14 threats: T-03-01, -02, -03, -07, -11, -12, -16, -17,
+-20, -23, -24, -25, -29, -SC) was re-located in the named component this run, not carried over
+on trust. Confirmed directly:
+
+- `src/inspector/inspect.ts` still returns a grep count of **0** for `RegExp` / `.match(` /
+  `.replace(` / `.includes(` (T-03-01).
+- `assertFloorNotWeakened` still iterates `[...D02_FLOOR_FACTS, ...D07_FLOOR_FACTS]` and throws
+  `RulesFileError` — `floor.ts:65-69`; `assertUnmatchedDefaultsToReview` at `floor.ts:145-149`
+  (T-03-02, T-03-04, T-03-17).
+- `AnalyzerParseError` → `EXIT_CODES.PARSE_FAILURE` at `cli.ts:114,128-132`; `EXIT_CODES` still
+  `Object.freeze`d at `types.ts:190-196` with no code equal to 1 (T-03-03, T-03-06, T-03-11).
+- `isFloorOperation` guards every lowering site in `classify.ts` (`:138`, `:141`, `:211`), not
+  only the entry point (T-03-07).
+- Both journal-mismatch directions still throw naming the offender —
+  `drizzle-migrations.ts:68-70` and `:82-84` (T-03-12).
+- `inspect-plpgsql.ts` still imports and re-enters `parseTopLevel` from `inspect.ts` (`:60`) and
+  caps at `MAX_NESTING_DEPTH = 8` (`:67`) (T-03-16, T-03-18).
+- All five adversarial drop/inert pairs present under `test/corpus/adversarial/`;
+  `D14_ADVERSARIAL_PAIR_IDS` still fails on both a missing shape (`corpus.test.ts:163`) and an
+  unexpected one (`:184-185`) (T-03-23, T-03-24).
+- `tests/guardrails.test.ts:64` still returns true for `packages/`-prefixed files (T-03-29).
+- `libpg-query` pinned exactly at `18.1.4` in `dependencies`; `squawk-cli` present only in
+  `devDependencies`, confirming `AR-03-02`'s standing condition still holds (T-03-SC, T-03-30).
+
+**Suite re-run.** `pnpm vitest run` — **301 tests across 30 files, all passing**, identical to
+the figures the first audit recorded. No drift.
+
+**Prior gap re-checked, still open as a process observation.** None of the seven
+`*-SUMMARY.md` files has gained a `## Threat Flags` section since the first audit, so Step 2b
+again had nothing to incorporate and mitigation evidence again rests on a single source (the
+implementation) rather than two. Not a threat and not blocking — recorded again so it does not
+quietly become the norm for Phase 4 onward.
+
 ---
 
 ## Sign-Off
@@ -138,4 +188,5 @@ audited at boundary-placement depth.
 - [x] `threats_open: 0` confirmed
 - [x] `status: verified` set in frontmatter
 
-**Approval:** verified 2026-09-08
+**Approval:** verified 2026-09-08 · re-audited 2026-09-08 (State A, register re-derived and
+high-severity evidence re-checked independently; no change in status)
