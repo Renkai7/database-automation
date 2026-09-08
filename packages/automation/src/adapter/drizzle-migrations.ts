@@ -35,10 +35,13 @@ interface Journal {
 }
 
 /** One migration file resolved against its journal entry: the tag, its journal index, the
- * resolved path, and the file's own SQL text. */
+ * journal entry's own `when` timestamp (Phase 4: drizzle's own "is this migration new?"
+ * comparison target, and the value the runner's ledger `created_at` column must carry -- D-04),
+ * the resolved path, and the file's own SQL text. */
 export interface MigrationFile {
   tag: string;
   idx: number;
+  when: number;
   path: string;
   sql: string;
 }
@@ -49,8 +52,10 @@ export interface MigrationFile {
  * overrides so a test can drive both mismatch directions against a temporary directory instead
  * of mutating the real migrations directory.
  *
- * A journal entry with no matching file, or a `.sql` file with no matching journal entry, is a
- * hard error naming the offending tag or filename -- never a silent skip.
+ * A journal entry with no matching file, a `.sql` file with no matching journal entry, or two
+ * journal entries sharing the same `idx`, is a hard error naming the offending tag, filename, or
+ * duplicated `idx` -- never a silent skip. Ordering must be total, not merely sorted: a journal
+ * with a duplicated `idx` has no single unambiguous application order, so nothing is applied.
  */
 export function enumerateMigrationFiles(
   migrationsDir: string = DEFAULT_MIGRATIONS_DIR,
@@ -58,6 +63,19 @@ export function enumerateMigrationFiles(
 ): MigrationFile[] {
   const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as Journal;
   const entries = [...journal.entries].sort((a, b) => a.idx - b.idx);
+
+  const seenIdx = new Map<number, string>();
+  for (const entry of entries) {
+    const priorTag = seenIdx.get(entry.idx);
+    if (priorTag !== undefined) {
+      throw new Error(
+        `Migration journal integrity error: idx ${entry.idx} is shared by both "${priorTag}" ` +
+          `and "${entry.tag}" in "${journalPath}". Ordering must be total -- applying nothing ` +
+          "until the journal names each migration a single, unambiguous position.",
+      );
+    }
+    seenIdx.set(entry.idx, entry.tag);
+  }
 
   const files: MigrationFile[] = entries.map((entry) => {
     const path = join(migrationsDir, `${entry.tag}.sql`);
@@ -71,7 +89,7 @@ export function enumerateMigrationFiles(
           "not examine must never look like a migration it approved.",
       );
     }
-    return { tag: entry.tag, idx: entry.idx, path, sql };
+    return { tag: entry.tag, idx: entry.idx, when: entry.when, path, sql };
   });
 
   const journalTags = new Set(entries.map((entry) => entry.tag));

@@ -6,3 +6,23 @@ export type { MigrationFile } from "./adapter/drizzle-migrations";
 export { loadDefaultRules } from "./adapter/default-rules";
 export { loadRules } from "./classifier/classify";
 export * from "./types";
+
+// D-27: Phase 4's runner core -- the local entry point (scripts/db-migrate.ts) and any future
+// harness (Testcontainers history tests) import exclusively from here, never by reaching into
+// individual src/runner/ modules directly.
+export type { RunnerClient } from "./runner/client";
+export {
+  assertTimeoutsInEffect,
+  LOCK_TIMEOUT_MS,
+  RUNNER_CONNECTION_OPTIONS,
+  STATEMENT_TIMEOUT_MS,
+} from "./runner/timeouts";
+export { RUNNER_EXIT_CODES } from "./runner/exit-codes";
+export type { RunnerExitCode } from "./runner/exit-codes";
+export { splitStatements } from "./runner/split-statements";
+export type { SplitStatement } from "./runner/split-statements";
+export { ensureDrizzleLedger, migrationHash } from "./runner/ledger";
+export { ensureRunnerTable } from "./runner/runner-table";
+export type { RunEntryState } from "./runner/runner-table";
+export { MigrationRefusedError, runMigrations } from "./runner/run-migrations";
+export type { RunMigrationsOptions, RunReport, RunReportEntry } from "./runner/run-migrations";

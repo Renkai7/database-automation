@@ -39,6 +39,7 @@ async function assertRebuiltState(): Promise<void> {
       "public.ingredients",
       "public.recipes",
       "public.steps",
+      "runner.migration_runs",
     ]);
 
     const countsResult = await client.query(
