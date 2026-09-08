@@ -74,6 +74,15 @@
       "why": "CR-02 regression (03-REVIEW.md): PostgreSQL's own grammar allows more than one subcommand in a single ALTER TABLE, and inspectAlterTableStmt used to inspect only the first (cmds[0]), silently discarding every later subcommand before it ever reached classification. This fixture combines a harmless ADD COLUMN with a genuinely destructive DROP COLUMN in one statement -- before the fix, analyzeSql returned file verdict SAFE with a single finding for the ADD COLUMN, and the DROP COLUMN never appeared anywhere in the result. The fix must produce one finding per subcommand and the file verdict must be BLOCKED, worst-verdict-wins."
     },
     {
+      "file": "packages/automation/test/corpus/blocked/multi-object-drop-table.sql",
+      "group": "catalogue",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "drop-table"
+      ],
+      "why": "WR-01 regression (04-REVIEW.md): PostgreSQL's own grammar allows more than one object in a single DROP statement, and inspectDropStmt used to read only objects[0], silently discarding every later object before it ever reached classification -- the same bug shape CR-02 already fixed for multi-subcommand ALTER TABLE. This fixture drops two tables in one statement; the fix must produce one finding per object (test/multi-object-drop.test.ts's own length-2 assertion covers this directly, since both objects share the same drop-table rule id and the corpus harness's set-based expectedRuleIds comparison would not by itself catch a regression that dropped one of the two findings)."
+    },
+    {
       "file": "packages/automation/test/corpus/blocked/reset-all.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",

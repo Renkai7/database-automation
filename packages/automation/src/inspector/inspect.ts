@@ -296,34 +296,50 @@ function inspectAlterTableStmt(alterTableStmt: Record<string, unknown>): Stateme
 
 /** Splits `DropStmt` by its own `removeType` into DropTable, DropSchema and DropIndex.
  * `DROP DATABASE` is NOT a `DropStmt` at all -- it parses to a distinct `DropdbStmt` node
- * (observed directly this session), handled separately below. */
-function inspectDropStmt(dropStmt: Record<string, unknown>): StatementFacts {
-  const target = (dropStmt.objects as unknown[] | undefined)?.[0];
-  const { schema, name } = readQualifiedName(target);
+ * (observed directly this session), handled separately below.
+ *
+ * WR-01 FIX (04-REVIEW.md): PostgreSQL's own grammar allows a single `DROP` statement to name
+ * MORE than one object (`DROP TABLE a, b;`, `DROP SCHEMA a, b;`, `DROP INDEX a, b;`) -- the exact
+ * multi-object bug shape CR-02 already fixed for `AlterTableStmt.cmds`. Reading only
+ * `dropStmt.objects[0]` silently discarded every object after the first before it ever became its
+ * own `StatementFacts`/`Finding`. Returns one `StatementFacts` PER object, in `objects` order,
+ * mirroring `inspectAlterTableStmt`'s fan-out -- a `DropStmt` with no objects at all (defensive;
+ * not observed in real parser output) yields a single Unrecognized fact set rather than an empty
+ * array, so every DropStmt still produces at least one finding. */
+function inspectDropStmt(dropStmt: Record<string, unknown>): StatementFacts[] {
+  const objects = (dropStmt.objects as unknown[] | undefined) ?? [];
   const concurrently = Boolean(dropStmt.concurrent);
 
-  switch (dropStmt.removeType) {
-    case "OBJECT_TABLE":
-      return { ...EMPTY_FACTS, statementKind: "DropTable", schema, table: name };
-    case "OBJECT_SCHEMA":
-      // A schema name has no further qualifier of its own -- readQualifiedName's bare-String
-      // branch returns it as `name` with `schema: null`; the schema being dropped IS that name.
-      return { ...EMPTY_FACTS, statementKind: "DropSchema", schema: name };
-    case "OBJECT_INDEX":
-      // D-10: DROP INDEX CONCURRENTLY is transaction-hostile the same way CREATE INDEX
-      // CONCURRENTLY is -- derived from the same `concurrent` flag read above, never a second
-      // independent check.
-      return {
-        ...EMPTY_FACTS,
-        statementKind: "DropIndex",
-        schema,
-        indexName: name,
-        concurrently,
-        transactionHostile: concurrently,
-      };
-    default:
-      return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
+  if (objects.length === 0) {
+    return [{ ...EMPTY_FACTS, statementKind: "Unrecognized" }];
   }
+
+  return objects.map((target) => {
+    const { schema, name } = readQualifiedName(target);
+
+    switch (dropStmt.removeType) {
+      case "OBJECT_TABLE":
+        return { ...EMPTY_FACTS, statementKind: "DropTable", schema, table: name };
+      case "OBJECT_SCHEMA":
+        // A schema name has no further qualifier of its own -- readQualifiedName's bare-String
+        // branch returns it as `name` with `schema: null`; the schema being dropped IS that name.
+        return { ...EMPTY_FACTS, statementKind: "DropSchema", schema: name };
+      case "OBJECT_INDEX":
+        // D-10: DROP INDEX CONCURRENTLY is transaction-hostile the same way CREATE INDEX
+        // CONCURRENTLY is -- derived from the same `concurrent` flag read above, never a second
+        // independent check.
+        return {
+          ...EMPTY_FACTS,
+          statementKind: "DropIndex",
+          schema,
+          indexName: name,
+          concurrently,
+          transactionHostile: concurrently,
+        };
+      default:
+        return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
+    }
+  });
 }
 
 /** `DROP DATABASE` -- its own AST node type (`DropdbStmt`), never a `DropStmt`. */
@@ -512,15 +528,16 @@ function inspectAlterRoleSetStmt(alterRoleSetStmt: Record<string, unknown>): Sta
  * which D-06 already sends to REVIEW REQUIRED via the ordinary no-match path -- that is not a
  * gap, it is D-06 working.
  *
- * CR-02 fix: returns StatementFacts[], not a single StatementFacts. Every statement kind except
- * AlterTableStmt always produces exactly one entry -- AlterTableStmt produces one entry per
- * subcommand (see inspectAlterTableStmt), because PostgreSQL's own grammar allows a single
- * ALTER TABLE to carry more than one independently dangerous (or safe) subcommand, and every one
- * of them must reach its own Finding rather than only the first.
+ * CR-02/WR-01 fix: returns StatementFacts[], not a single StatementFacts. Most statement kinds
+ * always produce exactly one entry -- AlterTableStmt produces one entry per subcommand (see
+ * inspectAlterTableStmt) and DropStmt produces one entry per named object (see inspectDropStmt),
+ * because PostgreSQL's own grammar allows both a single ALTER TABLE and a single DROP to carry
+ * more than one independently dangerous (or safe) target, and every one of them must reach its
+ * own Finding rather than only the first.
  */
 export function inspectStatement(stmt: ParsedStatement): StatementFacts[] {
   if ("DropStmt" in stmt) {
-    return [inspectDropStmt(stmt.DropStmt as Record<string, unknown>)];
+    return inspectDropStmt(stmt.DropStmt as Record<string, unknown>);
   }
   if ("DropdbStmt" in stmt) {
     return [inspectDropdbStmt(stmt.DropdbStmt as Record<string, unknown>)];

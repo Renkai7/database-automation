@@ -55,12 +55,14 @@ function emptyInputFinding(rules: RulesFile): Finding {
  * rule, not an unconditional SAFE, is what classifies it (gap closure: the previous
  * unconditional-SAFE behavior this replaces is exactly the false-SAFE defect this fix closes).
  *
- * CR-02 fix: inspectStatement now returns one StatementFacts per AlterTableCmd subcommand for a
- * multi-subcommand ALTER TABLE (never just the first). AlterTableStmt is never a DoBlock/
- * CreateFunction container, so a `factsList` with more than one entry can only mean "several
- * ALTER TABLE subcommands" -- each gets its own Finding, sharing statementIndex but carrying a
- * distinct nestedPath ([statementIndex, subcommandIndex]) so a consumer can tell them apart,
- * exactly like D-05's own nestedPath convention for recursion. */
+ * CR-02/WR-01 fix: inspectStatement now returns one StatementFacts per AlterTableCmd subcommand
+ * for a multi-subcommand ALTER TABLE, and one StatementFacts per named object for a multi-object
+ * DROP (never just the first in either case). Neither AlterTableStmt nor DropStmt is ever a
+ * DoBlock/CreateFunction container, so a `factsList` with more than one entry can only mean
+ * "several ALTER TABLE subcommands" or "several DROP objects" -- each gets its own Finding,
+ * sharing statementIndex but carrying a distinct nestedPath ([statementIndex, subcommandIndex])
+ * so a consumer can tell them apart, exactly like D-05's own nestedPath convention for
+ * recursion. */
 async function inspectAndClassifyStatement(
   stmt: ParsedStatement,
   statementIndex: number,
