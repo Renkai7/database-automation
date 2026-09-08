@@ -4,10 +4,10 @@ D-15's one-time calibration: this analyzer and squawk-cli, an independent, exter
 
 ## Run metadata
 
-- **Run date:** 2026-09-08T15:16:30.941Z
+- **Run date:** 2026-09-08T17:18:17.347Z
 - **squawk version:** squawk 2.64.0
 - **PostgreSQL version pin:** 17.0 (D9's project-wide pin)
-- **Corpus files compared:** 49
+- **Corpus files compared:** 51
 
 ## What "agreement" means here
 
@@ -15,13 +15,13 @@ The two tools do not speak the same language: squawk emits lint warnings (zero o
 
 ## Executive summary
 
-21 of 49 rows disagree under this report's agreement definition. Every one is examined below and
-resolves to one of two labels -- **19 different-by-design**, **2 analyzer-correct** -- and **zero
+22 of 51 rows disagree under this report's agreement definition. Every one is examined below and
+resolves to one of two labels -- **19 different-by-design**, **3 analyzer-correct** -- and **zero
 squawk-correct**. No row in this run showed squawk catching a hazard this catalogue's `rules.json`
-missed; that is a specific claim about this 49-file corpus on this run, not a claim that squawk
+missed; that is a specific claim about this 51-file corpus on this run, not a claim that squawk
 never catches anything this project's rules could miss on a different input.
 
-The two analyzer-correct rows matter for different reasons. `delete-without-where.sql` and
+The three analyzer-correct rows matter for different reasons. `delete-without-where.sql` and
 `update-without-where.sql` show squawk has no rule at all for an unscoped `DELETE`/`UPDATE` --
 this project's D-02 floor covers ground squawk's own catalogue does not. More significant:
 **`adversarial/do-block-drop.sql` shows squawk producing zero findings for a file containing a
@@ -34,7 +34,7 @@ exposed and fixed in this analyzer's own earlier code; seeing an independent, wi
 miss the same class of hazard entirely is the strongest evidence in this comparison that D-05's
 recursion investment was necessary, not academic.
 
-The remaining 19 different-by-design rows split into three buckets, none of them a gap in this
+The remaining 20 different-by-design rows split into three buckets, none of them a gap in this
 catalogue's stated scope (`.planning/research/FEATURES.md` §1's migration lock/rewrite/data-loss
 hazard list, per D-04):
 - **Session properties** (`require-lock-timeout`, `require-statement-timeout`) -- D-04's two
@@ -47,11 +47,23 @@ hazard list, per D-04):
 - **Schema-design style** (`prefer-bigint-over-int`) -- a future-capacity recommendation with no
   lock, rewrite, or data-loss mechanism, outside this catalogue's stated migration-safety scope.
 
+One row is new since this report was last annotated (see the audit note below) and adds a
+finding of its own. `safe/multi-subcommand-alter-table-all-safe.sql` and its `blocked/`
+counterpart were added by CR-02 to pin that this analyzer examines *every* subcommand of a
+multi-subcommand `ALTER TABLE`, not just the first. squawk's output on the safe fixture is
+byte-identical to its output on the single-subcommand `safe/add-column-nullable-no-default.sql`,
+and on the blocked fixture it raises nothing beyond the `ban-drop-column` it would have raised
+for a lone `DROP COLUMN`. squawk therefore emits no signal whatsoever about subcommand count.
+That is not a point against squawk -- flagging each subcommand is not what its rules are for --
+but it does establish that the CR-02 defect was outside this comparison's reach: squawk could
+not have caught it, so the corpus and the analyzer's own unit tests are the only things standing
+between that class of bug and a false SAFE.
+
 ## What this comparison does and does not establish
 
 It establishes that two independently-built tools looking at the same SQL agree where they should and differ only where a reason can be given. It does **not** establish that either tool is correct -- both could share a blind spot -- and it is a one-time calibration rather than a standing check (D-15): it goes stale the moment either tool's rule catalogue changes. Anything this run could not determine is recorded as UNKNOWN below, never smoothed over and never silently dropped.
 
-## Comparison table (49 rows)
+## Comparison table (51 rows)
 
 | File | Group | Analyzer verdict | Analyzer rule ids | squawk rules | Agreement |
 |---|---|---|---|---|---|
@@ -62,6 +74,7 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `packages/automation/test/corpus/blocked/drop-column.sql` | catalogue | BLOCKED | `drop-column` | `ban-drop-column`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `packages/automation/test/corpus/blocked/delete-without-where.sql` | catalogue | BLOCKED | `delete-without-where` | (no findings) | **disagree** |
 | `packages/automation/test/corpus/blocked/update-without-where.sql` | catalogue | BLOCKED | `update-without-where` | (no findings) | **disagree** |
+| `packages/automation/test/corpus/blocked/multi-subcommand-alter-table.sql` | catalogue | BLOCKED | `add-column-nullable-no-default`, `drop-column` | `ban-drop-column`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `packages/automation/test/corpus/review-required/set-not-null.sql` | catalogue | REVIEW_REQUIRED | `set-not-null` | `adding-not-nullable-field`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `packages/automation/test/corpus/review-required/add-column-volatile-default.sql` | catalogue | REVIEW_REQUIRED | `add-column-volatile-default` | `adding-field-with-default`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `packages/automation/test/corpus/review-required/alter-column-type.sql` | catalogue | REVIEW_REQUIRED | `alter-column-type` | `changing-column-type`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
@@ -89,6 +102,7 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `packages/automation/test/corpus/safe/pairing-concurrent-index-then-unique.sql` | catalogue | SAFE | `create-index-concurrently`, `pair-concurrent-index-unique` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `packages/automation/test/corpus/safe/pairing-validated-check-then-set-not-null.sql` | catalogue | SAFE | `add-check-constraint-not-valid`, `pair-not-valid-validated`, `pair-validated-check-set-not-null`, `set-not-null`, `validate-constraint` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `packages/automation/test/corpus/safe/near-miss-index-name-mismatch.sql` | catalogue | REVIEW_REQUIRED | `create-index-concurrently` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
+| `packages/automation/test/corpus/safe/multi-subcommand-alter-table-all-safe.sql` | catalogue | SAFE | `add-column-nullable-no-default` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `packages/automation/test/corpus/adversarial/inline-comment-drop.sql` | adversarial | BLOCKED | `drop-table` | `ban-drop-table`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 | `packages/automation/test/corpus/adversarial/inline-comment-inert.sql` | adversarial | SAFE | `add-column-nullable-no-default` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `packages/automation/test/corpus/adversarial/dollar-quoted-string-drop.sql` | adversarial | BLOCKED | `create-function-container`, `drop-table` | `require-lock-timeout`, `require-statement-timeout` | agree |
@@ -105,7 +119,7 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `apps/recipe-app/drizzle/0000_bumpy_khan.sql` | real-migration | SAFE | `create-table` | `prefer-bigint-over-int`, `prefer-robust-stmts` | **disagree** |
 | `apps/recipe-app/drizzle/0001_busy_thunderbolt.sql` | real-migration | REVIEW_REQUIRED | `add-foreign-key-validated`, `create-table` | `adding-foreign-key-constraint`, `constraint-missing-not-valid`, `prefer-bigint-over-int`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 
-## Disagreements (21)
+## Disagreements (22)
 
 Every row below needs one of exactly three labels -- **analyzer-correct**, **squawk-correct**, or **different-by-design** -- each with a stated reason. Placeholders below are filled in by hand, not generated: this generator records *what* disagrees, not *why*.
 
@@ -229,6 +243,14 @@ Every row below needs one of exactly three labels -- **analyzer-correct**, **squ
 - **Verdict on the disagreement:** different-by-design
 - **Reason:** Same D-04 session-property exclusion, rerun-idempotency, and pairing-mechanism reasoning as the two rows above. squawk's `adding-not-nullable-field` rule -- which fired on the naive standalone `set-not-null.sql` fixture -- does not fire on the third statement here: squawk has no cross-statement PG12+ validated-constraint awareness the way D-09's pairing does, but it also raises no objection, landing on the same practical outcome through a different (and narrower) mechanism.
 
+### `packages/automation/test/corpus/safe/multi-subcommand-alter-table-all-safe.sql`
+
+- **Analyzer verdict:** SAFE (`add-column-nullable-no-default`)
+- **squawk:** `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout`
+- **Corpus expectation:** CR-02's completeness counterpart: two subcommands in one ALTER TABLE, both harmless nullable ADD COLUMNs with no default. Proves the multi-subcommand fix produces a finding for EVERY subcommand (not just the first, and not just when one is dangerous) -- both findings carry the same add-column-nullable-no-default rule id, so the corpus harness's set-based expectedRuleIds comparison would not by itself catch a regression that dropped one of the two identical findings; test/multi-subcommand-alter-table.test.ts's own length-2 assertion covers that gap directly.
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Same two excluded categories as every other SAFE-verdict row above. `require-lock-timeout`/`require-statement-timeout` are D-04's explicitly and deliberately excluded pair -- they describe how the runner opens its session, which RUN-02 makes the Phase 4 runner responsible for setting on every migration regardless of content, not what this statement does. `prefer-robust-stmts` is the rerun-idempotency concern this project's one-shot, journal-tracked migration model (D11) does not need. Both `ADD COLUMN`s are nullable with no default, so PostgreSQL's fast add-column path applies to each and no rewrite or scan occurs -- which is what the SAFE verdict certifies. Worth recording specifically, because it is the point of this fixture: squawk's findings here are byte-identical to those on the single-subcommand `safe/add-column-nullable-no-default.sql` row, and it raised nothing on the multi-subcommand `blocked/` counterpart beyond the `ban-drop-column` it would have raised anyway. squawk therefore gives no signal at all about how many subcommands an ALTER TABLE carries -- the exact blind spot CR-02 fixed in this analyzer, where only the first subcommand was being examined. This comparison neither corroborates nor contradicts that fix; it establishes that squawk could not have caught it.
+
 ### `packages/automation/test/corpus/adversarial/inline-comment-inert.sql`
 
 - **Analyzer verdict:** SAFE (`add-column-nullable-no-default`)
@@ -276,6 +298,33 @@ Every row below needs one of exactly three labels -- **analyzer-correct**, **squ
 - **Corpus expectation:** The repository's first genuine Drizzle-generated migration, referenced in place rather than copied (the same bytes the runner would execute): a single CREATE TABLE statement for recipes. New tables have no existing rows to lock, scan or rewrite -- create-table matches unconditionally, regardless of the uuid/now() column defaults inside it, which only matter for ADD COLUMN, not table creation.
 - **Verdict on the disagreement:** different-by-design
 - **Reason:** Same reasoning as `add-column-literal-default.sql` (`prefer-bigint-over-int`, out-of-scope design recommendation) and `create-table.sql` (`prefer-robust-stmts`, rerun-idempotency) above. This is the first of this corpus's two real, currently-deployed Drizzle migrations, and squawk raises no lock-hazard or data-loss rule against it at all -- both tools agree it is safe on the dimension this project's catalogue actually classifies.
+
+
+## Annotation provenance (2026-09-08 Nyquist audit)
+
+This report was regenerated and re-annotated during `/gsd-validate-phase 3`, which found it had
+gone stale: it was hand-annotated at commit `ed47eb1` against a 49-row corpus, and commit
+`c7e807b` (CR-02) later added two fixtures without refreshing it. Nothing detected that drift, so
+`packages/automation/test/squawk-comparison-report.test.ts` now asserts every manifest entry has
+a row here, that none of the generator's own unfilled verdict/reason placeholders survive into a
+commit (the check matches that placeholder token literally, so this note deliberately does not
+spell it out — writing it here would trip the very assertion it describes), and that the stated
+row counts match the table.
+
+What changed, so a reader knows what carries what authority:
+
+- The 21 pre-existing disagreement explanations were carried across **verbatim**, matched by file
+  path. The regenerated analyzer verdict and squawk findings under each were checked against the
+  values those reasons were originally written for; none had changed.
+- **One reason is newly written and has not yet had its human read:**
+  `safe/multi-subcommand-alter-table-all-safe.sql`. It is drafted by the same agent that ran the
+  audit, not confirmed by the owner, and 03-07 Task 2's `<human-check>` over it is still
+  outstanding. Treat it as drafted until that read happens.
+- The **counts in the Executive summary were wrong before this pass and are corrected here.** It
+  claimed 19 different-by-design / 2 analyzer-correct over 21 rows; the file actually carried
+  18 / 3, and its own prose named three analyzer-correct files while calling them "two". The
+  labels on individual rows were right -- only the tally over them was off. It now reads
+  19 / 3 over 22 rows, which matches a count of the verdict lines below.
 
 ## Rows this run could not establish (0)
 
