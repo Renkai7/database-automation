@@ -272,14 +272,27 @@ export interface NestedFact {
  * DoBlock/CreateFunction container -- recursing via inspectContainerBody exactly like the
  * top-level dispatch does (analyze.ts's inspectAndClassifyStatement), so a container nested
  * inside a `LANGUAGE sql` body gets the identical bodyInspected/recursion treatment a
- * top-level or PL/pgSQL-nested one gets. */
+ * top-level or PL/pgSQL-nested one gets.
+ *
+ * CR-02 fix: inspectStatement returns one StatementFacts per AlterTableCmd subcommand for a
+ * multi-subcommand ALTER TABLE. AlterTableStmt is never a DoBlock/CreateFunction container, so
+ * more than one entry here can only mean several subcommands -- each gets its own NestedFact,
+ * with `path` gaining a subcommand index alongside the enclosing statement's own index, mirroring
+ * analyze.ts's identical treatment at the top level. */
 async function inspectParsedStatement(
   stmt: ParsedStatement,
   sourceContext: SourceContext,
   depth: number,
   index: number,
 ): Promise<NestedFact[]> {
-  const facts = inspectStatement(stmt);
+  const factsList = inspectStatement(stmt);
+  if (factsList.length > 1) {
+    return factsList.map((facts, subcommandIndex) => ({
+      facts: { ...facts, sourceContext, nestingDepth: depth + 1 },
+      path: [index, subcommandIndex],
+    }));
+  }
+  const facts = factsList[0];
   const isContainer = facts.statementKind === "DoBlock" || facts.statementKind === "CreateFunction";
   if (!isContainer) {
     return [{ facts: { ...facts, sourceContext, nestingDepth: depth + 1 }, path: [index] }];

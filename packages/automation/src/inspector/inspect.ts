@@ -17,13 +17,18 @@
 // catalogue -- resolves to "Unrecognized", which D-06 already sends to REVIEW REQUIRED via the
 // ordinary no-match path. That is not a gap; it is D-06 working.
 //
-// KNOWN LIMITATION, recorded rather than silently assumed away (CLAUDE.md: "mark unverified
-// things UNKNOWN"): an ALTER TABLE statement with more than one subcommand (e.g.
-// `ALTER TABLE t ADD COLUMN a int, ADD COLUMN b int`) only has its FIRST subcommand inspected.
-// Every migration this project has generated so far (both real Drizzle migrations and this
-// plan's fixtures) carries exactly one subcommand per ALTER TABLE statement, matching Drizzle's
-// own one-operation-per-statement generation style -- UNKNOWN whether a future migration could
-// combine subcommands; not exercised by this plan.
+// CR-02 FIX (03-REVIEW.md): an ALTER TABLE statement with more than one subcommand (PostgreSQL's
+// own grammar allows `ALTER TABLE t sub1, sub2, ...`) previously had only its FIRST subcommand
+// inspected -- every later subcommand was silently discarded before it ever reached
+// StatementFacts, classifyFacts, or the D-02 floor, which is exactly the "a statement is
+// silently skipped rather than classified" failure shape this analyzer exists to prevent (this
+// system's own threat model is "an AI agent writes SQL by hand," not only "SQL drizzle-kit
+// generated," so a hand-written multi-subcommand ALTER TABLE is not a theoretical input).
+// inspectAlterTableStmt now returns one StatementFacts PER subcommand (inspectStatement's
+// return type is StatementFacts[] for exactly this reason -- every other statement kind still
+// returns a single-element array), and every caller (analyze.ts's inspectAndClassifyStatement,
+// inspect-plpgsql.ts's inspectParsedStatement) turns each one into its own Finding, so D-10's
+// "complete findings list, worst verdict wins" applies across subcommands too.
 //
 // DISCOVERED THIS SESSION, load-bearing for AlterTypeDropValue: `ALTER TYPE ... DROP VALUE ...`
 // is grammatically valid PostgreSQL syntax whose own grammar action unconditionally raises
@@ -217,14 +222,16 @@ function inspectAddConstraint(
   }
 }
 
-/** Discriminates one `AlterTableStmt` by its (first, see module header) subcommand's own
- * `subtype` -- an alter table that is really a column drop, a constraint add, etc. must reach
- * its own distinct StatementKind rather than one generic "alter table" bucket, so the floor and
- * the catalogue can each match the operation that actually occurred. */
-function inspectAlterTableStmt(alterTableStmt: Record<string, unknown>): StatementFacts {
-  const { schema, table } = readRangeVar(alterTableStmt.relation);
-  const cmds = alterTableStmt.cmds as Array<{ AlterTableCmd?: Record<string, unknown> }> | undefined;
-  const cmd = cmds?.[0]?.AlterTableCmd as { subtype?: string; name?: string; def?: unknown } | undefined;
+/** Discriminates one `AlterTableCmd` subcommand by its own `subtype` -- an alter table that is
+ * really a column drop, a constraint add, etc. must reach its own distinct StatementKind rather
+ * than one generic "alter table" bucket, so the floor and the catalogue can each match the
+ * operation that actually occurred. `cmd` is `undefined` only defensively (a cmds entry with no
+ * AlterTableCmd wrapper is not observed in real parser output). */
+function inspectOneAlterTableCmd(
+  schema: string | null,
+  table: string | null,
+  cmd: { subtype?: string; name?: string; def?: unknown } | undefined,
+): StatementFacts {
   if (!cmd) {
     return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
   }
@@ -261,6 +268,30 @@ function inspectAlterTableStmt(alterTableStmt: Record<string, unknown>): Stateme
     default:
       return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
   }
+}
+
+/** CR-02 fix: an `AlterTableStmt` carries an ARRAY of subcommands (PostgreSQL's own grammar
+ * allows `ALTER TABLE t sub1, sub2, ...`), and every one of them is a real, independently
+ * dangerous (or safe) operation -- inspecting only `cmds[0]` silently discarded every later
+ * subcommand before it ever reached classification. Returns one StatementFacts per subcommand,
+ * in `cmds` order, so the caller (inspectStatement) can turn each into its own Finding rather
+ * than reporting only a fraction of what the statement does. A statement with no cmds at all
+ * (defensive; not observed in real parser output) yields a single Unrecognized fact set rather
+ * than an empty array, so every AlterTableStmt still produces at least one finding. */
+function inspectAlterTableStmt(alterTableStmt: Record<string, unknown>): StatementFacts[] {
+  const { schema, table } = readRangeVar(alterTableStmt.relation);
+  const cmds = alterTableStmt.cmds as Array<{ AlterTableCmd?: Record<string, unknown> }> | undefined;
+  if (!cmds || cmds.length === 0) {
+    return [{ ...EMPTY_FACTS, statementKind: "Unrecognized" }];
+  }
+
+  return cmds.map((cmdWrapper) =>
+    inspectOneAlterTableCmd(
+      schema,
+      table,
+      cmdWrapper.AlterTableCmd as { subtype?: string; name?: string; def?: unknown } | undefined,
+    ),
+  );
 }
 
 /** Splits `DropStmt` by its own `removeType` into DropTable, DropSchema and DropIndex.
@@ -382,40 +413,46 @@ function inspectAlterEnumStmt(_alterEnumStmt: Record<string, unknown>): Statemen
  * constraint type this function does not recognise resolves to statementKind "Unrecognized",
  * which D-06 already sends to REVIEW REQUIRED via the ordinary no-match path -- that is not a
  * gap, it is D-06 working.
+ *
+ * CR-02 fix: returns StatementFacts[], not a single StatementFacts. Every statement kind except
+ * AlterTableStmt always produces exactly one entry -- AlterTableStmt produces one entry per
+ * subcommand (see inspectAlterTableStmt), because PostgreSQL's own grammar allows a single
+ * ALTER TABLE to carry more than one independently dangerous (or safe) subcommand, and every one
+ * of them must reach its own Finding rather than only the first.
  */
-export function inspectStatement(stmt: ParsedStatement): StatementFacts {
+export function inspectStatement(stmt: ParsedStatement): StatementFacts[] {
   if ("DropStmt" in stmt) {
-    return inspectDropStmt(stmt.DropStmt as Record<string, unknown>);
+    return [inspectDropStmt(stmt.DropStmt as Record<string, unknown>)];
   }
   if ("DropdbStmt" in stmt) {
-    return inspectDropdbStmt(stmt.DropdbStmt as Record<string, unknown>);
+    return [inspectDropdbStmt(stmt.DropdbStmt as Record<string, unknown>)];
   }
   if ("TruncateStmt" in stmt) {
-    return inspectTruncateStmt(stmt.TruncateStmt as Record<string, unknown>);
+    return [inspectTruncateStmt(stmt.TruncateStmt as Record<string, unknown>)];
   }
   if ("DeleteStmt" in stmt) {
-    return inspectDeleteStmt(stmt.DeleteStmt as Record<string, unknown>);
+    return [inspectDeleteStmt(stmt.DeleteStmt as Record<string, unknown>)];
   }
   if ("UpdateStmt" in stmt) {
-    return inspectUpdateStmt(stmt.UpdateStmt as Record<string, unknown>);
+    return [inspectUpdateStmt(stmt.UpdateStmt as Record<string, unknown>)];
   }
   if ("AlterTableStmt" in stmt) {
     return inspectAlterTableStmt(stmt.AlterTableStmt as Record<string, unknown>);
   }
   if ("IndexStmt" in stmt) {
-    return inspectIndexStmt(stmt.IndexStmt as Record<string, unknown>);
+    return [inspectIndexStmt(stmt.IndexStmt as Record<string, unknown>)];
   }
   if ("CreateStmt" in stmt) {
-    return inspectCreateStmt(stmt.CreateStmt as Record<string, unknown>);
+    return [inspectCreateStmt(stmt.CreateStmt as Record<string, unknown>)];
   }
   if ("RenameStmt" in stmt) {
-    return inspectRenameStmt(stmt.RenameStmt as Record<string, unknown>);
+    return [inspectRenameStmt(stmt.RenameStmt as Record<string, unknown>)];
   }
   if ("CommentStmt" in stmt) {
-    return inspectCommentStmt(stmt.CommentStmt as Record<string, unknown>);
+    return [inspectCommentStmt(stmt.CommentStmt as Record<string, unknown>)];
   }
   if ("AlterEnumStmt" in stmt) {
-    return inspectAlterEnumStmt(stmt.AlterEnumStmt as Record<string, unknown>);
+    return [inspectAlterEnumStmt(stmt.AlterEnumStmt as Record<string, unknown>)];
   }
   // D-05 (plan 03-04): the container statement's own fact set. No schema/table/column -- a DO
   // block and a function creation are not scoped to a single relation the way every other
@@ -424,11 +461,11 @@ export function inspectStatement(stmt: ParsedStatement): StatementFacts {
   // function's -- inspectStatement only ever answers "what statement is this," never "what does
   // its body contain."
   if ("DoStmt" in stmt) {
-    return { ...EMPTY_FACTS, statementKind: "DoBlock" };
+    return [{ ...EMPTY_FACTS, statementKind: "DoBlock" }];
   }
   if ("CreateFunctionStmt" in stmt) {
-    return { ...EMPTY_FACTS, statementKind: "CreateFunction" };
+    return [{ ...EMPTY_FACTS, statementKind: "CreateFunction" }];
   }
 
-  return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
+  return [{ ...EMPTY_FACTS, statementKind: "Unrecognized" }];
 }

@@ -53,13 +53,31 @@ function emptyInputFinding(rules: RulesFile): Finding {
  * -- any declared language other than plpgsql or sql) carries `bodyInspected: false` on its own
  * finding and has no nested findings alongside it; rules.json's container-body-not-inspected
  * rule, not an unconditional SAFE, is what classifies it (gap closure: the previous
- * unconditional-SAFE behavior this replaces is exactly the false-SAFE defect this fix closes). */
+ * unconditional-SAFE behavior this replaces is exactly the false-SAFE defect this fix closes).
+ *
+ * CR-02 fix: inspectStatement now returns one StatementFacts per AlterTableCmd subcommand for a
+ * multi-subcommand ALTER TABLE (never just the first). AlterTableStmt is never a DoBlock/
+ * CreateFunction container, so a `factsList` with more than one entry can only mean "several
+ * ALTER TABLE subcommands" -- each gets its own Finding, sharing statementIndex but carrying a
+ * distinct nestedPath ([statementIndex, subcommandIndex]) so a consumer can tell them apart,
+ * exactly like D-05's own nestedPath convention for recursion. */
 async function inspectAndClassifyStatement(
   stmt: ParsedStatement,
   statementIndex: number,
   rules: RulesFile,
 ): Promise<Finding[]> {
-  const facts = inspectStatement(stmt);
+  const factsList = inspectStatement(stmt);
+  if (factsList.length > 1) {
+    return factsList.map((facts, subcommandIndex) =>
+      buildFinding(
+        statementIndex,
+        [statementIndex, subcommandIndex],
+        facts,
+        classifyFacts(facts, rules.rules),
+      ),
+    );
+  }
+  const facts = factsList[0];
   const isContainer = facts.statementKind === "DoBlock" || facts.statementKind === "CreateFunction";
   if (!isContainer) {
     return [buildFinding(statementIndex, [], facts, classifyFacts(facts, rules.rules))];

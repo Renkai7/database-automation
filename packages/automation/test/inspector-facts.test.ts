@@ -14,10 +14,12 @@ import { inspectStatement, parseTopLevel } from "../src/inspector/inspect";
 import type { StatementFacts, StatementKind } from "../src/types";
 
 /** Parses a single top-level statement and reduces it to facts -- the shape every row below
- * exercises. */
+ * exercises. Every row here is a single-subcommand statement, so inspectStatement's
+ * (CR-02) StatementFacts[] always has exactly one entry; multi-subcommand ALTER TABLE is
+ * covered separately by test/multi-subcommand-alter-table.test.ts. */
 async function factsFor(sql: string): Promise<StatementFacts> {
   const [stmt] = await parseTopLevel(sql);
-  return inspectStatement(stmt);
+  return inspectStatement(stmt)[0];
 }
 
 interface Row {
