@@ -69,6 +69,35 @@ async function sourceSurfaceFiles(): Promise<string[]> {
 }
 
 describe("structural guardrails", () => {
+  it("sourceSurfaceFiles() actually enumerates packages/ (and the other claimed roots), so the D-11/Pitfall 3 checks below cannot pass vacuously (03-07-PLAN.md Task 3)", async () => {
+    // 03-VALIDATION.md's last row: a `--reporter verbose` run only prints test NAMES, never the
+    // enumerated file list, so nothing previously pinned that `packages/` (or `scripts/`,
+    // `tests/`, `apps/recipe-app/`) genuinely yields files -- a renamed directory, a gitignore
+    // change, or a reverted line would make every source-surface check below pass vacuously
+    // while looking identical under --reporter verbose. This assertion makes the claim a real
+    // check instead of something a human is asked to eyeball.
+    const files = await sourceSurfaceFiles();
+
+    const packagesFiles = files.filter((file) => file.startsWith("packages/"));
+    expect(
+      packagesFiles.length,
+      "D-11/Pitfall 3 (03-07-PLAN.md Task 3): sourceSurfaceFiles() must actually enumerate at " +
+        "least one file under \"packages/\" -- if it ever enumerates zero, every " +
+        "connection-string/direct-sync/direct-environment-read check that claims to cover " +
+        "packages/ would pass having examined nothing.",
+    ).toBeGreaterThan(0);
+
+    for (const root of ["scripts/", "tests/", "apps/recipe-app/"]) {
+      const rootFiles = files.filter((file) => file.startsWith(root));
+      expect(
+        rootFiles.length,
+        `sourceSurfaceFiles() must actually enumerate at least one file under "${root}" -- an ` +
+          "enumeration that silently yields nothing for a claimed root makes every check that " +
+          "relies on it pass vacuously.",
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it("docker-compose.yml publishes the database port on loopback only, never all-interfaces (D-18)", () => {
     const compose = readFileSync("docker-compose.yml", "utf-8");
     expect(
