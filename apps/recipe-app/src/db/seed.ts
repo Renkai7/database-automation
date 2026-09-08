@@ -96,14 +96,21 @@ export async function seed(): Promise<void> {
 
 // Runnable directly via `pnpm db:seed` (tsx apps/recipe-app/src/db/seed.ts) and importable
 // programmatically as `seed()` elsewhere.
+//
+// WR-03 FIX (04-REVIEW.md): never force a synchronous process exit (matching
+// `scripts/db-migrate.ts`'s own established pattern) -- doing so immediately after a
+// `libpg-query` WASM `parse()` call reproduced a genuine Windows libuv crash in this repo.
+// `seed.ts` does not itself call `libpg-query`, but setting `process.exitCode` once and letting
+// the event loop drain naturally is the load-bearing pattern every other command entry point in
+// this repo follows, so this is not the one that copies from a synchronous `process.exit()`.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   seed()
     .then(() => {
       console.log("Seed complete.");
-      process.exit(0);
+      process.exitCode = 0;
     })
     .catch((error: unknown) => {
       console.error("Seed failed:", error instanceof Error ? error.message : error);
-      process.exit(1);
+      process.exitCode = 1;
     });
 }
