@@ -7,7 +7,7 @@ D-15's one-time calibration: this analyzer and squawk-cli, an independent, exter
 - **Run date:** 2026-09-08T17:18:17.347Z
 - **squawk version:** squawk 2.64.0
 - **PostgreSQL version pin:** 17.0 (D9's project-wide pin)
-- **Corpus files compared:** 61
+- **Corpus files compared:** 64
 
 ## What "agreement" means here
 
@@ -15,10 +15,10 @@ The two tools do not speak the same language: squawk emits lint warnings (zero o
 
 ## Executive summary
 
-27 of 61 rows disagree under this report's agreement definition. Every one is examined below and
-resolves to one of two labels -- **22 different-by-design**, **5 analyzer-correct** -- and **zero
+29 of 64 rows disagree under this report's agreement definition. Every one is examined below and
+resolves to one of two labels -- **24 different-by-design**, **5 analyzer-correct** -- and **zero
 squawk-correct**. No row in this run showed squawk catching a hazard this catalogue's `rules.json`
-missed; that is a specific claim about this 61-file corpus on this run, not a claim that squawk
+missed; that is a specific claim about this 64-file corpus on this run, not a claim that squawk
 never catches anything this project's rules could miss on a different input.
 
 The five analyzer-correct rows matter for different reasons. `delete-without-where.sql` and
@@ -45,7 +45,7 @@ content). The nested case additionally reconfirms the same DO-block-recursion ga
 `do-block-drop.sql` already established: squawk did not descend into the body at all, for either
 reason.
 
-The remaining 22 different-by-design rows split into three buckets, none of them a gap in this
+The remaining 24 different-by-design rows split into three buckets, none of them a gap in this
 catalogue's stated scope (`.planning/research/FEATURES.md` §1's migration lock/rewrite/data-loss
 hazard list, per D-04):
 - **Session properties** (`require-lock-timeout`, `require-statement-timeout`) -- D-04's two
@@ -91,7 +91,7 @@ into the executive summary's totals above.
 
 It establishes that two independently-built tools looking at the same SQL agree where they should and differ only where a reason can be given. It does **not** establish that either tool is correct -- both could share a blind spot -- and it is a one-time calibration rather than a standing check (D-15): it goes stale the moment either tool's rule catalogue changes. Anything this run could not determine is recorded as UNKNOWN below, never smoothed over and never silently dropped.
 
-## Comparison table (61 rows)
+## Comparison table (64 rows)
 
 | File | Group | Analyzer verdict | Analyzer rule ids | squawk rules | Agreement |
 |---|---|---|---|---|---|
@@ -156,8 +156,11 @@ It establishes that two independently-built tools looking at the same SQL agree 
 | `packages/automation/test/corpus/usually-safe/create-index-concurrently-standalone.sql` | catalogue | SAFE | `create-index-concurrently` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
 | `packages/automation/test/corpus/adversarial/set-lock-timeout-in-do-block.sql` | adversarial | BLOCKED | `add-column-nullable-no-default`, `disarms-timeout-guc`, `do-block-container` | (no findings) | **disagree** |
 | `packages/automation/test/corpus/adversarial/comment-mentions-set-lock-timeout.sql` | adversarial | SAFE | `add-column-nullable-no-default`, `do-block-container` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
+| `apps/recipe-app/drizzle/0002_oval_maelstrom.sql` | real-migration | SAFE | `add-column-nullable-no-default` | `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | **disagree** |
+| `apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql` | real-migration | REVIEW_REQUIRED | (none) | (no findings) | **disagree** |
+| `apps/recipe-app/drizzle/0004_redundant_apocalypse.sql` | real-migration | REVIEW_REQUIRED | `set-not-null` | `adding-not-nullable-field`, `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout` | agree |
 
-## Disagreements (27)
+## Disagreements (29)
 
 Every row below needs one of exactly three labels -- **analyzer-correct**, **squawk-correct**, or **different-by-design** -- each with a stated reason. Placeholders below are filled in by hand, not generated: this generator records *what* disagrees, not *why*.
 
@@ -377,6 +380,22 @@ Every row below needs one of exactly three labels -- **analyzer-correct**, **squ
 - **Verdict on the disagreement:** different-by-design
 - **Reason:** Same session-property-plus-idempotency bucket as every other SAFE-verdict row in this report (`require-lock-timeout`, `require-statement-timeout`, `prefer-robust-stmts`) -- squawk raises nothing about the comment or the dollar-quoted text itself, i.e. it agrees the mentioned text is inert; the disagreement is entirely the same three routinely-excluded rules every other SAFE row in this corpus also triggers.
 
+### `apps/recipe-app/drizzle/0002_oval_maelstrom.sql`
+
+- **Analyzer verdict:** SAFE (`add-column-nullable-no-default`)
+- **squawk:** `prefer-robust-stmts`, `require-lock-timeout`, `require-statement-timeout`
+- **Corpus expectation:** 04-06/D-30: the real, generated ADD COLUMN notes -- a metadata-only ADD COLUMN with no default requires no table rewrite and no scan, exactly matching the Phase 3 corpus prediction (app-shaped/recipes-add-notes-column.sql) checked against reality.
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Byte-identical bucket to `app-shaped/recipes-add-notes-column.sql` above (its own real-schema mirror) -- the same D-04 session-property exclusion and rerun-idempotency reasoning applies. This is the real, applied migration that fixture predicted; the disagreement is unchanged by it being real rather than mirrored.
+
+### `apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql`
+
+- **Analyzer verdict:** REVIEW_REQUIRED ((none))
+- **squawk:** (no findings)
+- **Corpus expectation:** 04-06/D-31: the real, hand-authored backfill (a single scoped `UPDATE steps SET timer_label = '' WHERE timer_label IS NULL`) that must run before the SET NOT NULL migration, since the seed genuinely leaves NULL rows. It demonstrates the update-without-where floor rule from the PASSING side -- a scoped UPDATE matches no rule at all (D-06's unmatched-statement default applies), where the same statement without a WHERE would be BLOCKED.
+- **Verdict on the disagreement:** different-by-design
+- **Reason:** Same default-outcome-policy difference `review-required/set-search-path.sql` and `adversarial/dollar-quoted-string-inert.sql` above already established: squawk has no rule watching a scoped `UPDATE` at all (confirmed live: zero findings, exit 0), so its silence reflects "no rule exists" rather than "this is safe" -- while this analyzer's D-06 earn-SAFE default gives any unmatched statement its own explicit REVIEW_REQUIRED verdict rather than leaving it unclassified. Not a hazard disagreement about the `UPDATE` itself (both tools implicitly treat a `WHERE`-scoped `UPDATE` as unremarkable) -- a policy-for-the-unrecognized-case disagreement, the same category as those two rows.
+
 ## Annotation provenance (2026-09-08 Nyquist audit)
 
 This report was regenerated and re-annotated during `/gsd-validate-phase 3`, which found it had
@@ -402,6 +421,19 @@ What changed, so a reader knows what carries what authority:
   18 / 3, and its own prose named three analyzer-correct files while calling them "two". The
   labels on individual rows were right -- only the tally over them was off. It now reads
   19 / 3 over 22 rows, which matches a count of the verdict lines below.
+
+## Audit note (Phase 4 plan 06)
+
+Three rows are new since this report was last annotated, added when 04-06-PLAN.md spent two of
+`01-CONTEXT.md` D-11's reserved recipe-app churn rows for real: `apps/recipe-app/drizzle/0002_oval_maelstrom.sql`
+(the SAFE `notes` column, D-30), `apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql`
+(the REVIEW REQUIRED backfill, D-31), and `apps/recipe-app/drizzle/0004_redundant_apocalypse.sql`
+(the REVIEW REQUIRED `SET NOT NULL`, D-31). This edit was made by hand against a squawk run over
+exactly these three files (never a full regeneration of this report, which would have destroyed
+every hand-filled disagreement above) -- appended to the end of the comparison table, matching
+the CR-02 and Phase 4 plan 02 precedents above. Two of the three disagree (`0002_oval_maelstrom.sql`
+and `0003_backfill_steps_timer_label.sql`, both different-by-design, detailed individually above);
+`0004_redundant_apocalypse.sql` agrees. Already folded into the executive summary's totals above.
 
 ## Rows this run could not establish (0)
 

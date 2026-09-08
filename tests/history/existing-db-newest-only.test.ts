@@ -78,11 +78,11 @@ describe("tests/history/existing-db-newest-only.test.ts — RUN-06", () => {
         const shapeAfterFull = await readSchemaShape(client);
 
         // The staged database was genuinely missing something the newest migration adds -- not
-        // assumed, asserted against the actual before/after table lists.
-        const tablesAddedByNewest = shapeAfterFull.tables.filter(
-          (table) => !shapeAfterStaged.tables.includes(table),
-        );
-        expect(tablesAddedByNewest.length).toBeGreaterThan(0);
+        // assumed, asserted against the actual before/after schema shape. This does not assume
+        // the newest migration adds a whole new table: 04-06's own newest migrations
+        // (0002/0003/0004) alter existing tables' columns rather than creating new ones, so the
+        // comparison is over the full shape (tables + column lists), not tables alone.
+        expect(shapeAfterFull).not.toEqual(shapeAfterStaged);
 
         expect(shapeAfterFull.columns.recipes).toEqual(EXPECTED_FULL_HISTORY_COLUMNS.recipes);
         expect(shapeAfterFull.columns.ingredients).toEqual(EXPECTED_FULL_HISTORY_COLUMNS.ingredients);

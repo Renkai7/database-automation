@@ -233,17 +233,22 @@ describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enf
   });
 });
 
-// ANLZ-07: the repository's two genuine Drizzle-generated migrations, referenced at their own
+// ANLZ-07: the repository's genuine Drizzle-generated migrations, referenced at their own
 // repository paths rather than copied into the corpus directory (03-CONTEXT.md D-13) -- a copy
 // drifts the moment the real file changes, and the whole value of having genuine ORM-generated
-// SQL in the corpus is that it is the same bytes the runner would execute.
+// SQL in the corpus is that it is the same bytes the runner would execute. 04-06/D-30/D-31 spent
+// two more real-migration slots (a real SAFE change, a real REVIEW REQUIRED change split across
+// a backfill and a constraint migration) widening this list from two entries to five.
 const REAL_MIGRATION_PATHS = [
   "apps/recipe-app/drizzle/0000_bumpy_khan.sql",
   "apps/recipe-app/drizzle/0001_busy_thunderbolt.sql",
+  "apps/recipe-app/drizzle/0002_oval_maelstrom.sql",
+  "apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql",
+  "apps/recipe-app/drizzle/0004_redundant_apocalypse.sql",
 ];
 
-describe("real-migration group: the repository's two genuine Drizzle migrations are referenced in place (ANLZ-07)", () => {
-  it("the manifest's real-migration group references exactly the two real Drizzle migrations, at their own repository paths", () => {
+describe("real-migration group: the repository's genuine Drizzle migrations are referenced in place (ANLZ-07)", () => {
+  it("the manifest's real-migration group references exactly the real Drizzle migrations, at their own repository paths", () => {
     const realMigrationFiles = manifest.entries
       .filter((entry) => entry.group === "real-migration")
       .map((entry) => entry.file)

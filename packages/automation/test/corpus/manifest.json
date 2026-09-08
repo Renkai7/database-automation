@@ -581,6 +581,31 @@
         "create-table"
       ],
       "why": "The repository's second genuine Drizzle migration, referenced in place: two CREATE TABLE statements (SAFE, create-table) followed by two ADD CONSTRAINT ... FOREIGN KEY statements with no NOT VALID flag. A plainly added foreign key scans and locks both the altering and the referenced table while validating every existing row (PITFALLS.md A6) -- a correct REVIEW_REQUIRED classification of real Drizzle-generated SQL, not a defect: the safe form would have added the constraint NOT VALID and validated it in a separate statement, which this migration does not do. Live-verified against the installed analyzer (a disposable probe script, then discarded) before being written here, per this plan's own corpus_integrity instruction to reason about correctness rather than copy an unexamined actual value."
+    },
+    {
+      "file": "apps/recipe-app/drizzle/0002_oval_maelstrom.sql",
+      "group": "real-migration",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default"
+      ],
+      "why": "04-06/D-30: the real, generated ADD COLUMN notes -- a metadata-only ADD COLUMN with no default requires no table rewrite and no scan, exactly matching the Phase 3 corpus prediction (app-shaped/recipes-add-notes-column.sql) checked against reality. Live-verified against the installed analyzer via `pnpm db:analyze` before being written here, and applied through `pnpm db:migrate` (verdict SAFE, exit 0)."
+    },
+    {
+      "file": "apps/recipe-app/drizzle/0003_backfill_steps_timer_label.sql",
+      "group": "real-migration",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [],
+      "why": "04-06/D-31: the real, hand-authored backfill (a single scoped `UPDATE steps SET timer_label = '' WHERE timer_label IS NULL`) that must run before the SET NOT NULL migration, since the seed genuinely leaves NULL rows. It demonstrates the update-without-where floor rule from the PASSING side -- a scoped UPDATE matches no rule at all (D-06's unmatched-statement default applies, expectedRuleIds empty exactly like review-required/add-column-unknown-default-function.sql's own precedent), where the same statement without a WHERE would be BLOCKED. Live-verified against the installed analyzer via `pnpm db:analyze` and applied through `pnpm db:migrate` (verdict REVIEW_REQUIRED, exit 0)."
+    },
+    {
+      "file": "apps/recipe-app/drizzle/0004_redundant_apocalypse.sql",
+      "group": "real-migration",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "set-not-null"
+      ],
+      "why": "04-06/D-31: the real, generated constraint migration (`SET DEFAULT ''` then `SET NOT NULL` on steps.timer_label) -- a full table scan under ACCESS EXCLUSIVE the analyzer has no connection to skip, matching the Phase 3 corpus prediction (app-shaped/steps-timer-label-set-not-null.sql) checked against reality. The SET DEFAULT statement matches no rule (D-06 unmatched default, contributing no rule id), so set-not-null is the only rule id the file's findings carry. Live-verified against the installed analyzer via `pnpm db:analyze` before being written here, and applied through `pnpm db:migrate` (verdict REVIEW_REQUIRED, exit 0)."
     }
   ]
 }
