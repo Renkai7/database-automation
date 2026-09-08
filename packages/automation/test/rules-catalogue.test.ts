@@ -4,9 +4,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { loadRules } from "../src/classifier/classify";
+import { loadDefaultRules } from "../src/adapter/default-rules";
+import { analyzeSql } from "../src/analyze";
+import { classifyFacts, loadRules } from "../src/classifier/classify";
+import { D02_FLOOR_FACTS, D07_FLOOR_FACTS } from "../src/classifier/floor";
 import { parseRulesFile, type Rule } from "../src/classifier/rules-schema";
-import { RulesFileError } from "../src/types";
+import { EMPTY_FACTS, RulesFileError } from "../src/types";
 
 const RULES_PATH = fileURLToPath(new URL("../src/rules/rules.json", import.meta.url));
 
@@ -287,5 +290,110 @@ describe("CR-01: an empty match object is rejected at load time, never silently 
     };
 
     expect(() => parseRulesFile(raw)).not.toThrow();
+  });
+});
+
+// 03-VERIFICATION.md gap (post-03-REVIEW.md CR-01 fix): CR-01's `.refine` closes only the
+// trivial zero-key `match: {}` case. The SAME blanket-SAFE effect is reachable without ever
+// leaving `match` empty -- by enumerating every legal value of a field (most naturally
+// `statementKind`) instead. `ruleMatches`'s array branch is `matchValue.includes(factValue)`,
+// so a rule whose `match.statementKind` array contains every StatementKind the catalogue
+// recognises matches every fact set unconditionally on that field, exactly like an empty match
+// object would -- just spelled out longhand. Reproduced live (03-VERIFICATION.md): this passed
+// both `parseRulesFile` and `assertFloorNotWeakened` with no error, and
+// `classifyFacts({statementKind:"Unrecognized"}, rules)` returned SAFE -- the exact
+// CLUSTER/REINDEX/ALTER SYSTEM/any-uncatalogued-DDL case D-06 exists to stop at REVIEW_REQUIRED.
+//
+// The exploit rule's statementKind list is derived from the shipped rules.json itself (every
+// value any real rule's `match.statementKind` references), never a hardcoded literal snapshot
+// of the 28-value StatementKind union -- StatementKind is a compile-time-only TypeScript type
+// with no runtime shape to introspect (see VALID_FACT_NAMES's comment above), so a parallel
+// hand-written list here would silently rot the moment the catalogue's own statement-kind
+// coverage changed, exactly the failure mode this reproduction must not have.
+function deriveCatalogueStatementKinds(rules: Rule[]): string[] {
+  const kinds = new Set<string>();
+  for (const rule of rules) {
+    const value = rule.match.statementKind;
+    if (value === undefined) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        kinds.add(String(v));
+      }
+    } else {
+      kinds.add(String(value));
+    }
+  }
+  return [...kinds].sort();
+}
+
+describe("D-06 gap closure (03-VERIFICATION.md): enumerating every legal statementKind value is rejected at load time, never silently accepted", () => {
+  it("appending a rule that enumerates every statementKind value the shipped catalogue uses is REJECTED by loadRules, never silently reaching classifyFacts", () => {
+    const raw = loadRawRulesFile() as { version: number; rules: Rule[]; notes?: string };
+    const parsedForDerivation = parseRulesFile(raw);
+    const everyCatalogueStatementKind = deriveCatalogueStatementKinds(parsedForDerivation.rules);
+    // Sanity: the shipped catalogue really does name every legal StatementKind (28 in
+    // types.ts) -- if this ever shrinks, the exploit reproduction below would be weaker than
+    // the one 03-VERIFICATION.md actually demonstrated, silently.
+    expect(everyCatalogueStatementKind.length).toBeGreaterThanOrEqual(28);
+
+    const exploited = {
+      ...raw,
+      rules: [
+        ...raw.rules,
+        {
+          id: "enumerate-catch-all",
+          category: "usually-safe",
+          match: { statementKind: everyCatalogueStatementKind },
+          verdict: "SAFE",
+          rationale: "Enumerates every legal statementKind value -- the CR-01 broad-variant exploit reproduction.",
+        },
+      ],
+    };
+
+    expect(() => loadRules(exploited)).toThrow(RulesFileError);
+  });
+
+  it("the exploit rule, if it were NOT rejected, would in fact grant SAFE to an uncatalogued statement (proves the reproduction is real, not a false alarm)", () => {
+    const raw = loadRawRulesFile() as { version: number; rules: Rule[]; notes?: string };
+    const parsedForDerivation = parseRulesFile(raw);
+    const everyCatalogueStatementKind = deriveCatalogueStatementKinds(parsedForDerivation.rules);
+    const exploitRule: Rule = {
+      id: "enumerate-catch-all",
+      category: "usually-safe",
+      match: { statementKind: everyCatalogueStatementKind },
+      verdict: "SAFE",
+      rationale: "Enumerates every legal statementKind value -- the CR-01 broad-variant exploit reproduction.",
+    };
+
+    const outcome = classifyFacts(
+      { ...EMPTY_FACTS, statementKind: "Unrecognized" },
+      [...parsedForDerivation.rules, exploitRule],
+    );
+    expect(outcome.verdict).toBe("SAFE");
+    expect(outcome.ruleIds).toContain("enumerate-catch-all");
+  });
+
+  it("the shipped, unmodified rules.json still loads successfully under the new check (no false positive)", () => {
+    expect(() => loadDefaultRules()).not.toThrow();
+  });
+
+  it("CLUSTER and REINDEX -- real, uncatalogued SQL -- still classify REVIEW_REQUIRED under the shipped rules", async () => {
+    const rules = loadDefaultRules();
+
+    const clusterResult = await analyzeSql("CLUSTER orders USING orders_pkey;", rules);
+    expect(clusterResult.verdict).toBe("REVIEW_REQUIRED");
+
+    const reindexResult = await analyzeSql("REINDEX TABLE orders;", rules);
+    expect(reindexResult.verdict).toBe("REVIEW_REQUIRED");
+  });
+
+  it("the D-02/D-07 floor operations remain BLOCKED under the shipped rules with the new check active", () => {
+    const rules = loadDefaultRules();
+    for (const facts of [...D02_FLOOR_FACTS, ...D07_FLOOR_FACTS]) {
+      const outcome = classifyFacts(facts, rules.rules);
+      expect(outcome.verdict, `expected floor fact set "${facts.statementKind}" to stay BLOCKED`).toBe("BLOCKED");
+    }
   });
 });
