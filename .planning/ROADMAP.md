@@ -125,7 +125,7 @@ Plans:
   4. Every classification rule lives in a schema-validated rules file; adding or changing a rule means editing that data file, not the classifier's code, and an invalid rules file fails validation rather than being silently accepted.
   5. Running the same corpus of migrations through the analyzer and through `squawk-cli` produces a comparison report, and every disagreement between the two has been examined and explained.
 
-**Plans**: 4/7 plans executed
+**Plans**: 5/7 plans executed
 
 Plans:
 
@@ -144,7 +144,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-05-PLAN.md — The corpus manifest schema and harness, plus fixtures for the whole BLOCKED, REVIEW REQUIRED and USUALLY SAFE catalogue
+- [x] 03-05-PLAN.md — The corpus manifest schema and harness, plus fixtures for the whole BLOCKED, REVIEW REQUIRED and USUALLY SAFE catalogue
 
 **Wave 5** *(blocked on Wave 4 completion)*
 

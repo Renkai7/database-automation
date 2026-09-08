@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Safety Analyzer
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-09-08T13:34:04.443Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-09-08T14:12:00.000Z"
 last_activity: 2026-09-08
-last_activity_desc: Phase 03 execution in progress (3/7 plans)
-state_head: d119cc774fc576cfa742c848bf99ab0a363c8186
+last_activity_desc: Phase 03 execution in progress (5/7 plans)
+state_head: 86de98d
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 20
-  completed_plans: 17
+  completed_plans: 18
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 03 (Safety Analyzer) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
-Last activity: 2026-09-08 — Completed 03-03-PLAN.md
+Last activity: 2026-09-08 — Completed 03-05-PLAN.md
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -76,6 +76,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P02 | 29min | 3 tasks | 10 files |
 | Phase 03 P03 | 20min | 2 tasks | 14 files |
 | Phase 03 P04 | 50 min | 2 tasks | 9 files |
+| Phase 03 P05 | 40 min | 3 tasks | 37 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 03]: [Phase 03] 03-03: analyze.ts imported node:fs (via loadDefaultRules), violating the plan's own must-have core-purity truth inherited from 03-01 -- extracted loadDefaultRules into a new sibling adapter, src/adapter/default-rules.ts, so src/inspector/, src/classifier/, and src/analyze.ts are now mechanically proven filesystem-free (Rule 1 deviation)
 - [Phase 03]: [Phase 03] 03-03: a synchronous process.exit() called immediately after 2+ libpg-query WASM parse() calls in one process reproducibly crashed on this Windows machine with a genuine libuv assertion failure (raw exit code 3221226505) -- cli.ts's main() restructured into run(): Promise<number>, which never calls process.exit(); process.exitCode is applied once run() settles instead, letting the event loop drain naturally (Rule 1 deviation, found by this task's own multi-file CLI verify step)
 - [Phase 03]: D-05/D-07 shipped: PL/pgSQL recursion into DO/function bodies via reconstructed statement text fed back through parsePlPgSQL, plus a non-weakenable D07_FLOOR_FACTS floor for unresolvable dynamic SQL
+- [Phase 03]: [Phase 03] 03-05: Corpus fixtures derived by execution, not by reading rules.json prose -- every expected verdict/rule-id was produced by running the candidate SQL through the real, installed analyzer in a disposable probe script and reasoning about whether the observed output was correct. This caught two genuine plan-text-vs-analyzer disagreements: (1) the plan's 8th BLOCKED fixture (ALTER TYPE ... DROP VALUE) cannot exist as parseable SQL at all -- PostgreSQL's own grammar rejects it unconditionally (re-confirmed live against libpg-query@18.1.4); blocked/ ships 7 fixtures instead of 8, with the id in the rule-coverage exception list. (2) The plan's literal near-miss control (unvalidated-then-validate pair with a mismatched constraint name) resolves SAFE under the real analyzer, not REVIEW_REQUIRED as predicted, because both halves match unconditionally regardless of pairing (matches 03-02-SUMMARY.md's own documented finding) -- substituted the concurrent-index-then-unique-constraint shape with a mismatched index name instead, which genuinely demonstrates exact-name matching. ANLZ-02 and ANLZ-04 marked complete in REQUIREMENTS.md (all declaring plans -- 03-01/02/03/05 -- now have summaries); ANLZ-07 stays Pending until 03-06 (its other declaring plan) completes.
 - [Phase 03]: [Gap closure, post-03-04] Orchestrator spot-check against the real CLI found a false-SAFE defect: do-block-container/create-function-container matched unconditionally on statementKind alone, so a `LANGUAGE sql` (or `BEGIN ATOMIC`, or any non-plpgsql-language) function body was never re-parsed yet still earned SAFE -- confirmed live, e.g. `CREATE FUNCTION g() RETURNS void AS $$ DROP TABLE ingredients $$ LANGUAGE sql;` classified SAFE and exited 0. Fixed in two parts, both TDD RED->GREEN, no PLAN.md (task spec only): (1) StatementFacts gains `bodyInspected`, set truthfully at the single decision point (inspect-plpgsql.ts's new `planContainerBody`); the two container SAFE rules now require `bodyInspected:true`, and a new `container-body-not-inspected` rule (REVIEW_REQUIRED, analyzer-integrity) matches `bodyInspected:false` generically across `statementKind: [DoBlock, CreateFunction]` -- any uninspectable language (plperl, c, future ones) lands there, not a per-language allowlist. (2) `LANGUAGE sql` bodies are now genuinely inspected: dollar-quoted/single-quoted text is re-parsed through the ordinary `parseTopLevel`/`inspectStatement` path (never pattern-matched), and the `BEGIN ATOMIC ... END` form is read directly off `CreateFunctionStmt.sql_body` (probed live against libpg-query@18.1.4: arrives as already-parsed AST nodes, not text). `inspectPlPgSqlBody`/`reconstructPlPgSqlStatement` generalised into `inspectContainerBody`/`planContainerBody`, applied identically at the top level and to a nested container found inside another body. Verified against the real CLI (exit 20/10/0 as expected) in addition to 13 new unit/integration tests. Commits: `399e35f` (RED), `b9c5e64` (GREEN). Full `pnpm test`: 214/214 (201 -> 214); `tsc --noEmit` clean.
 
 ### Pending Todos
@@ -153,6 +155,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T13:34:04.372Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-09-08T14:12:00.000Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None

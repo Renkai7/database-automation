@@ -27,9 +27,9 @@
 ### Safety Analyzer (ANLZ)
 
 - [x] **ANLZ-01**: Migration SQL is parsed into an operation list using `libpg-query`, the real PostgreSQL parser — never regex or string matching
-- [ ] **ANLZ-02**: Every operation is classified SAFE, REVIEW REQUIRED, or BLOCKED
+- [x] **ANLZ-02**: Every operation is classified SAFE, REVIEW REQUIRED, or BLOCKED
 - [x] **ANLZ-03**: Classification rules are data (a schema-validated rules file), extensible without changing code
-- [ ] **ANLZ-04**: Classification is context-aware: it distinguishes volatile from non-volatile `ADD COLUMN` defaults, and recognises the `NOT VALID` + `VALIDATE CONSTRAINT` and `CONCURRENTLY` safe forms rather than matching on statement keywords
+- [x] **ANLZ-04**: Classification is context-aware: it distinguishes volatile from non-volatile `ADD COLUMN` defaults, and recognises the `NOT VALID` + `VALIDATE CONSTRAINT` and `CONCURRENTLY` safe forms rather than matching on statement keywords
 - [ ] **ANLZ-05**: The analyzer test suite includes adversarial fixtures — comments, dollar-quoted strings, `DO` blocks, and function bodies — proving it cannot be fooled in either direction
 - [ ] **ANLZ-06**: Analyzer output is cross-checked against `squawk-cli` on a shared corpus, with disagreements investigated
 - [ ] **ANLZ-07**: A real `DROP TABLE` is blocked and a genuinely safe migration passes — demonstrated by test, not asserted
