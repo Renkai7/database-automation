@@ -167,7 +167,7 @@ Plans:
   4. A migration deliberately made to fail partway through leaves a state that is reported clearly rather than silently marked applied, and recovering from it never requires hand-editing `_journal.json`.
   5. Running a real recipe-app schema change of each kind — one that lands SAFE, one REVIEW REQUIRED, one BLOCKED — through the runner produces the expected outcome for each.
 
-**Plans**: 5/7 plans executed
+**Plans**: 6/7 plans executed
 
 Plans:
 
@@ -190,7 +190,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion — the recipe-app schema is a shared mutable resource)*
 
-- [ ] 04-06-PLAN.md — APP-02: the real SAFE change and the real REVIEW REQUIRED change, generated and applied through the runner
+- [x] 04-06-PLAN.md — APP-02: the real SAFE change and the real REVIEW REQUIRED change, generated and applied through the runner
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -249,7 +249,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Local Environment | 8/8 | Complete    | 2026-09-07 |
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
-| 4. Migration Runner & History Tests | 5/7 | In Progress|  |
+| 4. Migration Runner & History Tests | 6/7 | In Progress|  |
 | 5. CI Pipeline Gate | 0/TBD | Not started | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-09-08T22:28:23.639Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-09-08T22:54:36.899Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 04 execution started
-state_head: cdeef8e342c64bc24ab22f50607b320b8d159c6e
+state_head: fef768b87fc500579bcfa48b094d5863c5fc1764
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 27
-  completed_plans: 25
+  completed_plans: 26
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 04 (Migration Runner & History Tests) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 04 execution started
 
@@ -85,6 +85,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 20min | 3 tasks | 11 files |
 | Phase 04 P04 | 17min | 2 tasks | 7 files |
 | Phase 04 P05 | 55min | 3 tasks | 11 files |
+| Phase 04 P06 | 24 min | 3 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 04]: [Phase 04] 04-05: resolveMarker (state -> resolved) is reserved exclusively for db:migrate:recover's own outcome -- the ordinary run-migrations.ts success/failure paths use two new helpers (markMarkerApplied/markMarkerFailed) instead, so a normal successful unwrapped migration still ends up applied. — Required because tests/history/empty-db-full-history.test.ts (04-03, unmodified) asserts every row for a clean run's run_id is applied -- calling resolveMarker on every ordinary success would have broken that pre-existing assertion.
 - [Phase 04]: [Phase 04] 04-05: Case A's fixture inserts two steps rows sharing one recipe_id at DIFFERENT positions (0 and 1) so the pre-existing UNIQUE(recipe_id, position) constraint does not block the insert, while the new CREATE UNIQUE INDEX CONCURRENTLY (recipe_id) still genuinely fails. — Real duplicate data is what makes criterion 4's failure genuine rather than artificial fault injection.
 - [Phase 04]: [Phase 04] 04-05: Added a direct real-database test for must-have truth 6 (a wrapped failure is self-cleaning and does not block the next run) ahead of Case A, rather than resting only on the implicit proof already present in 04-04's own timeouts-and-concurrently.test.ts Case B/C sequence. — The must-have truth is explicit in the plan; giving it its own direct proof avoids depending on a sibling file's test never being edited or removed.
+- [Phase 04]: [Phase 04] 04-06: EXPECTED_FULL_HISTORY_COLUMNS actually lives in tests/history/support.ts, edited there rather than tests/history/empty-db-full-history.test.ts as the plan's read_first named — That is where the constant this task must update actually lives; the test file merely imports it
+- [Phase 04]: [Phase 04] 04-06: tests/history/existing-db-newest-only.test.ts's RUN-06 assertion widened from a table-added check to a full schema-shape inequality check — The real newest migrations now alter existing tables' columns rather than creating tables, so the original table-list assumption no longer held
+- [Phase 04]: [Phase 04] 04-06: docs/30-squawk-comparison.md updated by hand against a disposable squawk probe over exactly the three new real migrations, never through the full generator script — Regenerating would have destroyed every hand-filled disagreement analysis already committed to that file; followed the CR-02/Phase-4-plan-02 append-at-end precedent already established there
 
 ### Pending Todos
 
@@ -180,6 +184,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T22:28:23.584Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-09-08T22:54:36.844Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None
