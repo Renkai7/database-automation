@@ -45,6 +45,18 @@ describe("PL/pgSQL recursion (03-04-PLAN.md task 1, D-05)", () => {
     expect(result.findings.some((f) => f.ruleIds.includes("drop-table"))).toBe(false);
   });
 
+  it("a DO block whose body only mentions dropping a table inside a SQL comment produces no drop-table finding, and the file verdict is not BLOCKED (the second D-14 adversarial half, must_haves.truths)", async () => {
+    const rules = loadDefaultRules();
+    const sql =
+      "DO $$ BEGIN -- DROP TABLE ingredients (old note, no longer true)\n" +
+      "INSERT INTO log(msg) VALUES ('ok'); END; $$;";
+
+    const result = await analyzeSql(sql, rules);
+
+    expect(result.verdict).not.toBe("BLOCKED");
+    expect(result.findings.some((f) => f.ruleIds.includes("drop-table"))).toBe(false);
+  });
+
   it("a CREATE OR REPLACE FUNCTION whose body genuinely drops a table is BLOCKED, with a nested finding whose sourceContext is function-body", async () => {
     const rules = loadDefaultRules();
     const sql =
