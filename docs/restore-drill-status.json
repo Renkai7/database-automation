@@ -1,6 +1,6 @@
 {
   "automated": {
-    "lastRunAt": "2026-09-07T22:53:19.577Z",
+    "lastRunAt": "2026-09-08T18:01:16.353Z",
     "outcome": "PASS",
     "tiers": {
       "artifactIntegrity": true,
@@ -9,11 +9,11 @@
       "contentAndReferentialIntegrity": true
     },
     "durationMs": {
-      "backup": 625,
-      "containerStart": 2000,
-      "globalsRestore": 92,
-      "dataRestore": 124,
-      "assert": 414
+      "backup": 557,
+      "containerStart": 2119,
+      "globalsRestore": 91,
+      "dataRestore": 132,
+      "assert": 388
     }
   },
   "human": {
