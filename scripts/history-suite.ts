@@ -31,8 +31,13 @@ const HISTORY_VITEST_CONFIG = "vitest.history.config.ts";
 export async function runHistorySuite(): Promise<number> {
   let exitCode: number;
   try {
+    // stdio: "inherit" -- execa buffers and does NOT forward a child's output to the parent's
+    // own stdout/stderr by default (verified live this session), and vitest's real per-test
+    // output is exactly what a developer running `pnpm test:history` needs to see, the same way
+    // `pnpm db:drill`'s own step-by-step console.log output is visible (scripts/drill.ts).
     const run = await execa("pnpm", ["exec", "vitest", "run", "--config", HISTORY_VITEST_CONFIG], {
       reject: false,
+      stdio: "inherit",
     });
     exitCode = run.exitCode ?? 1;
   } catch (error) {

@@ -5,14 +5,15 @@
 // fixtures under a mkdtempSync directory, following tests/drill-status.test.ts's own shape. This
 // is what lets this check join the default `pnpm test` glob without slowing it down.
 //
-// Task 1 deliberately does NOT yet assert against the committed docs/migration-history-status.json
-// record -- it still reads outcome: null at this point in the plan, and asserting PASS against it
-// here would make `pnpm test` fail until Task 3 records a real run. Task 3 adds that assertion
-// once a real run has produced a PASS.
+// Task 3 (below): the cheap D-24 default-suite check against the REAL committed record, once
+// `pnpm test:history` has genuinely produced a PASS. `02-CONTEXT.md` D-18: the two facts stay
+// separate -- this check reads only its own path constant, never anything belonging to the
+// drill's own status file.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_DRILL_STATUS_PATH } from "../scripts/drill-status";
 import {
   DEFAULT_HISTORY_STATUS_PATH,
   HistoryStatusSchema,
@@ -143,5 +144,18 @@ describe("scripts/history-status.ts — assertHistoryStatusPassed failing direct
 describe("DEFAULT_HISTORY_STATUS_PATH", () => {
   it("points at the committed docs/migration-history-status.json path", () => {
     expect(DEFAULT_HISTORY_STATUS_PATH).toBe("docs/migration-history-status.json");
+  });
+});
+
+// D-24: the cheap check `pnpm test` runs on every invocation, against the REAL committed
+// docs/migration-history-status.json -- this is what makes a missing/malformed/never-run/FAIL
+// record hard-fail the default suite, not merely the temp-file cases above.
+describe("assertHistoryStatusPassed() — the committed default-suite check (D-24)", () => {
+  it("passes against the real committed docs/migration-history-status.json record", async () => {
+    await expect(assertHistoryStatusPassed()).resolves.toBeUndefined();
+  });
+
+  it("reads only the history record -- its path is distinct from the restore drill's own status path, so a green run of one can never silently upgrade the other (02-CONTEXT.md D-18)", () => {
+    expect(DEFAULT_HISTORY_STATUS_PATH).not.toBe(DEFAULT_DRILL_STATUS_PATH);
   });
 });
