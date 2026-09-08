@@ -78,13 +78,15 @@ async function main(): Promise<void> {
   });
 
   // Step 4: apply the full migration history through the root db:migrate target.
-  await runStep("drizzle-kit migrate", async () => {
+  await runStep("apply migration history via the gated runner", async () => {
     await execa("pnpm", ["run", "db:migrate"]);
   });
 
-  // CR-02: `drizzle-kit migrate` has been observed to exit zero on Windows without applying
-  // any SQL. D-22's whole purpose is to prove the migration history applies to a truly empty
-  // instance, so an unverified migrate makes that claim unfalsifiable -- this step re-queries
+  // CR-02: drizzle-kit's own migrate sub-command was observed to exit zero on Windows without
+  // applying any SQL (Phase 4: db:migrate is now the gated runner, not that sub-command -- see
+  // docs/decisions.md D-02 -- but the lesson still motivates this independent check). D-22's
+  // whole purpose is to prove the migration history applies to a truly empty instance, so an
+  // unverified migrate makes that claim unfalsifiable -- this step re-queries
   // the database directly instead of trusting the exit code above. It fails loudly (runStep
   // exits non-zero and does not print a completion line) rather than warning and continuing;
   // it takes no flag, argument, or environment variable that skips it (D-24).

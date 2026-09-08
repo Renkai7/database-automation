@@ -43,7 +43,7 @@ describe("development target pin — end-to-end (D-16)", () => {
   );
 
   it(
-    "refuses drizzle-kit migrate when RECIPE_DEV_DATABASE_URL is redirected at a non-loopback host",
+    "refuses db:migrate (the gated runner) when RECIPE_DEV_DATABASE_URL is redirected at a non-loopback host",
     async () => {
       const result = await execa("pnpm", ["run", "db:migrate"], {
         reject: false,

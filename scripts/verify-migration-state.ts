@@ -1,6 +1,7 @@
 // CR-02: the independently testable post-migrate state assertion the rebuild tool runs on
-// itself, so a `drizzle-kit migrate` that exits zero without applying SQL (an observed Windows
-// failure mode) cannot produce a false-positive "Complete." A separate module rather than a
+// itself, so a migrate step that exits zero without applying SQL (an observed Windows failure
+// mode of drizzle-kit's own migrate sub-command) cannot produce a false-positive "Complete." A
+// separate module rather than a
 // block inline in scripts/db-reset.ts, deliberately: that script calls its own entry function
 // at module load, so importing it from a test would run a real teardown. A standalone module
 // is callable on its own, and therefore provable in the failing direction as well as the
@@ -21,10 +22,14 @@ export const DEFAULT_JOURNAL_PATH = "apps/recipe-app/drizzle/meta/_journal.json"
 const EXPECTED_RECIPE_CORE_TABLES = ["ingredients", "recipes", "steps"] as const;
 
 /**
- * Re-queries the live database independently of `drizzle-kit migrate`'s own exit code and
- * fails loudly when the state it finds does not match what the committed journal expects.
- * Row counts and table names are not credentials and are safe to name in a thrown message;
- * the connection string is not, so it is never interpolated into one.
+ * Re-queries the live database independently of the migrate step's own exit code and fails
+ * loudly when the state it finds does not match what the committed journal expects. Row counts
+ * and table names are not credentials and are safe to name in a thrown message; the connection
+ * string is not, so it is never interpolated into one.
+ *
+ * D-29 (Phase 4): kept deliberately even now that `db:migrate` is the gated runner rather than
+ * drizzle-kit's own migrate sub-command -- an assertion that does not trust a tool's own account
+ * of itself is most valuable exactly when the tool behind it is new.
  */
 export async function assertMigrationHistoryApplied(
   journalPath: string = DEFAULT_JOURNAL_PATH,

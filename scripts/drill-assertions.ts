@@ -1,6 +1,7 @@
 // D-13 tiers 1-2 (02-CONTEXT.md): scripts/drill.ts's re-query-never-trust-exit-code assertions
 // against a restored database, following the same "re-query the real state, don't trust an
-// exit code" shape scripts/verify-migration-state.ts established for `drizzle-kit migrate`.
+// exit code" shape scripts/verify-migration-state.ts established for drizzle-kit's own migrate
+// sub-command.
 // A standalone module with no module-load side effects, importable from a test without opening
 // a database connection.
 import { join } from "node:path";

@@ -277,6 +277,45 @@ describe("structural guardrails", () => {
     }
   });
 
+  it("no file in the source surface references drizzle-kit's own migrate sub-command (D-02, Phase 4)", async () => {
+    // Concatenated at runtime, matching the drizzle-kit-push check above's own idiom, so this
+    // test file's own source never contains the forbidden two-token string. Unconditional: no
+    // per-file allowlist, matching the user's explicit decision on Task 2's checkpoint -- a gate
+    // with a second door is not a gate, and an exemption list is the mechanism by which a real
+    // invocation later hides behind "it is only a comment".
+    const forbidden = ["drizzle-kit", "migrate"].join(" ");
+    const files = await sourceSurfaceFiles();
+    for (const file of files) {
+      const content = readFileSync(file, "utf-8");
+      expect(
+        content,
+        `D-02: "${file}" must not reference "${forbidden}" -- db:migrate is now the gated ` +
+          "runner, and drizzle-kit's own migrate sub-command must be structurally unreachable " +
+          "from every file in this repository, with no exemption",
+      ).not.toContain(forbidden);
+    }
+  });
+
+  it("packages/automation never imports the pg driver (D-28)", async () => {
+    // Concatenated at runtime, same self-match-avoidance idiom as every other needle in this
+    // file, so this assertion's own source never contains the literal it searches for.
+    const fromPgNeedle = ['from "pg', '"'].join("");
+    const requirePgNeedle = ["require(", '"pg"', ")"].join("");
+    const files = (await sourceSurfaceFiles()).filter((file) => file.startsWith("packages/automation/src/"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const content = readFileSync(file, "utf-8");
+      expect(
+        content,
+        `D-28: "${file}" must not import "pg" -- the runner core receives an already-` +
+          "constructed client from its caller; adding the driver here would grant the " +
+          "extractable safety package the one capability this project spends most of its " +
+          "effort constraining",
+      ).not.toContain(fromPgNeedle);
+      expect(content, `D-28: "${file}" must not require("pg")`).not.toContain(requirePgNeedle);
+    }
+  });
+
   it("apps/recipe-app/drizzle.config.ts calls the shared target assertion (D-16, closes the PARTIAL key link)", () => {
     const content = readFileSync("apps/recipe-app/drizzle.config.ts", "utf-8");
     expect(

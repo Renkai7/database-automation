@@ -7,8 +7,8 @@
 // operator maintains rather than a property of the runner, and "set it to 0 in CI" becomes a
 // one-line diff nobody reviews.
 //
-// D-15: this repository already holds one recorded case of a migrate tool
-// (`drizzle-kit migrate` on Windows) exiting zero without doing its job
+// D-15: this repository already holds one recorded case of a migrate tool -- drizzle-kit's own
+// migrate sub-command, on Windows -- exiting zero without doing its job
 // (`scripts/verify-migration-state.ts` exists because of it) -- "set it and trust it" is not
 // good enough here, so the runner re-queries `pg_settings` (never `SHOW`, which returns the
 // human-formatted `"3s"` rather than a comparable integer -- verified live in
