@@ -51,6 +51,14 @@ list — `dollar-quote-collision.test.ts`, `embedded-reparse-guard.test.ts`,
 deviations and the security re-audit. They run in the default `pnpm test` suite. They are
 additional coverage, not gaps, and are not re-listed row by row below.
 
+**Second audit pass, 2026-09-08.** `/gsd-validate-phase 03` was re-run. The 43 mapped commands
+were re-checked (every underlying test file present; full suite green) and GAP-1's and GAP-2's
+tests were confirmed still green. One **new** gap was found and closed — GAP-3, the unpinned
+`DROP OWNED BY` classification — adding `packages/automation/test/drop-owned-by.test.ts`. The
+Sign-Off's suite-size figure (31 files / 305 tests) had gone stale and now reads 34 / 322; the
+dated audit sections below keep whatever count was true on their own pass. `nyquist_compliant`
+stays `true`.
+
 ---
 
 ## Test Infrastructure
@@ -151,6 +159,7 @@ but checked by nothing.
 |-----|-------------|-----------------|-----------|-------------------|--------|
 | GAP-1 | ANLZ-06 | The committed comparison report cannot silently drift from the corpus: every manifest entry appears as a table row, no unfilled generator placeholder survives into a committed report, and the report's own stated row count matches the rows it actually holds | unit | `pnpm exec vitest run packages/automation/test/squawk-comparison-report.test.ts` | ✅ green (3/3) — red when written, closed 2026-09-08 |
 | GAP-2 | ANLZ-06 | `sourceSurfaceFiles()` provably enumerates `packages/` (and `scripts/`, `tests/`, `apps/recipe-app/`), so the three source-surface checks cannot pass having examined nothing | guard | `pnpm exec vitest run tests/guardrails.test.ts` | ✅ green (11/11) |
+| GAP-3 | ANLZ-02, ANLZ-04 | `DROP OWNED BY <role>` cannot drift silently in either direction: it must never become SAFE, and if it is later promoted to BLOCKED the test fails loudly so the two artifacts recording it as an open question get updated rather than going stale | unit | `pnpm exec vitest run packages/automation/test/drop-owned-by.test.ts` | ✅ green (1/1) — added 2026-09-08 (second audit pass) |
 
 **Why GAP-2 existed.** The plan's own guard command for 03-07-03 was
 `vitest run tests/guardrails.test.ts --reporter verbose`, justified as confirming the new paths
@@ -159,6 +168,41 @@ never shows the enumerated file list, so its output would look identical if `pac
 enumerated zero files and all three checks passed vacuously. `packages/` is genuinely in scope
 today (`git ls-files packages/` → 86 files, and `tests/guardrails.test.ts:64` admits it), but
 nothing pinned that. The new assertion does.
+
+### GAP-3 — the finding, and how it was closed (2026-09-08, second audit pass)
+
+**What was wrong.** `DROP OWNED BY <role>` drops every object a role owns. Two phase artifacts —
+`03-07-SUMMARY.md` ("Open item for the owner, not decided here") and `03-VERIFICATION.md`'s
+open-items list — record that it resolves REVIEW_REQUIRED through D-06's unmatched-statement
+default rather than the D-02 BLOCKED floor, and flag whether it belongs on that floor as an open
+owner decision. Confirmed live during this audit: `pnpm db:analyze --json` on
+`DROP OWNED BY app_user;` exits 10, `statementKind: "Unrecognized"`, no matching rule.
+
+**Why nothing caught it.** `grep` across `packages/automation/src`, `packages/automation/test` and
+the corpus found **zero** references to `DROP OWNED` — no rule, no fixture, no test. The verdict
+was reachable only by running the analyzer by hand. A later rules edit could have moved it in
+either direction with nothing to say so: silently to SAFE (a real safety regression), or silently
+to BLOCKED (leaving both artifacts' "open question" prose describing a decision that had already
+been made).
+
+**What was done.** A characterization test, `packages/automation/test/drop-owned-by.test.ts`. It
+pins today's behavior and deliberately does **not** resolve the open question — no rule added,
+`rules.json` untouched, nothing put on the D-02 floor. It asserts the verdict is not SAFE (the
+safety-critical direction) and is REVIEW_REQUIRED via the D-06 path (`ruleIds: []`, rationale
+"No rule matched this operation"), with a failure message telling a future reader that a BLOCKED
+reading means the owner decision was made, not that something broke.
+
+**Why a standalone test rather than a 52nd corpus fixture.** `squawk-comparison-report.test.ts`
+(GAP-1's own check) asserts every manifest entry appears as a row in `docs/30-squawk-comparison.md`
+and that the report's stated row count matches its actual rows. A 52nd manifest entry would turn
+that test red until the report was regenerated — and regenerating overwrites all 22 hand-written
+disagreement explanations with placeholders, the exact trap documented under GAP-1 above.
+Disproportionate for pinning one open-question statement, so the corpus manifest (51 entries) and
+the report were left untouched.
+
+**Still an open owner decision.** This audit pinned the behavior; it did not decide it. Whether
+`DROP OWNED BY` belongs on the D-02 BLOCKED floor remains a judgement call for the owner, tracked
+where it already was.
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -275,9 +319,15 @@ D11 rerun-idempotency). It is drafted, not owner-confirmed — see Manual-Only a
       one outstanding item is a human read of a single drafted explanation, tracked in
       Manual-Only, which is a confirmation task rather than missing coverage.
 
+- [x] Second audit pass (2026-09-08): GAP-3 found and closed — `DROP OWNED BY`'s verdict is now
+      pinned by a characterization test, so a behavior recorded in two artifacts as an open owner
+      question can no longer drift silently in either direction
+
 **Approval:** VALIDATED — plan-time contract populated 2026-09-08; execution-time sign-off given
-2026-09-08. 43/43 mapped commands green, 2 gaps found, 2 gaps closed. Full suite 31 files /
-305 tests, all passing. One manual confirmation outstanding (see Manual-Only).
+2026-09-08; re-audited 2026-09-08. 43/43 mapped commands green, 3 gaps found across two passes,
+3 gaps closed. Full suite 34 files / 322 tests, all passing. One manual confirmation outstanding
+(see Manual-Only), plus one open owner decision that is now pinned by test rather than by prose
+alone (GAP-3).
 
 ---
 
@@ -310,3 +360,35 @@ already-established bucket rather than requiring a novel judgement.
 No implementation file was modified: `packages/automation/src/**`,
 `packages/automation/scripts/squawk-comparison.ts`, the corpus fixtures and the corpus manifest
 are all untouched by this audit.
+
+---
+
+## Validation Audit 2026-09-08 (second pass)
+
+`/gsd-validate-phase 03` re-run against the same repository.
+
+| Metric | Count |
+|--------|-------|
+| Mapped commands re-checked | 43 |
+| Mapped commands green | 43 |
+| Prior gaps re-checked (GAP-1, GAP-2) | 2, both still green |
+| Gaps found | 1 (GAP-3) |
+| Resolved | 1 (GAP-3 — `DROP OWNED BY` verdict pinned) |
+| Escalated | 0 |
+| Manual confirmations outstanding | 1 (unchanged — one drafted disagreement explanation) |
+| Open owner decisions now pinned by test | 1 (`DROP OWNED BY` on the D-02 floor?) |
+
+**Full suite after this pass:** `pnpm test` → 34 files, 322 tests, all passing (was 33 / 321
+before the gap-fill — the one new file and its one test, no regressions).
+
+**How GAP-3 was found.** The 43 mapped commands and both earlier gap-fills all held, so the pass
+looked instead for behavior the phase's own artifacts describe but nothing checks. `DROP OWNED BY`
+was recorded as an open judgement call in two places and referenced by no rule, fixture or test.
+
+**Files added/changed by this audit:**
+
+- `packages/automation/test/drop-owned-by.test.ts` (new — GAP-3's characterization test)
+
+No implementation file was modified. `packages/automation/src/**` (including `rules.json`), the
+corpus manifest (still 51 entries), the corpus fixtures and `docs/30-squawk-comparison.md` are all
+untouched by this pass.
