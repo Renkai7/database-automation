@@ -6,7 +6,7 @@
 // re-derive-never-trust discipline scripts/verify-migration-state.ts establishes).
 //
 // No imports beyond types and the rules schema, no side effects.
-import { assertFloorNotWeakened, D02_FLOOR_FACTS } from "./floor";
+import { assertFloorNotWeakened, assertUnmatchedDefaultsToReview, D02_FLOOR_FACTS } from "./floor";
 import { parseRulesFile, type Rule, type RulesFile } from "./rules-schema";
 import { VERDICT_SEVERITY, type Finding, type StatementFacts, type Verdict } from "../types";
 
@@ -223,14 +223,22 @@ export function applySafeFormPairing(findings: Finding[], rules: RulesFile["rule
 }
 
 /**
- * Validates a raw rules-file value through parseRulesFile and then D-02's load-time self-check
- * (assertFloorNotWeakened) before returning it -- the analyzer refuses to start on a weakened
- * rules file rather than silently substituting the floor for real classification traffic.
- * assertFloorNotWeakened is passed this exact classifyFacts function, never a second copy of
- * the matching logic.
+ * Validates a raw rules-file value through parseRulesFile and then two load-time self-checks
+ * before returning it -- the analyzer refuses to start on a weakened rules file rather than
+ * silently substituting a safer verdict for real classification traffic:
+ *   - assertFloorNotWeakened (D-02/D-07): no named floor operation can resolve to anything
+ *     other than BLOCKED.
+ *   - assertUnmatchedDefaultsToReview (D-06, gap closure per 03-VERIFICATION.md extending
+ *     03-REVIEW.md's CR-01 fix): no representative unmatched operation (an uncatalogued
+ *     statement kind, or a genuinely uncovered combination of a catalogued one) can resolve to
+ *     anything other than REVIEW_REQUIRED -- closing the "enumerate every legal value of a
+ *     field instead of leaving match empty" variant of CR-01's blanket-SAFE exploit, which the
+ *     trivial empty-match rejection in rules-schema.ts does not catch.
+ * Both are passed this exact classifyFacts function, never a second copy of the matching logic.
  */
 export function loadRules(raw: unknown): RulesFile {
   const rulesFile = parseRulesFile(raw);
   assertFloorNotWeakened(rulesFile, classifyFacts);
+  assertUnmatchedDefaultsToReview(rulesFile, classifyFacts);
   return rulesFile;
 }
