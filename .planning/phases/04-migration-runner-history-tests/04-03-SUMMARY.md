@@ -52,13 +52,13 @@ key-decisions:
 patterns-established:
   - "Non-test shared helper modules for a *.test.ts-glob'd suite live in the suite's own directory but outside the include glob's file pattern (tests/history/support.ts, not tests/history/support.test.ts), avoiding vitest's per-import re-registration of describe/it blocks."
 
-requirements-completed: [RUN-05, RUN-06]
+requirements-completed: [RUN-01, RUN-05, RUN-06]
 
-# RUN-01 is jointly declared by 04-01 and 04-03 (04-01-PLAN.md's own frontmatter); it is left off
-# this list even though this plan's tamper-then-refuse test satisfies criterion 1, because
-# 04-01-SUMMARY.md already marked it complete once both declaring plans had summaries (the
-# shared-ID gate resolved it at that point, not here) -- update_requirements below re-confirms
-# rather than re-declares it.
+# RUN-01 is jointly declared by 04-01 and 04-03 (04-01-PLAN.md's own frontmatter); 04-01-SUMMARY.md
+# left it Pending because the shared-ID gate reported 0/3 ready at that time (04-03 had no summary
+# yet). This SUMMARY is the second and final declaring plan, so RUN-01 becomes ready now --
+# gsd-tools query requirements.ready-ids confirmed ["RUN-01","RUN-05","RUN-06"] all ready before
+# update_requirements below marked them.
 
 coverage:
   - id: D1
@@ -195,7 +195,7 @@ None - no external service configuration required.
 - `tests/history/support.ts` gives plans 04-04/04-05/04-06 a working Testcontainers harness (`startEmptyPostgres17`, `runnerClientFor`, `readSchemaShape`) to add further `tests/history/*.test.ts` files against with no new infrastructure, per this plan's own `success_criteria`.
 - `docs/migration-history-status.json` carries a real, current `PASS` -- the default `pnpm test` suite (404 tests, all green) will hard-fail if this record ever goes missing, malformed, or FAIL (live-verified this session: temporarily set to FAIL, confirmed the exact failure, reverted with `git checkout`).
 - `git status --porcelain apps/recipe-app/drizzle` is empty -- the committed migrations directory was never mutated by any test in this plan.
-- RUN-05 and RUN-06 marked complete in `REQUIREMENTS.md` (sole declaring plan). RUN-01 was already marked complete by `04-01-SUMMARY.md` once both its declaring plans (04-01, 04-03) had summaries at that time -- `update_requirements` below re-confirms rather than re-declares it, since 04-03 had not yet produced a summary when 04-01 closed out; if the shared-ID gate reports it still pending, this plan's own `tests/history/tamper-then-refuse.test.ts` is the second declaring plan's proof.
+- RUN-05 and RUN-06 marked complete in `REQUIREMENTS.md` (sole declaring plan). RUN-01 -- jointly declared by 04-01 and this plan -- was left Pending by `04-01-SUMMARY.md` (shared-ID gate reported 0/3 ready then, since this plan had no summary yet). This SUMMARY is the second and final declaring plan, so `gsd-tools query requirements.ready-ids` now reports RUN-01 ready alongside RUN-05/RUN-06, and `update_requirements` marks all three.
 - No blockers for the next plan in this phase.
 
 ## Self-Check: PASSED
