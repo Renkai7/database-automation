@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-09-08T21:40:10.667Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-09-08T21:57:02.303Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 04 execution started
-state_head: 403eec6b4220176f79218da968b0b34de414105a
+state_head: e7fa6841c9c19b1da5a1cad18193a6c6df4d859e
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 27
-  completed_plans: 23
+  completed_plans: 24
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 04 (Migration Runner & History Tests) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 04 execution started
 
@@ -83,6 +83,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01 | 31min | 3 tasks | 22 files |
 | Phase 04-migration-runner-history-tests P02 | 20min | 3 tasks | 22 files |
 | Phase 04 P03 | 20min | 3 tasks | 11 files |
+| Phase 04 P04 | 17min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 04]: [Phase 04] 04-02: D06_UNMATCHED_CANARY_FACTS deliberately excludes a disarmsTimeout:true canary (only transactionHostile:true added) -- disarms-timeout-guc matches disarmsTimeout:true unconditionally by design, making that combination a genuinely catalogued BLOCKED case, mirroring the existing nestingLimitExceeded exclusion. — Including it would make assertUnmatchedDefaultsToReview reject the shipped rules file itself (a stronger, not weaker, verdict). Equivalent enumeration-exploit coverage proven instead via timeout-disarm-floor.test.ts and a parallel transactionHostile-enumeration test. Recorded as unmet-truth #4 in WINDOWS.md for transparency against the plan's literal must_haves wording.
 - [Phase 04]: [Phase 04] 04-03: tests/history/support.ts is a plain non-test module, not exported-from/imported-into one of the two test files -- importing a *.test.ts file from another duplicates its registered tests in vitest (live-verified: a 2-test fixture became 3).
 - [Phase 04]: [Phase 04] 04-03: scripts/history-suite.ts uses stdio: "inherit" on the vitest child process -- execa does not forward a child's stdout/stderr to the parent by default (verified live), so pnpm test:history was silent without it.
+- [Phase 04]: [Phase 04] 04-04: decideTransactionPolicy counts hostile findings across the whole array (top-level and nested D-05 findings alike) and refuses on any combination beyond exactly one finding that is hostile -- including two hostile findings sharing one file, since a file is one unit.
+- [Phase 04]: [Phase 04] 04-04: applyMigration computes the transaction policy before splitStatements/execution, so a mixed-file refusal is provably zero-statement (proven on the recorded client call sequence, not merely on the thrown error type).
 
 ### Pending Todos
 
@@ -173,6 +176,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T21:40:10.611Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-09-08T21:57:02.249Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None

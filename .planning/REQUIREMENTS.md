@@ -38,8 +38,8 @@
 
 - [x] **RUN-01**: The runner re-derives classification by parsing the actual SQL immediately before executing it, never trusting a verdict computed upstream
 - [x] **RUN-02**: A BLOCKED classification is refused at execution with no override path
-- [ ] **RUN-03**: Every migration execution is wrapped with `lock_timeout` and `statement_timeout`
-- [ ] **RUN-04**: Statements are not forced into a single transaction where doing so would break `CREATE INDEX CONCURRENTLY` and similar safe forms
+- [x] **RUN-03**: Every migration execution is wrapped with `lock_timeout` and `statement_timeout`
+- [x] **RUN-04**: Statements are not forced into a single transaction where doing so would break `CREATE INDEX CONCURRENTLY` and similar safe forms
 - [x] **RUN-05**: An empty database plus the full migration history produces the expected schema, verified automatically
 - [x] **RUN-06**: An existing database plus only the new migration applies cleanly, verified automatically
 - [ ] **RUN-07**: The application starts successfully against the resulting schema
