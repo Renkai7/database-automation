@@ -152,7 +152,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion; contains a blocking package-legitimacy checkpoint)*
 
-- [ ] 03-07-PLAN.md — The squawk-cli cross-check and committed comparison report, the widened guardrail scope, the D16 decision entry, and the coverage declaration
+- [x] 03-07-PLAN.md — The squawk-cli cross-check and committed comparison report, the widened guardrail scope, the D16 decision entry, and the coverage declaration
 
 ### Phase 4: Migration Runner & History Tests
 
