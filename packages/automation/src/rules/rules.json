@@ -49,6 +49,13 @@
       "match": { "statementKind": "Update", "hasWhereClause": false },
       "verdict": "BLOCKED",
       "rationale": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
+    },
+    {
+      "id": "empty-input",
+      "category": "analyzer-integrity",
+      "match": { "statementKind": "EmptyInput" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "The analyzer found no executable statement in this migration file (empty, whitespace-only, or comment-only input). SAFE must be earned by a matching rule (D-06), and a migration file with nothing executable in it is anomalous enough to be worth a human glance."
     }
   ]
 }

@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "libpg-query": "17.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3"
   }
 }
