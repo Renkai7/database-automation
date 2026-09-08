@@ -4,10 +4,10 @@ current_phase: 4
 current_phase_name: Migration Runner & History Tests
 status: planning
 stopped_at: Phase 03 complete, ready to plan Phase 4
-last_updated: "2026-09-08T16:32:12.185Z"
+last_updated: "2026-09-08T18:55:20.294Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 03 complete, transitioned to Phase 4
-state_head: 98788dc5e2fc505b151dbdf212f7d639380ce46b
+state_head: 3af8bfbe39869fc84bab204f3a253f603988562e
 progress:
   total_phases: 7
   completed_phases: 1
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 4 — Migration Runner & History Tests
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-09-08 — Phase 03 complete, transitioned to Phase 4
+Last activity: 2026-09-08 - Completed quick task 260908-kdl: tick APP-01 and refresh the REQUIREMENTS.md footer note (Phase 03 complete, transitioned to Phase 4)
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -151,6 +151,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 |---|-------------|------|--------|-----------|
 | 260907-ir1 | Fix UAT gap G-01-2: raise tablet body-copy type scale in recipe-app globals.css | 2026-09-07 | f598dea | [260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop](./quick/260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop/) |
 | 260907-r6z | Add decision D15 to docs/decisions.md documenting the proposed packaging/reuse strategy for the backup-restore-drill tooling | 2026-09-07 | 2699dc5 | [260907-r6z-add-decision-d15-to-docs-decisions-md-do](./quick/260907-r6z-add-decision-d15-to-docs-decisions-md-do/) |
+| 260908-kdl | tick APP-01 and refresh the REQUIREMENTS.md footer note | 2026-09-08 | 3af8bfb | [260908-kdl-tick-app-01-and-refresh-the-requirements](./quick/260908-kdl-tick-app-01-and-refresh-the-requirements/) |
 
 ## Deferred Items
 
