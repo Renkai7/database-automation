@@ -91,6 +91,12 @@ export interface StatementFacts {
   dynamicSqlUnresolved: boolean;
   sourceContext: SourceContext;
   nestingDepth: number;
+  /** D-05/plan 03-04: true only for the single synthetic fact set inspectPlPgSqlBody emits when
+   * MAX_NESTING_DEPTH would be exceeded (statementKind stays "Unrecognized" -- there is no real
+   * statement to name, just the fact that recursion stopped). A rule matches on this the same
+   * way it matches any other fact: by exact equality, never a computed depth comparison (D-01
+   * still applies one level down into PL/pgSQL). */
+  nestingLimitExceeded: boolean;
 }
 
 /** Every field at its neutral default, so any consumer that needs a complete StatementFacts
@@ -112,6 +118,7 @@ export const EMPTY_FACTS: StatementFacts = {
   dynamicSqlUnresolved: false,
   sourceContext: "top-level",
   nestingDepth: 0,
+  nestingLimitExceeded: false,
 };
 
 /**
