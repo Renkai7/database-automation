@@ -167,7 +167,34 @@ Plans:
   4. A migration deliberately made to fail partway through leaves a state that is reported clearly rather than silently marked applied, and recovering from it never requires hand-editing `_journal.json`.
   5. Running a real recipe-app schema change of each kind — one that lands SAFE, one REVIEW REQUIRED, one BLOCKED — through the runner produces the expected outcome for each.
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Tracer: one committed migration travels read → classify → split → execute → ledger → run report under verified timeouts, and drizzle-kit's own migrate sub-command becomes unreachable
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — The analyzer learns transaction-hostility and timeout self-disarm, and the code floor widens to "irreversible data loss or self-disarming"
+- [ ] 04-03-PLAN.md — The Testcontainers history harness: empty-database full history, existing-database newest-only, tamper-then-refuse, and the committed status record
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-04-PLAN.md — Wrapped by default, auto-unwrapped for a lone transaction-hostile statement, mixed files refused — and criterion 2 proven against a real database
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-05-PLAN.md — The in-flight marker, the refusal that will not step past an unknown state, and `db:migrate:recover`
+
+**Wave 5** *(blocked on Wave 4 completion — the recipe-app schema is a shared mutable resource)*
+
+- [ ] 04-06-PLAN.md — APP-02: the real SAFE change and the real REVIEW REQUIRED change, generated and applied through the runner
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04-07-PLAN.md — APP-02: the real BLOCKED change refused and reverted with a committed replay test, RUN-07's app boot, and the phase record
 
 ### Phase 5: CI Pipeline Gate
 
