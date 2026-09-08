@@ -11,11 +11,13 @@ import { z } from "zod";
 import { RulesFileError } from "../types";
 
 /** D-01: a rule matches StatementFacts by equality or set membership only -- no expressions,
- * no computed conditions. A fact value is therefore a string, a boolean, or an array of either
- * (set membership), never a function or a nested object. */
+ * no computed conditions. A fact value is therefore a string, a boolean, `null` (equality
+ * against an absent value, e.g. `usingIndexName: null` for "no index attached" -- 03-02-PLAN.md
+ * task 2's add-unique-constraint rule), or an array of string/boolean (set membership), never a
+ * function or a nested object. */
 const FactMatchSchema = z.record(
   z.string(),
-  z.union([z.string(), z.boolean(), z.array(z.union([z.string(), z.boolean()]))]),
+  z.union([z.string(), z.boolean(), z.null(), z.array(z.union([z.string(), z.boolean()]))]),
 );
 
 /** D-04: rename/compatibility rules are their own category, distinct from the lock-hazard
@@ -43,6 +45,11 @@ const RuleSchema = z.object({
 export const RulesFileSchema = z.object({
   version: z.number().int(),
   rules: z.array(RuleSchema),
+  // Optional, top-level, human-readable documentation of a deliberate catalogue exclusion (e.g.
+  // 03-CONTEXT.md D-04's lock_timeout/statement_timeout exclusion) -- explicitly kept in the
+  // schema (rather than stripped as an unknown key) so the reason survives a load/re-save round
+  // trip and Phase 5 can eventually render it, not just this repo's own rules.json.
+  notes: z.string().optional(),
 });
 
 export type Rule = z.infer<typeof RuleSchema>;

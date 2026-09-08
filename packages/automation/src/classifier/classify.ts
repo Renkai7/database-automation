@@ -16,9 +16,13 @@ export interface ClassificationOutcome {
   rationales: string[];
 }
 
-/** A single rule's `match` value matches a single fact value: a scalar matches by strict
- * equality, an array matches by membership (D-01: equality/set-membership only). */
-function factMatches(matchValue: string | boolean | Array<string | boolean>, factValue: unknown): boolean {
+/** A single rule's `match` value matches a single fact value: a scalar (including `null`, for
+ * matching an absent value like `usingIndexName: null`) matches by strict equality, an array
+ * matches by membership (D-01: equality/set-membership only). */
+function factMatches(
+  matchValue: string | boolean | null | Array<string | boolean>,
+  factValue: unknown,
+): boolean {
   if (Array.isArray(matchValue)) {
     return matchValue.includes(factValue as string | boolean);
   }

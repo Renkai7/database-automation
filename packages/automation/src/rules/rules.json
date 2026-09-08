@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "notes": "Deliberately excludes require-lock-timeout/require-statement-timeout equivalents (squawk's rules): those describe how the runner opens its session, not what the SQL says. RUN-02 makes the Phase 4 runner responsible for setting them on every migration; a rule flagging every migration for a property the runner already guarantees would be a false positive by construction (03-CONTEXT.md D-04).",
   "rules": [
     {
       "id": "drop-table",
@@ -49,6 +50,153 @@
       "match": { "statementKind": "Update", "hasWhereClause": false },
       "verdict": "BLOCKED",
       "rationale": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
+    },
+    {
+      "id": "alter-type-drop-value",
+      "category": "irreversible-data-loss",
+      "match": { "statementKind": "AlterTypeDropValue" },
+      "verdict": "BLOCKED",
+      "rationale": "Dropping an enum value permanently removes it from the type and destroys any row still carrying it, with no automated way to recover the value afterward. PostgreSQL's own grammar rejects this statement outright today (confirmed live against libpg-query@17.7.4: it always raises 'dropping an enum value is not implemented' at parse time), so this rule can never currently fire -- it is kept as documentation of FEATURES.md section 1's BLOCKED entry and as a floor should a future PostgreSQL version ever implement the operation."
+    },
+    {
+      "id": "add-column-volatile-default",
+      "category": "lock-hazard",
+      "match": { "statementKind": "AddColumn", "defaultVolatility": "volatile" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "A volatile default (e.g. clock_timestamp(), gen_random_uuid()) cannot be stored as a single metadata value, so PostgreSQL rewrites the entire table and its indexes under ACCESS EXCLUSIVE."
+    },
+    {
+      "id": "set-not-null",
+      "category": "lock-hazard",
+      "match": { "statementKind": "SetNotNull" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "SET NOT NULL on an existing column forces a full table scan under ACCESS EXCLUSIVE to verify no NULLs exist, blocking reads and writes for the scan's duration."
+    },
+    {
+      "id": "alter-column-type",
+      "category": "lock-hazard",
+      "match": { "statementKind": "AlterColumnType" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "ALTER COLUMN TYPE always takes ACCESS EXCLUSIVE, and this analyzer has no database connection to know whether the change is a safe widening or a lossy narrowing, so the lossiness question goes to a human."
+    },
+    {
+      "id": "add-unique-constraint",
+      "category": "lock-hazard",
+      "match": { "statementKind": "AddUniqueConstraint", "usingIndexName": null },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Adding a UNIQUE constraint without USING INDEX builds its backing index while holding ACCESS EXCLUSIVE for the entire build, blocking reads and writes on the table."
+    },
+    {
+      "id": "create-index-not-concurrently",
+      "category": "lock-hazard",
+      "match": { "statementKind": "CreateIndex", "concurrently": false },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Building an index without CONCURRENTLY takes a SHARE lock on the table for the whole build, blocking every INSERT, UPDATE and DELETE until it finishes."
+    },
+    {
+      "id": "drop-index-not-concurrently",
+      "category": "lock-hazard",
+      "match": { "statementKind": "DropIndex", "concurrently": false },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Dropping an index without CONCURRENTLY takes ACCESS EXCLUSIVE on the table for the drop, which can queue behind and then block every other lock request on it."
+    },
+    {
+      "id": "add-foreign-key-validated",
+      "category": "lock-hazard",
+      "match": { "statementKind": "AddForeignKey", "notValid": false },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "A plainly added foreign key scans and locks both the altering table and the referenced table while validating every existing row, unlike the NOT VALID plus VALIDATE CONSTRAINT two-step form."
+    },
+    {
+      "id": "rename-column",
+      "category": "compatibility",
+      "match": { "statementKind": "RenameColumn" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Renaming a column is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
+    },
+    {
+      "id": "rename-table",
+      "category": "compatibility",
+      "match": { "statementKind": "RenameTable" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Renaming a table is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
+    },
+    {
+      "id": "drop-not-null",
+      "category": "compatibility",
+      "match": { "statementKind": "DropNotNull" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Dropping a NOT NULL constraint is metadata-only with no lock hazard, but it silently changes what application code can rely on being present, breaking any code that assumed the column was never null."
+    },
+    {
+      "id": "drop-constraint",
+      "category": "compatibility",
+      "match": { "statementKind": "DropConstraint" },
+      "verdict": "REVIEW_REQUIRED",
+      "rationale": "Dropping a constraint is metadata-only with no lock hazard, but whether any application code depends on the guarantee it enforced is an application-level fact this analyzer cannot verify from the database alone."
+    },
+    {
+      "id": "create-table",
+      "category": "usually-safe",
+      "match": { "statementKind": "CreateTable" },
+      "verdict": "SAFE",
+      "rationale": "Creating a brand new table has no existing rows to lock, scan or rewrite, and no application code can yet depend on it."
+    },
+    {
+      "id": "add-column-nullable-no-default",
+      "category": "usually-safe",
+      "match": { "statementKind": "AddColumn", "defaultVolatility": "none" },
+      "verdict": "SAFE",
+      "rationale": "Adding a nullable column with no default is a metadata-only change that requires no table rewrite and no scan of existing rows."
+    },
+    {
+      "id": "add-column-nonvolatile-default",
+      "category": "usually-safe",
+      "match": { "statementKind": "AddColumn", "defaultVolatility": ["literal", "immutable", "stable"] },
+      "verdict": "SAFE",
+      "rationale": "A non-volatile default (a literal, or an IMMUTABLE or STABLE function such as now()) is evaluated once and stored in the table's own metadata, so PostgreSQL's fast add-column path applies and no rewrite is required."
+    },
+    {
+      "id": "create-index-concurrently",
+      "category": "usually-safe",
+      "match": { "statementKind": "CreateIndex", "concurrently": true },
+      "verdict": "SAFE",
+      "rationale": "CREATE INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire build."
+    },
+    {
+      "id": "drop-index-concurrently",
+      "category": "usually-safe",
+      "match": { "statementKind": "DropIndex", "concurrently": true },
+      "verdict": "SAFE",
+      "rationale": "DROP INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire drop."
+    },
+    {
+      "id": "comment-on",
+      "category": "usually-safe",
+      "match": { "statementKind": "CommentOn" },
+      "verdict": "SAFE",
+      "rationale": "COMMENT ON only updates catalog metadata text, taking no meaningful lock and touching no row in the table it describes."
+    },
+    {
+      "id": "add-check-constraint-not-valid",
+      "category": "usually-safe",
+      "match": { "statementKind": "AddCheckConstraint", "notValid": true },
+      "verdict": "SAFE",
+      "rationale": "A check constraint added NOT VALID is instant and enforces only on new or changed rows, deferring the table scan to a separate, weaker-locked VALIDATE CONSTRAINT step."
+    },
+    {
+      "id": "add-foreign-key-not-valid",
+      "category": "usually-safe",
+      "match": { "statementKind": "AddForeignKey", "notValid": true },
+      "verdict": "SAFE",
+      "rationale": "A foreign key added NOT VALID is instant and enforces only on new or changed rows, deferring the scan of both tables to a separate, weaker-locked VALIDATE CONSTRAINT step."
+    },
+    {
+      "id": "validate-constraint",
+      "category": "usually-safe",
+      "match": { "statementKind": "ValidateConstraint" },
+      "verdict": "SAFE",
+      "rationale": "VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE on the altered table, letting concurrent reads and writes continue while it scans for constraint violations."
     },
     {
       "id": "empty-input",
