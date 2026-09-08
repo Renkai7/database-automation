@@ -1,7 +1,7 @@
 // D-13 (03-CONTEXT.md)/03-05-PLAN.md task 1: the harness that runs every corpus fixture through
 // the real analyzer and diffs the outcome against the committed manifest -- the corpus's own
 // "test" in the sense that a fixture with no assertion attached is worse than no fixture, since
-// it looks like coverage. This file owns four separate concerns, each its own describe block:
+// it looks like coverage. This file owns five separate concerns, each its own describe block:
 //   1. Per-fixture: every manifest row's file, run through the real analyzeSql, matches its
 //      expectedVerdict and its expectedRuleIds exactly (missing AND extra are both failures).
 //   2. Structural integrity: no .sql file is unlisted, no manifest row names a missing file.
