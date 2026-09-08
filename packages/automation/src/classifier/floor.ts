@@ -27,6 +27,17 @@ export const D02_FLOOR_FACTS: StatementFacts[] = [
   { ...EMPTY_FACTS, statementKind: "Update", hasWhereClause: false },
 ];
 
+/** D-07's floor operation (plan 03-04): the single canonical fact set for an unresolvable
+ * dynamic EXECUTE. Kept as its own named export, never merged into D02_FLOOR_FACTS, precisely
+ * because they answer to two different decisions -- D-02 fixes the irreversible-data-loss set
+ * the developer named explicitly; D-07 is the analyzer-integrity addition its own decision
+ * requires (an EXECUTE nobody, not the analyzer and not a reviewer, can read). Merging them
+ * would lose which decision each entry answers to, which matters when Phase 7 audits why a
+ * verdict could not be overridden. */
+export const D07_FLOOR_FACTS: StatementFacts[] = [
+  { ...EMPTY_FACTS, statementKind: "ExecuteDynamic", dynamicSqlUnresolved: true },
+];
+
 /** The shape classify.ts's classifyFacts satisfies -- declared here so floor.ts has no import
  * dependency on classify.ts (classify.ts imports floor.ts, not the reverse). */
 export type ClassifyFactsFn = (
@@ -35,19 +46,22 @@ export type ClassifyFactsFn = (
 ) => { verdict: string; ruleIds: string[]; rationales: string[] };
 
 /**
- * Runs every D02_FLOOR_FACTS entry through `classifyFacts` (the exact function real
- * classification uses) against the loaded rules. Throws RulesFileError naming the offending
- * fact set and the verdict it produced if any result is not BLOCKED -- this covers the
- * "no rule matched" case too, since D-06 would otherwise resolve an unmatched floor operation
- * to REVIEW REQUIRED, which is exactly the silent weakening D-02 exists to prevent.
+ * Runs every D02_FLOOR_FACTS and D07_FLOOR_FACTS entry through `classifyFacts` (the exact
+ * function real classification uses) against the loaded rules. Throws RulesFileError naming the
+ * offending fact set and the verdict it produced if any result is not BLOCKED -- this covers the
+ * "no rule matched" case too, since D-06 would otherwise resolve an unmatched floor operation to
+ * REVIEW REQUIRED, which is exactly the silent weakening D-02/D-07 exist to prevent. Both floor
+ * sets run through the identical check: an unresolvable dynamic EXECUTE is exactly as
+ * non-weakenable as DROP TABLE, just for a different reason (D-07: nobody can read what it would
+ * execute, rather than D-02: the operation is named and irreversible).
  */
 export function assertFloorNotWeakened(rulesFile: RulesFile, classifyFacts: ClassifyFactsFn): void {
-  for (const facts of D02_FLOOR_FACTS) {
+  for (const facts of [...D02_FLOOR_FACTS, ...D07_FLOOR_FACTS]) {
     const outcome = classifyFacts(facts, rulesFile.rules);
     if (outcome.verdict !== "BLOCKED") {
       throw new RulesFileError(
         `Rules file validation failed: floor operation "${facts.statementKind}" resolved to ` +
-          `"${outcome.verdict}", not BLOCKED. The rules file cannot weaken the code floor (D-02).`,
+          `"${outcome.verdict}", not BLOCKED. The rules file cannot weaken the code floor (D-02/D-07).`,
       );
     }
   }
