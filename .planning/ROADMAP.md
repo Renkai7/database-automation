@@ -148,7 +148,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 03-06-PLAN.md — Five matched adversarial pairs with a structural pairing check, the app-shaped group, the two real migrations, and the success-criterion-1 demonstration
+- [x] 03-06-PLAN.md — Five matched adversarial pairs with a structural pairing check, the app-shaped group, the two real migrations, and the success-criterion-1 demonstration
 
 **Wave 6** *(blocked on Wave 5 completion; contains a blocking package-legitimacy checkpoint)*
 

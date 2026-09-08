@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Safety Analyzer
 status: executing
-stopped_at: Completed 03-05-PLAN.md
-last_updated: "2026-09-08T14:12:00.000Z"
+stopped_at: Completed 03-06-PLAN.md
+last_updated: "2026-09-08T14:31:45.002Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 03 execution in progress (5/7 plans)
-state_head: 86de98d
+state_head: dbcf2ecaee50c3fcc7c711ad95ee9f08f0830cd9
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 03 (Safety Analyzer) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-09-08 — Completed 03-05-PLAN.md
 
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P03 | 20min | 2 tasks | 14 files |
 | Phase 03 P04 | 50 min | 2 tasks | 9 files |
 | Phase 03 P05 | 40 min | 3 tasks | 37 files |
+| Phase 03-safety-analyzer P06 | ~35min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 03]: D-05/D-07 shipped: PL/pgSQL recursion into DO/function bodies via reconstructed statement text fed back through parsePlPgSQL, plus a non-weakenable D07_FLOOR_FACTS floor for unresolvable dynamic SQL
 - [Phase 03]: [Phase 03] 03-05: Corpus fixtures derived by execution, not by reading rules.json prose -- every expected verdict/rule-id was produced by running the candidate SQL through the real, installed analyzer in a disposable probe script and reasoning about whether the observed output was correct. This caught two genuine plan-text-vs-analyzer disagreements: (1) the plan's 8th BLOCKED fixture (ALTER TYPE ... DROP VALUE) cannot exist as parseable SQL at all -- PostgreSQL's own grammar rejects it unconditionally (re-confirmed live against libpg-query@18.1.4); blocked/ ships 7 fixtures instead of 8, with the id in the rule-coverage exception list. (2) The plan's literal near-miss control (unvalidated-then-validate pair with a mismatched constraint name) resolves SAFE under the real analyzer, not REVIEW_REQUIRED as predicted, because both halves match unconditionally regardless of pairing (matches 03-02-SUMMARY.md's own documented finding) -- substituted the concurrent-index-then-unique-constraint shape with a mismatched index name instead, which genuinely demonstrates exact-name matching. ANLZ-02 and ANLZ-04 marked complete in REQUIREMENTS.md (all declaring plans -- 03-01/02/03/05 -- now have summaries); ANLZ-07 stays Pending until 03-06 (its other declaring plan) completes.
 - [Phase 03]: [Gap closure, post-03-04] Orchestrator spot-check against the real CLI found a false-SAFE defect: do-block-container/create-function-container matched unconditionally on statementKind alone, so a `LANGUAGE sql` (or `BEGIN ATOMIC`, or any non-plpgsql-language) function body was never re-parsed yet still earned SAFE -- confirmed live, e.g. `CREATE FUNCTION g() RETURNS void AS $$ DROP TABLE ingredients $$ LANGUAGE sql;` classified SAFE and exited 0. Fixed in two parts, both TDD RED->GREEN, no PLAN.md (task spec only): (1) StatementFacts gains `bodyInspected`, set truthfully at the single decision point (inspect-plpgsql.ts's new `planContainerBody`); the two container SAFE rules now require `bodyInspected:true`, and a new `container-body-not-inspected` rule (REVIEW_REQUIRED, analyzer-integrity) matches `bodyInspected:false` generically across `statementKind: [DoBlock, CreateFunction]` -- any uninspectable language (plperl, c, future ones) lands there, not a per-language allowlist. (2) `LANGUAGE sql` bodies are now genuinely inspected: dollar-quoted/single-quoted text is re-parsed through the ordinary `parseTopLevel`/`inspectStatement` path (never pattern-matched), and the `BEGIN ATOMIC ... END` form is read directly off `CreateFunctionStmt.sql_body` (probed live against libpg-query@18.1.4: arrives as already-parsed AST nodes, not text). `inspectPlPgSqlBody`/`reconstructPlPgSqlStatement` generalised into `inspectContainerBody`/`planContainerBody`, applied identically at the top level and to a nested container found inside another body. Verified against the real CLI (exit 20/10/0 as expected) in addition to 13 new unit/integration tests. Commits: `399e35f` (RED), `b9c5e64` (GREEN). Full `pnpm test`: 214/214 (201 -> 214); `tsc --noEmit` clean.
+- [Phase 03]: D-14 adversarial pair-integrity is a structural corpus-test invariant: a shape with only one half fails the suite, live-verified by temporarily deleting a manifest row and confirming the named failure. — Prevents the false-positive half of the adversarial pairing from quietly rotting away (PITFALLS.md C2), rather than relying on future contributors to remember to add both halves.
 
 ### Pending Todos
 
@@ -155,6 +157,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T14:12:00.000Z
-Stopped at: Completed 03-05-PLAN.md
+Last session: 2026-09-08T14:31:44.937Z
+Stopped at: Completed 03-06-PLAN.md
 Resume file: None
