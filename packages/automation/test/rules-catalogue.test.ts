@@ -31,6 +31,7 @@ const VALID_FACT_NAMES = new Set([
   "dynamicSqlUnresolved",
   "sourceContext",
   "nestingDepth",
+  "nestingLimitExceeded",
 ]);
 
 // Boolean-typed StatementFacts fields -- a rule matching one of these with a string (or vice
@@ -41,6 +42,7 @@ const BOOLEAN_FACTS = new Set([
   "checkProvesNotNull",
   "hasWhereClause",
   "dynamicSqlUnresolved",
+  "nestingLimitExceeded",
 ]);
 
 // String-or-null-typed StatementFacts fields (nullable identifiers).

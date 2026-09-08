@@ -58,10 +58,18 @@ describe("PL/pgSQL recursion (03-04-PLAN.md task 1, D-05)", () => {
     expect(dropFinding!.facts.sourceContext).toBe("function-body");
   });
 
-  it("a DO block containing only an insert and a where-scoped update yields a SAFE file verdict", async () => {
+  it("a DO block whose body contains only statements the catalogue already classifies SAFE yields a SAFE file verdict", async () => {
+    // Deviation note (see SUMMARY): the plan's own wording for this fixture was "an insert and
+    // an update with a where clause." Neither is actually SAFE under the catalogue 03-02 already
+    // shipped and tested: INSERT is not in the StatementKind vocabulary at all (D-04's catalogue
+    // never included it), and an UPDATE with a WHERE clause has no SAFE rule -- deliberately, the
+    // same way a WHERE-scoped DELETE has none either (only the unscoped/no-WHERE floor case is
+    // named). Expanding that established, already-tested catalogue is out of this plan's scope
+    // (Rule 4 territory, not decided here) -- this fixture proves the identical point (a body of
+    // unambiguously-safe statements earns the container a SAFE verdict) using two statement kinds
+    // the catalogue already classifies SAFE.
     const rules = loadDefaultRules();
-    const sql =
-      "DO $$ BEGIN INSERT INTO log(msg) VALUES ('ok'); UPDATE t SET c = 1 WHERE id = 1; END; $$;";
+    const sql = "DO $$ BEGIN CREATE TABLE new_log (id int); COMMENT ON TABLE new_log IS 'x'; END; $$;";
 
     const result = await analyzeSql(sql, rules);
 

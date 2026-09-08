@@ -199,6 +199,34 @@
       "rationale": "VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE on the altered table, letting concurrent reads and writes continue while it scans for constraint violations."
     },
     {
+      "id": "do-block-container",
+      "category": "usually-safe",
+      "match": { "statementKind": "DoBlock" },
+      "verdict": "SAFE",
+      "rationale": "The DO block container itself is not the hazard -- its dollar-quoted body is re-parsed and every statement inside it is classified on its own findings (D-05). Without this rule every DO block would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
+    },
+    {
+      "id": "create-function-container",
+      "category": "usually-safe",
+      "match": { "statementKind": "CreateFunction" },
+      "verdict": "SAFE",
+      "rationale": "The function creation itself is not the hazard -- its dollar-quoted body is re-parsed and every statement inside it is classified on its own findings (D-05). Without this rule every legitimate trigger-function migration would be permanently unclassifiable-as-safe under D-06's no-match default, which is exactly the friction that manufactures pressure for an override path."
+    },
+    {
+      "id": "nesting-depth-exceeded",
+      "category": "analyzer-integrity",
+      "match": { "statementKind": "Unrecognized", "nestingLimitExceeded": true },
+      "verdict": "BLOCKED",
+      "rationale": "A procedural body nested deeper than the analyzer's recursion limit could not be fully read, and a body the analyzer could not fully read cannot be called safe (D-06). The limit exists so a pathological or adversarial input cannot exhaust the analyzer's own call stack."
+    },
+    {
+      "id": "unresolvable-dynamic-sql",
+      "category": "analyzer-integrity",
+      "match": { "statementKind": "ExecuteDynamic", "dynamicSqlUnresolved": true },
+      "verdict": "BLOCKED",
+      "rationale": "An EXECUTE whose argument the analyzer cannot resolve to a static string could be anything, including a drop -- neither the analyzer nor a reviewer can read what it would actually run, which is the weakest possible form of the REVIEW REQUIRED gate (D-07). This is the analyzer refusing to guess, not a rule that can be reasoned into REVIEW_REQUIRED: the load-time floor self-check (D07_FLOOR_FACTS) refuses to start if a rules file ever assigns this anything weaker than BLOCKED."
+    },
+    {
       "id": "empty-input",
       "category": "analyzer-integrity",
       "match": { "statementKind": "EmptyInput" },

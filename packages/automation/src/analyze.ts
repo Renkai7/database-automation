@@ -10,15 +10,25 @@ import { applySafeFormPairing, classifyFacts } from "./classifier/classify";
 import type { ClassificationOutcome } from "./classifier/classify";
 import type { RulesFile } from "./classifier/rules-schema";
 import { inspectStatement, parseTopLevel, type ParsedStatement } from "./inspector/inspect";
+import { inspectPlPgSqlBody, reconstructPlPgSqlStatement } from "./inspector/inspect-plpgsql";
 import type { AnalysisResult, Finding, StatementFacts } from "./types";
 import { EMPTY_FACTS, VERDICT_SEVERITY } from "./types";
 
-/** Builds a Finding from an outcome + facts pair -- shared between the ordinary per-statement
- * path and the synthetic empty-input finding below, so the two never drift apart in shape. */
-function buildFinding(statementIndex: number, facts: StatementFacts, outcome: ClassificationOutcome): Finding {
+/** Builds a Finding from a nestedPath + facts + outcome triple -- shared by the top-level path,
+ * D-05's recursive path, and the synthetic empty-input finding below, so all three never drift
+ * apart in shape. `nestedPath` is `[]` for every top-level (non-recursed) finding, and
+ * `[statementIndex, ...positions-within-body]` for a finding D-05's recursion produced -- "the
+ * enclosing statement index followed by its position within the body," per this plan's own
+ * wording. */
+function buildFinding(
+  statementIndex: number,
+  nestedPath: number[],
+  facts: StatementFacts,
+  outcome: ClassificationOutcome,
+): Finding {
   return {
     statementIndex,
-    nestedPath: [],
+    nestedPath,
     verdict: outcome.verdict,
     ruleIds: outcome.ruleIds,
     rationales: outcome.rationales,
@@ -31,14 +41,42 @@ function buildFinding(statementIndex: number, facts: StatementFacts, outcome: Cl
  * classified through the ordinary rule path against a single EmptyInput fact set. */
 function emptyInputFinding(rules: RulesFile): Finding {
   const facts: StatementFacts = { ...EMPTY_FACTS, statementKind: "EmptyInput" };
-  return buildFinding(0, facts, classifyFacts(facts, rules.rules));
+  return buildFinding(0, [], facts, classifyFacts(facts, rules.rules));
+}
+
+/** D-05: inspects and classifies one top-level statement, and -- when it is a DO block or
+ * function creation whose body is PL/pgSQL -- recurses into that body via inspectPlPgSqlBody,
+ * turning every fact set the recursion finds into its own Finding. The container statement
+ * always gets its own finding (facts from inspectStatement, nestedPath []) regardless of whether
+ * recursion happens at all; a container whose body could not be recursed into (see
+ * inspect-plpgsql.ts's KNOWN LIMITATION on non-plpgsql languages) still earns SAFE by its own
+ * container rule (do-block-container/create-function-container), it simply has no nested
+ * findings alongside it. */
+async function inspectAndClassifyStatement(
+  stmt: ParsedStatement,
+  statementIndex: number,
+  rules: RulesFile,
+): Promise<Finding[]> {
+  const facts = inspectStatement(stmt);
+  const containerFinding = buildFinding(statementIndex, [], facts, classifyFacts(facts, rules.rules));
+
+  const nestedContainer = reconstructPlPgSqlStatement(stmt);
+  if (!nestedContainer) {
+    return [containerFinding];
+  }
+
+  const nested = await inspectPlPgSqlBody(nestedContainer.sql, nestedContainer.sourceContext, 0);
+  const nestedFindings = nested.map((entry) =>
+    buildFinding(statementIndex, [statementIndex, ...entry.path], entry.facts, classifyFacts(entry.facts, rules.rules)),
+  );
+  return [containerFinding, ...nestedFindings];
 }
 
 /** D-10: deterministic finding order -- ascending statement index, then ascending nested path
  * compared element by element -- so output is byte-stable across runs and a diff of two reports
- * is meaningful. Nested findings (D-05's PL/pgSQL recursion, a later plan) are not produced by
- * this plan, but the comparator handles them correctly already: a shorter path sorts before a
- * longer one that shares the same prefix. */
+ * is meaningful. A container's own finding always has nestedPath [] and therefore always sorts
+ * before any nested finding D-05's recursion produced for the same statementIndex, since a
+ * shorter path sorts before a longer one that shares the same (empty) prefix. */
 function compareFindings(a: Finding, b: Finding): number {
   if (a.statementIndex !== b.statementIndex) {
     return a.statementIndex - b.statementIndex;
@@ -77,10 +115,11 @@ export async function analyzeSql(sql: string, rules: RulesFile): Promise<Analysi
   const rawFindings: Finding[] =
     statements.length === 0
       ? [emptyInputFinding(rules)]
-      : statements.map((stmt, statementIndex) => {
-          const facts = inspectStatement(stmt);
-          return buildFinding(statementIndex, facts, classifyFacts(facts, rules.rules));
-        });
+      : (
+          await Promise.all(
+            statements.map((stmt, statementIndex) => inspectAndClassifyStatement(stmt, statementIndex, rules)),
+          )
+        ).flat();
 
   // D-10: deterministic order first, so the D-09 pairing pass below sees statements in genuine
   // file order (its own "earlier"/"later" comparisons depend on it) -- then the same-file

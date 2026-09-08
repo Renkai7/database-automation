@@ -6,11 +6,16 @@
 // so a test can import parseTopLevel/inspectStatement directly and exercise both the passing
 // and the failing direction without standing up anything.
 //
-// Scope: every StatementKind the FEATURES.md section 1 catalogue needs except DoBlock,
-// CreateFunction and ExecuteDynamic, which plan 03-04 owns (D-05's PL/pgSQL recursion). A
-// statement kind the inspector does not recognise -- or an AlterTableStmt subcommand/constraint
-// type outside this catalogue -- resolves to "Unrecognized", which D-06 already sends to
-// REVIEW REQUIRED via the ordinary no-match path. That is not a gap; it is D-06 working.
+// Scope: every StatementKind the FEATURES.md section 1 catalogue needs, including DoBlock and
+// CreateFunction (plan 03-04's D-05 PL/pgSQL recursion owns what happens INSIDE those bodies --
+// see src/inspector/inspect-plpgsql.ts -- but inspectStatement itself recognises the container
+// node whether it is encountered at the top level or, recursively, nested inside another body).
+// ExecuteDynamic is never produced here: a dynamic EXECUTE only exists inside a PL/pgSQL body,
+// which this module never parses (parseTopLevel handles ordinary top-level SQL only) --
+// inspect-plpgsql.ts's own traversal is where that fact set is synthesised. A statement kind the
+// inspector does not recognise -- or an AlterTableStmt subcommand/constraint type outside this
+// catalogue -- resolves to "Unrecognized", which D-06 already sends to REVIEW REQUIRED via the
+// ordinary no-match path. That is not a gap; it is D-06 working.
 //
 // KNOWN LIMITATION, recorded rather than silently assumed away (CLAUDE.md: "mark unverified
 // things UNKNOWN"): an ALTER TABLE statement with more than one subcommand (e.g.
@@ -369,10 +374,14 @@ function inspectAlterEnumStmt(_alterEnumStmt: Record<string, unknown>): Statemen
  * top-level node-type key and delegating to a per-statement-type function that spreads
  * EMPTY_FACTS and overrides only what that node actually carries, so every field the classifier
  * might match on is always present. Every StatementKind the FEATURES.md section 1 catalogue
- * needs is covered here except DoBlock, CreateFunction and ExecuteDynamic (plan 03-04's D-05
- * recursion). A statement kind, an AlterTableCmd subtype, or a constraint type this function
- * does not recognise resolves to statementKind "Unrecognized", which D-06 already sends to
- * REVIEW REQUIRED via the ordinary no-match path -- that is not a gap, it is D-06 working.
+ * needs is covered here, including DoBlock and CreateFunction -- a DO block or function creation
+ * always earns its OWN container fact set here, whether this function is called on a top-level
+ * statement (analyze.ts) or, recursively, on a statement re-parsed out of another body's
+ * embedded SQL text (inspect-plpgsql.ts). What is INSIDE that body is a separate concern D-05's
+ * recursion owns, not this function's. A statement kind, an AlterTableCmd subtype, or a
+ * constraint type this function does not recognise resolves to statementKind "Unrecognized",
+ * which D-06 already sends to REVIEW REQUIRED via the ordinary no-match path -- that is not a
+ * gap, it is D-06 working.
  */
 export function inspectStatement(stmt: ParsedStatement): StatementFacts {
   if ("DropStmt" in stmt) {
@@ -407,6 +416,18 @@ export function inspectStatement(stmt: ParsedStatement): StatementFacts {
   }
   if ("AlterEnumStmt" in stmt) {
     return inspectAlterEnumStmt(stmt.AlterEnumStmt as Record<string, unknown>);
+  }
+  // D-05 (plan 03-04): the container statement's own fact set. No schema/table/column -- a DO
+  // block and a function creation are not scoped to a single relation the way every other
+  // statement kind here is. Whether this container's body gets recursed into at all (and what
+  // happens to the findings if it does) is analyze.ts's/inspect-plpgsql.ts's job, not this
+  // function's -- inspectStatement only ever answers "what statement is this," never "what does
+  // its body contain."
+  if ("DoStmt" in stmt) {
+    return { ...EMPTY_FACTS, statementKind: "DoBlock" };
+  }
+  if ("CreateFunctionStmt" in stmt) {
+    return { ...EMPTY_FACTS, statementKind: "CreateFunction" };
   }
 
   return { ...EMPTY_FACTS, statementKind: "Unrecognized" };
