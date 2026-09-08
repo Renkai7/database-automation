@@ -82,7 +82,7 @@
 
 The recipe app is a thin test fixture. These requirements exist to exercise the pipeline, not to build a product.
 
-- [ ] **APP-01**: A minimal recipe schema exists and the application boots against it
+- [x] **APP-01**: A minimal recipe schema exists and the application boots against it
 - [ ] **APP-02**: The schema evolves through a sequence of real changes that exercise the SAFE, REVIEW REQUIRED, and BLOCKED paths
 - [ ] **APP-03**: At least one expand-and-contract change is carried out across multiple releases rather than as a single destructive migration
 
@@ -141,9 +141,11 @@ Acknowledged and deliberately deferred. Not in the current roadmap.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-07 after 01-08 gap-closure work — the two Phase 1 traceability rows now
-carry one identical status ("Gap closure done — awaiting re-verification") instead of
-contradicting each other; no requirement checkbox above was ticked, since that status names
-work pending re-verification, not verified completion. Previously updated 2026-09-06 after
-roadmap revision (Phase 1 split into Phase 1 + Phase 2; downstream phases renumbered 3-7; 100%
-coverage preserved).*
+*Last updated: 2026-09-08 — APP-01's checkbox above was ticked to agree with the completion
+status its traceability row already carried, on the evidence of the 2026-09-07 Phase 1
+re-verification pass recorded in `01-VERIFICATION.md` (corroborated by `01-02-SUMMARY.md` and
+`01-05-SUMMARY.md`, both of which already list APP-01 as completed). No other checkbox above
+was ticked, and no traceability status prose was altered. Previously updated 2026-09-07 after
+01-08 gap-closure work, which made the two Phase 1 traceability rows agree with each other
+instead of contradicting; and 2026-09-06 after the roadmap revision that split Phase 1 into
+Phase 1 + Phase 2 and left downstream phases renumbered 3-7.*
