@@ -87,8 +87,8 @@ describe("tests/history/partial-failure-recovery.test.ts — criterion 4 / RUN-0
 
     concurrentMigration = {
       tag: "9999_partial_failure_index",
-      idx: journal.length,
-      when: newestWhen + 1,
+      idx: journal.length + 1,
+      when: newestWhen + 2,
       path: "in-memory://9999_partial_failure_index.sql",
       sql: `CREATE UNIQUE INDEX CONCURRENTLY ${INVALID_INDEX_NAME} ON steps (recipe_id);`,
     };
@@ -98,6 +98,51 @@ describe("tests/history/partial-failure-recovery.test.ts — criterion 4 / RUN-0
     await client.end();
     await container.stop();
   });
+
+  it(
+    "must-have truth 6: a wrapped failure is self-cleaning -- it leaves no marker and does not block the next run",
+    async () => {
+      // An ordinary (non-transaction-hostile) statement that genuinely fails at execution --
+      // `slug` already exists on `recipes`, so this ADD COLUMN fails for a real reason and runs
+      // WRAPPED (BEGIN/ROLLBACK), never through the unwrapped/marker path at all. Runs BEFORE
+      // Case A on purpose: Case A leaves a genuine unresolved marker that would block every
+      // later run, so this proof must happen while the table is still marker-free.
+      const wrappedFailureMigration: MigrationFile = {
+        tag: "9999_wrapped_failure_self_cleaning",
+        idx: journal.length,
+        when: newestWhen + 1,
+        path: "in-memory://9999_wrapped_failure_self_cleaning.sql",
+        sql: "ALTER TABLE recipes ADD COLUMN slug text;",
+      };
+
+      let caught: unknown;
+      try {
+        await runMigrations(client, { migrations: [wrappedFailureMigration], rules });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(MigrationRefusedError);
+      expect((caught as MigrationRefusedError).code).toBe(RUNNER_EXIT_CODES.EXECUTION_FAILED);
+
+      const { rows: failedRunRows } = await client.query<{ state: string; wrapped: boolean }>(
+        "SELECT state, wrapped FROM runner.migration_runs WHERE migration_tag = $1 " +
+          "ORDER BY id DESC LIMIT 1",
+        [wrappedFailureMigration.tag],
+      );
+      expect(failedRunRows).toHaveLength(1);
+      expect(failedRunRows[0].state).toBe("failed");
+      expect(failedRunRows[0].wrapped).toBe(true);
+
+      // The wrapped failure's own row never matches readUnresolvedMarkers' filter
+      // (state='failed' AND wrapped=false) -- proven directly, not inferred.
+      const unresolvedAfterWrappedFailure = await readUnresolvedMarkers(client);
+      expect(unresolvedAfterWrappedFailure).toHaveLength(0);
+
+      // And the next run genuinely proceeds -- not merely "would proceed in theory".
+      await expect(runMigrations(client, { migrations: journal, rules })).resolves.toBeDefined();
+    },
+    180000,
+  );
 
   it(
     "Case A: a genuine mid-migration failure leaves a failed, unresolved marker and an INVALID index -- no ledger row",
@@ -263,8 +308,8 @@ describe("tests/history/partial-failure-recovery.test.ts — criterion 4 / RUN-0
 
       const freshMigration: MigrationFile = {
         tag: "9999_partial_failure_followup",
-        idx: journal.length + 1,
-        when: newestWhen + 2,
+        idx: journal.length + 2,
+        when: newestWhen + 3,
         path: "in-memory://9999_partial_failure_followup.sql",
         sql: "ALTER TABLE recipes ADD COLUMN partial_failure_probe text;",
       };
