@@ -210,6 +210,33 @@ describe("D-14: adversarial fixtures ship as matched pairs, and the manifest enf
   });
 });
 
+// ANLZ-07: the repository's two genuine Drizzle-generated migrations, referenced at their own
+// repository paths rather than copied into the corpus directory (03-CONTEXT.md D-13) -- a copy
+// drifts the moment the real file changes, and the whole value of having genuine ORM-generated
+// SQL in the corpus is that it is the same bytes the runner would execute.
+const REAL_MIGRATION_PATHS = [
+  "apps/recipe-app/drizzle/0000_bumpy_khan.sql",
+  "apps/recipe-app/drizzle/0001_busy_thunderbolt.sql",
+];
+
+describe("real-migration group: the repository's two genuine Drizzle migrations are referenced in place (ANLZ-07)", () => {
+  it("the manifest's real-migration group references exactly the two real Drizzle migrations, at their own repository paths", () => {
+    const realMigrationFiles = manifest.entries
+      .filter((entry) => entry.group === "real-migration")
+      .map((entry) => entry.file)
+      .sort();
+    expect(realMigrationFiles).toEqual([...REAL_MIGRATION_PATHS].sort());
+  });
+
+  it("no copy of either real migration exists under the corpus directory itself", () => {
+    const onDisk = findAllSqlFiles(CORPUS_DIR);
+    const copies = onDisk.filter(
+      (file) => file.endsWith("/0000_bumpy_khan.sql") || file.endsWith("/0001_busy_thunderbolt.sql"),
+    );
+    expect(copies, `Copies of a real migration found under the corpus directory: ${copies.join(", ")}`).toEqual([]);
+  });
+});
+
 describe("rule coverage: every shipped catalogue rule id is exercised by at least one fixture", () => {
   it("every RULE_COVERAGE_EXCEPTIONS entry is a real rule id in the shipped catalogue", () => {
     const realRuleIds = new Set(rules.rules.map((rule) => rule.id));
