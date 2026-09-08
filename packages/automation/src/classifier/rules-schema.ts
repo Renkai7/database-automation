@@ -14,11 +14,27 @@ import { RulesFileError } from "../types";
  * no computed conditions. A fact value is therefore a string, a boolean, `null` (equality
  * against an absent value, e.g. `usingIndexName: null` for "no index attached" -- 03-02-PLAN.md
  * task 2's add-unique-constraint rule), or an array of string/boolean (set membership), never a
- * function or a nested object. */
-const FactMatchSchema = z.record(
-  z.string(),
-  z.union([z.string(), z.boolean(), z.null(), z.array(z.union([z.string(), z.boolean()]))]),
-);
+ * function or a nested object.
+ *
+ * CR-01 fix (03-REVIEW.md): `ruleMatches` (classify.ts) implements "every entry in `match`
+ * holds" as `Object.entries(rule.match).every(...)`, and `Array.prototype.every` on an empty
+ * array is vacuously `true` -- so a rule whose `match` is `{}` matched EVERY StatementFacts
+ * value unconditionally, silently granting blanket SAFE to any statement kind the catalogue has
+ * no other opinion on and defeating D-06's "SAFE must be earned" default without ever touching
+ * a D-02/D-07 floor rule (the floor's own named operations stay protected because their own
+ * specific BLOCKED rules still match and worst-verdict-wins over the catch-all's SAFE -- this is
+ * a broader, quieter weakening than a floor breach). The `.refine` below rejects an empty match
+ * object at schema-validation time (RulesFileError, D-03's "fails schema validation loudly"),
+ * before the rule can ever reach classifyFacts. */
+const FactMatchSchema = z
+  .record(
+    z.string(),
+    z.union([z.string(), z.boolean(), z.null(), z.array(z.union([z.string(), z.boolean()]))]),
+  )
+  .refine((match) => Object.keys(match).length > 0, {
+    message:
+      "a rule's match object must reference at least one fact -- an empty match object matches every statement unconditionally, silently granting blanket SAFE",
+  });
 
 /** D-04: rename/compatibility rules are their own category, distinct from the lock-hazard
  * rules -- this is a load-bearing distinction for Phase 5's PR rendering, not decoration. */

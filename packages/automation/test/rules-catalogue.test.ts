@@ -4,7 +4,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { loadRules } from "../src/classifier/classify";
 import { parseRulesFile, type Rule } from "../src/classifier/rules-schema";
+import { RulesFileError } from "../src/types";
 
 const RULES_PATH = fileURLToPath(new URL("../src/rules/rules.json", import.meta.url));
 
@@ -217,5 +219,73 @@ describe("rules catalogue (03-02-PLAN.md task 2, ANLZ-03/D-04)", () => {
     const rulesFile = parseRulesFile(loadRawRulesFile());
     const rule = rulesFile.rules.find((r) => r.id === "add-unique-constraint");
     expect(rule?.match.usingIndexName).toBeNull();
+  });
+});
+
+// CR-01 (03-REVIEW.md): a rule whose `match` object has no conditions at all
+// (`ruleMatches`'s `Object.entries(rule.match).every(...)` is vacuously true for zero
+// conditions) previously matched EVERY StatementFacts value, including every statement kind
+// the catalogue has no other opinion on -- silently granting blanket SAFE and defeating D-06's
+// "SAFE must be earned" default without ever touching a D-02/D-07 floor rule. Regression test
+// for the exact reproduction: a "blanket-catch-all" rule with `match: {}` appended to the real
+// shipped rules file must be REJECTED at load time with a clear error, never silently accepted.
+describe("CR-01: an empty match object is rejected at load time, never silently accepted", () => {
+  it("parseRulesFile throws on a rule whose match object is {}", () => {
+    const raw = {
+      version: 1,
+      rules: [
+        {
+          id: "blanket-catch-all",
+          category: "usually-safe",
+          match: {},
+          verdict: "SAFE",
+          rationale: "An empty match object -- must be rejected, never silently accepted.",
+        },
+      ],
+    };
+
+    expect(() => parseRulesFile(raw)).toThrow();
+    try {
+      parseRulesFile(raw);
+      expect.unreachable("expected parseRulesFile to throw for an empty match object");
+    } catch (error) {
+      expect((error as Error).message.toLowerCase()).toMatch(/match/);
+    }
+  });
+
+  it("appending a blanket-catch-all rule (match: {}) to the real shipped rules file is rejected by loadRules, and never silently reaches classifyFacts", () => {
+    const raw = loadRawRulesFile() as { version: number; rules: unknown[]; notes?: string };
+    const weakened = {
+      ...raw,
+      rules: [
+        ...raw.rules,
+        {
+          id: "blanket-catch-all",
+          category: "usually-safe",
+          match: {},
+          verdict: "SAFE",
+          rationale: "An empty match object should never be accepted by the rules schema.",
+        },
+      ],
+    };
+
+    expect(() => loadRules(weakened)).toThrow(RulesFileError);
+  });
+
+  it("a match object with at least one condition is still accepted (the fix rejects only the empty case)", () => {
+    const raw = {
+      version: 1,
+      rules: [
+        {
+          id: "narrow-rule",
+          category: "usually-safe",
+          match: { statementKind: "CommentOn" },
+          verdict: "SAFE",
+          rationale: "A rule with a real condition must still be accepted after the CR-01 fix.",
+        },
+      ],
+    };
+
+    expect(() => parseRulesFile(raw)).not.toThrow();
   });
 });
