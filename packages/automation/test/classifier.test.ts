@@ -65,3 +65,17 @@ describe("file-level verdict and completeness (03-02-PLAN.md task 3, D-10)", () 
     expect(result.findings[1].verdict).toBe("REVIEW_REQUIRED");
   });
 });
+
+describe("plan-level verification: the Pitfall 1 correction holds end to end through rules.json", () => {
+  it("a now() default is SAFE and a clock_timestamp() default is REVIEW_REQUIRED, asserted in one test", async () => {
+    const rules = loadDefaultRules();
+
+    const nowResult = await analyzeSql("ALTER TABLE t ADD COLUMN c timestamptz DEFAULT now();", rules);
+    const clockResult = await analyzeSql("ALTER TABLE t ADD COLUMN c timestamptz DEFAULT clock_timestamp();", rules);
+
+    expect(nowResult.verdict).toBe("SAFE");
+    expect(nowResult.findings[0].ruleIds).toContain("add-column-nonvolatile-default");
+    expect(clockResult.verdict).toBe("REVIEW_REQUIRED");
+    expect(clockResult.findings[0].ruleIds).toContain("add-column-volatile-default");
+  });
+});
