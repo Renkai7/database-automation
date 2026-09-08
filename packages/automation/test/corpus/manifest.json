@@ -4,126 +4,162 @@
       "file": "packages/automation/test/corpus/blocked/drop-table.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["drop-table"],
+      "expectedRuleIds": [
+        "drop-table"
+      ],
       "why": "DROP TABLE permanently destroys the table and every row it holds -- the floor operation D-02 protects, and the first fixture the corpus manifest schema and harness are built against."
     },
     {
       "file": "packages/automation/test/corpus/blocked/drop-schema.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["drop-schema"],
+      "expectedRuleIds": [
+        "drop-schema"
+      ],
       "why": "DROP SCHEMA permanently destroys every object inside the schema, including all of its tables and their data."
     },
     {
       "file": "packages/automation/test/corpus/blocked/drop-database.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["drop-database"],
+      "expectedRuleIds": [
+        "drop-database"
+      ],
       "why": "DROP DATABASE permanently destroys the entire database, every schema and table in it."
     },
     {
       "file": "packages/automation/test/corpus/blocked/truncate.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["truncate"],
+      "expectedRuleIds": [
+        "truncate"
+      ],
       "why": "TRUNCATE removes every row from a table in a single unrecoverable operation, bypassing per-row triggers and any WHERE-based scoping."
     },
     {
       "file": "packages/automation/test/corpus/blocked/drop-column.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["drop-column"],
+      "expectedRuleIds": [
+        "drop-column"
+      ],
       "why": "DROP COLUMN permanently destroys every value stored in that column across every row."
     },
     {
       "file": "packages/automation/test/corpus/blocked/delete-without-where.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["delete-without-where"],
+      "expectedRuleIds": [
+        "delete-without-where"
+      ],
       "why": "A DELETE with no WHERE clause removes every row in the table, which is almost never the intended scope of a migration."
     },
     {
       "file": "packages/automation/test/corpus/blocked/update-without-where.sql",
       "group": "catalogue",
       "expectedVerdict": "BLOCKED",
-      "expectedRuleIds": ["update-without-where"],
+      "expectedRuleIds": [
+        "update-without-where"
+      ],
       "why": "An UPDATE with no WHERE clause overwrites every row in the table, which is almost never the intended scope of a migration."
     },
     {
       "file": "packages/automation/test/corpus/review-required/set-not-null.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["set-not-null"],
+      "expectedRuleIds": [
+        "set-not-null"
+      ],
       "why": "SET NOT NULL on an existing column forces a full table scan under ACCESS EXCLUSIVE -- the canonical lock-hazard REVIEW REQUIRED case."
     },
     {
       "file": "packages/automation/test/corpus/review-required/add-column-volatile-default.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["add-column-volatile-default"],
+      "expectedRuleIds": [
+        "add-column-volatile-default"
+      ],
       "why": "clock_timestamp() is genuinely volatile -- a different value on every call -- so PostgreSQL cannot store it as a single metadata entry and must rewrite the whole table."
     },
     {
       "file": "packages/automation/test/corpus/review-required/alter-column-type.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["alter-column-type"],
+      "expectedRuleIds": [
+        "alter-column-type"
+      ],
       "why": "ALTER COLUMN TYPE always takes ACCESS EXCLUSIVE, and this analyzer has no database connection to tell a safe widening from a lossy narrowing, so the question goes to a human."
     },
     {
       "file": "packages/automation/test/corpus/review-required/add-unique-constraint.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["add-unique-constraint"],
+      "expectedRuleIds": [
+        "add-unique-constraint"
+      ],
       "why": "Adding a UNIQUE constraint without USING INDEX builds its backing index while holding ACCESS EXCLUSIVE for the entire build, blocking reads and writes."
     },
     {
       "file": "packages/automation/test/corpus/review-required/create-index-not-concurrently.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["create-index-not-concurrently"],
+      "expectedRuleIds": [
+        "create-index-not-concurrently"
+      ],
       "why": "Building an index without CONCURRENTLY takes a SHARE lock on the table for the whole build, blocking every INSERT, UPDATE and DELETE until it finishes."
     },
     {
       "file": "packages/automation/test/corpus/review-required/drop-index-not-concurrently.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["drop-index-not-concurrently"],
+      "expectedRuleIds": [
+        "drop-index-not-concurrently"
+      ],
       "why": "Dropping an index without CONCURRENTLY takes ACCESS EXCLUSIVE on the table for the drop, which can queue behind and then block every other lock request on it."
     },
     {
       "file": "packages/automation/test/corpus/review-required/add-foreign-key-validated.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["add-foreign-key-validated"],
+      "expectedRuleIds": [
+        "add-foreign-key-validated"
+      ],
       "why": "A plainly added foreign key scans and locks both the altering table and the referenced table while validating every existing row, unlike the NOT VALID plus VALIDATE CONSTRAINT two-step form."
     },
     {
       "file": "packages/automation/test/corpus/review-required/rename-column.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["rename-column"],
+      "expectedRuleIds": [
+        "rename-column"
+      ],
       "why": "Renaming a column is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
     },
     {
       "file": "packages/automation/test/corpus/review-required/rename-table.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["rename-table"],
+      "expectedRuleIds": [
+        "rename-table"
+      ],
       "why": "Renaming a table is an instant metadata change with no lock hazard, but any application code still referencing the old name breaks immediately during a rolling deploy's compatibility window."
     },
     {
       "file": "packages/automation/test/corpus/review-required/drop-not-null.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["drop-not-null"],
+      "expectedRuleIds": [
+        "drop-not-null"
+      ],
       "why": "Dropping a NOT NULL constraint is metadata-only with no lock hazard, but it silently changes what application code can rely on being present."
     },
     {
       "file": "packages/automation/test/corpus/review-required/drop-constraint.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["drop-constraint"],
+      "expectedRuleIds": [
+        "drop-constraint"
+      ],
       "why": "Dropping a constraint is metadata-only with no lock hazard, but whether any application code depends on the guarantee it enforced is an application-level fact this analyzer cannot verify."
     },
     {
@@ -144,84 +180,111 @@
       "file": "packages/automation/test/corpus/safe/create-table.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["create-table"],
+      "expectedRuleIds": [
+        "create-table"
+      ],
       "why": "Creating a brand new table has no existing rows to lock, scan or rewrite and no application code can yet depend on it -- the simplest SAFE case."
     },
     {
       "file": "packages/automation/test/corpus/safe/add-column-nullable-no-default.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-column-nullable-no-default"],
+      "expectedRuleIds": [
+        "add-column-nullable-no-default"
+      ],
       "why": "Adding a nullable column with no default is a metadata-only change that requires no table rewrite and no scan of existing rows."
     },
     {
       "file": "packages/automation/test/corpus/safe/add-column-literal-default.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-column-nonvolatile-default"],
+      "expectedRuleIds": [
+        "add-column-nonvolatile-default"
+      ],
       "why": "A literal default is evaluated once and stored in the table's own metadata, so PostgreSQL's fast add-column path applies and no rewrite is required."
     },
     {
       "file": "packages/automation/test/corpus/safe/add-column-now-default.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-column-nonvolatile-default"],
+      "expectedRuleIds": [
+        "add-column-nonvolatile-default"
+      ],
       "why": "now() is catalogued STABLE, not VOLATILE (03-RESEARCH.md's Pitfall 1 correction) -- it is evaluated once at ALTER TABLE time and stored in metadata exactly like a literal, so PostgreSQL's fast add-column path applies. Expecting REVIEW_REQUIRED here would be a false positive on a genuinely safe migration, the exact review-fatigue anti-pattern this catalogue exists to avoid; its counterpart (a clock_timestamp() default, review-required/add-column-volatile-default.sql) is genuinely VOLATILE and correctly expects REVIEW_REQUIRED -- the two fixtures together make the STABLE-vs-VOLATILE distinction visible in the corpus, not only in a unit test."
     },
     {
       "file": "packages/automation/test/corpus/safe/create-index-concurrently.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["create-index-concurrently"],
+      "expectedRuleIds": [
+        "create-index-concurrently"
+      ],
       "why": "CREATE INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire build."
     },
     {
       "file": "packages/automation/test/corpus/safe/drop-index-concurrently.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["drop-index-concurrently"],
+      "expectedRuleIds": [
+        "drop-index-concurrently"
+      ],
       "why": "DROP INDEX CONCURRENTLY takes only SHARE UPDATE EXCLUSIVE, letting concurrent reads and writes continue for almost the entire drop."
     },
     {
       "file": "packages/automation/test/corpus/safe/comment-on.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["comment-on"],
+      "expectedRuleIds": [
+        "comment-on"
+      ],
       "why": "COMMENT ON only updates catalog metadata text, taking no meaningful lock and touching no row in the table it describes."
     },
     {
       "file": "packages/automation/test/corpus/safe/add-check-constraint-not-valid.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-check-constraint-not-valid"],
+      "expectedRuleIds": [
+        "add-check-constraint-not-valid"
+      ],
       "why": "A check constraint added NOT VALID is instant and enforces only on new or changed rows, deferring the table scan to a separate, weaker-locked VALIDATE CONSTRAINT step."
     },
     {
       "file": "packages/automation/test/corpus/safe/add-foreign-key-not-valid.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-foreign-key-not-valid"],
+      "expectedRuleIds": [
+        "add-foreign-key-not-valid"
+      ],
       "why": "A foreign key added NOT VALID is instant and enforces only on new or changed rows, deferring the scan of both tables to a separate, weaker-locked VALIDATE CONSTRAINT step."
     },
     {
       "file": "packages/automation/test/corpus/safe/validate-constraint.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["validate-constraint"],
+      "expectedRuleIds": [
+        "validate-constraint"
+      ],
       "why": "VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE on the altered table, letting concurrent reads and writes continue while it scans for constraint violations -- true on its own regardless of what statement (if any) preceded it in the same file."
     },
     {
       "file": "packages/automation/test/corpus/safe/pairing-not-valid-then-validate.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["add-check-constraint-not-valid", "pair-not-valid-validated", "validate-constraint"],
+      "expectedRuleIds": [
+        "add-check-constraint-not-valid",
+        "pair-not-valid-validated",
+        "validate-constraint"
+      ],
       "why": "The complete two-step safe form for adding a validated constraint without a table-scanning lock: a check constraint added NOT VALID, then validated by its own VALIDATE CONSTRAINT naming the exact same constraint on the exact same table in this same file -- the applySafeFormPairing pass adds pair-not-valid-validated to both statements' findings alongside each half's own already-SAFE rule id."
     },
     {
       "file": "packages/automation/test/corpus/safe/pairing-concurrent-index-then-unique.sql",
       "group": "catalogue",
       "expectedVerdict": "SAFE",
-      "expectedRuleIds": ["create-index-concurrently", "pair-concurrent-index-unique"],
+      "expectedRuleIds": [
+        "create-index-concurrently",
+        "pair-concurrent-index-unique"
+      ],
       "why": "The complete two-step safe form for adding a unique constraint without blocking writes during the index build: an index built CONCURRENTLY, then attached via ADD CONSTRAINT ... UNIQUE USING INDEX naming that exact index -- without the pairing, the second statement would be an unmatched D-06 REVIEW_REQUIRED (no ordinary rule matches AddUniqueConstraint with a non-null usingIndexName), so pair-concurrent-index-unique is the only thing that resolves it to SAFE."
     },
     {
@@ -241,8 +304,121 @@
       "file": "packages/automation/test/corpus/safe/near-miss-index-name-mismatch.sql",
       "group": "catalogue",
       "expectedVerdict": "REVIEW_REQUIRED",
-      "expectedRuleIds": ["create-index-concurrently"],
+      "expectedRuleIds": [
+        "create-index-concurrently"
+      ],
       "why": "Near-miss control proving the pairing match is exact name equality, never a fuzzy or approximate match: an index built CONCURRENTLY as orders_customer_id_idx, paired against a unique constraint whose USING INDEX names a DIFFERENT index (orders_other_idx) -- one character or one whole word different is still a different index, not a typo to forgive, so pair-concurrent-index-unique never fires and the constraint statement falls through to D-06's unmatched REVIEW_REQUIRED. (The literal 'unvalidated-then-validate pair with a mismatched constraint name' shape the plan text originally described does NOT produce this outcome under the real analyzer -- see 03-05-SUMMARY.md's Deviations section for why this shape was substituted.)"
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/inline-comment-drop.sql",
+      "group": "adversarial",
+      "pairId": "inline-comment",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "drop-table"
+      ],
+      "why": "D-14/PITFALLS.md C1: a block comment sits between the DROP TABLE keyword and the table name, inside the statement itself -- the statement still executes exactly as written. A line-oriented text scan that treats anything after -- or between /* */ as inert would miss this; the real parser strips the comment and sees a genuine DropTable node regardless."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/inline-comment-inert.sql",
+      "group": "adversarial",
+      "pairId": "inline-comment",
+      "half": "inert-text-only",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "add-column-nullable-no-default"
+      ],
+      "why": "D-14's false-positive half, the one PITFALLS.md C2 warns rots first: a leading line comment mentions dropping the table in prose, but the actual statement is an ordinary nullable ADD COLUMN. A regex matching 'drop' in a comment would flag this; the real parser only sees the SQL statement, never the comment text."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/dollar-quoted-string-drop.sql",
+      "group": "adversarial",
+      "pairId": "dollar-quoted-string",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "create-function-container",
+        "drop-table"
+      ],
+      "why": "D-14/PITFALLS.md C1: the real drop lives inside a dollar-quoted function body using a custom tag ($migration_body$, not the default $$) -- proving the recursion (D-05) re-parses the body regardless of which dollar tag was used to quote it, and the container itself still earns its own SAFE finding (bodyInspected true) alongside the nested BLOCKED one (D-10: complete findings list, worst verdict wins)."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/dollar-quoted-string-inert.sql",
+      "group": "adversarial",
+      "pairId": "dollar-quoted-string",
+      "half": "inert-text-only",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [],
+      "why": "D-14's false-positive half: the words DROP TABLE orders appear only as DATA -- a dollar-quoted string literal (custom tag $evasion_tag$, proving tagged quoting specifically) being inserted as an ordinary column value. INSERT has no StatementKind in this catalogue at all (D-04 never included it, same limitation 03-04/03-05 already documented), so this resolves REVIEW_REQUIRED via D-06's unmatched-statement default -- never BLOCKED, and no drop rule id anywhere in its findings."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/do-block-drop.sql",
+      "group": "adversarial",
+      "pairId": "do-block",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "do-block-container",
+        "drop-table"
+      ],
+      "why": "D-14/PITFALLS.md C1: the drop is guarded by real control flow (an IF around it, deciding at runtime whether to run), not sitting at the top of the body -- extractEmbeddedSql's deep generic tree walk (not a named-construct allowlist) finds it regardless of which branch it is nested inside, exactly the standard PITFALLS.md C1's IF-guarded-DROP example demands."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/do-block-inert.sql",
+      "group": "adversarial",
+      "pairId": "do-block",
+      "half": "inert-text-only",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "do-block-container"
+      ],
+      "why": "D-14's false-positive half: the body only raises a NOTICE whose message text mentions not dropping the table -- RAISE is not PLpgSQL_stmt_execsql/dynexecute, so extractEmbeddedSql's walk finds no embedded SQL at all, and the container earns its own SAFE finding (bodyInspected true) with no nested finding and no drop rule id."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/function-body-drop.sql",
+      "group": "adversarial",
+      "pairId": "function-body",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "create-function-container",
+        "drop-table"
+      ],
+      "why": "D-14/PITFALLS.md C1's 'CREATE OR REPLACE FUNCTION bodies' bullet: a LANGUAGE sql function whose body is a single-quoted (not dollar-quoted) string containing a real DROP TABLE -- the post-03-04 gap-closure fix's own LANGUAGE sql re-parse path (planContainerBody's sql-text branch, never parsePlPgSQL) catches it exactly like the plpgsql case, proving the evasion fails regardless of which quoting style hides the body."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/function-body-inert.sql",
+      "group": "adversarial",
+      "pairId": "function-body",
+      "half": "inert-text-only",
+      "expectedVerdict": "REVIEW_REQUIRED",
+      "expectedRuleIds": [
+        "create-function-container"
+      ],
+      "why": "D-14's false-positive half: a LANGUAGE sql function whose body only returns a string constant mentioning dropping the table, never an executable drop. The container earns its own SAFE finding (bodyInspected true), but the body's own SELECT statement has no StatementKind in this catalogue (SELECT was never in D-04's scope), so the nested finding is REVIEW_REQUIRED via D-06's unmatched default -- worst-verdict-wins makes the file REVIEW_REQUIRED, never BLOCKED, and no drop rule id anywhere."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/quoted-identifier-drop.sql",
+      "group": "adversarial",
+      "pairId": "quoted-identifier",
+      "half": "hidden-executable",
+      "expectedVerdict": "BLOCKED",
+      "expectedRuleIds": [
+        "drop-table"
+      ],
+      "why": "D-14/PITFALLS.md C1: the table being dropped is literally named \"table\" (a double-quoted identifier colliding with a SQL keyword) -- proving that quoting an identifier to look unusual does not change what statement it is: this is still a genuine DropStmt node, and drop-table matches on statementKind alone, never on the literal text of the name."
+    },
+    {
+      "file": "packages/automation/test/corpus/adversarial/quoted-identifier-inert.sql",
+      "group": "adversarial",
+      "pairId": "quoted-identifier",
+      "half": "inert-text-only",
+      "expectedVerdict": "SAFE",
+      "expectedRuleIds": [
+        "create-table"
+      ],
+      "why": "D-14's false-positive half: a table is CREATED whose quoted name is itself the phrase \"drop table\" -- proving an identifier that reads like an entire dangerous statement is not treated as one. This is a genuine CreateStmt node classified SAFE by create-table; nothing about the identifier's text is ever inspected."
     }
   ]
 }
