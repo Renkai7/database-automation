@@ -6,7 +6,7 @@
 // in this module that touches the filesystem, so analyzeSql itself stays pure.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { classifyFacts, loadRules } from "./classifier/classify";
+import { applySafeFormPairing, classifyFacts, loadRules } from "./classifier/classify";
 import type { ClassificationOutcome } from "./classifier/classify";
 import type { RulesFile } from "./classifier/rules-schema";
 import { inspectStatement, parseTopLevel, type ParsedStatement } from "./inspector/inspect";
@@ -34,6 +34,24 @@ function emptyInputFinding(rules: RulesFile): Finding {
   return buildFinding(0, facts, classifyFacts(facts, rules.rules));
 }
 
+/** D-10: deterministic finding order -- ascending statement index, then ascending nested path
+ * compared element by element -- so output is byte-stable across runs and a diff of two reports
+ * is meaningful. Nested findings (D-05's PL/pgSQL recursion, a later plan) are not produced by
+ * this plan, but the comparator handles them correctly already: a shorter path sorts before a
+ * longer one that shares the same prefix. */
+function compareFindings(a: Finding, b: Finding): number {
+  if (a.statementIndex !== b.statementIndex) {
+    return a.statementIndex - b.statementIndex;
+  }
+  const length = Math.min(a.nestedPath.length, b.nestedPath.length);
+  for (let i = 0; i < length; i++) {
+    if (a.nestedPath[i] !== b.nestedPath[i]) {
+      return a.nestedPath[i] - b.nestedPath[i];
+    }
+  }
+  return a.nestedPath.length - b.nestedPath.length;
+}
+
 /**
  * Parses `sql`, reduces every top-level statement to facts, classifies each one, and assembles
  * the complete AnalysisResult. D-10: the file verdict is the most severe finding verdict, and
@@ -56,13 +74,21 @@ export async function analyzeSql(sql: string, rules: RulesFile): Promise<Analysi
   // call SAFE. Synthesise one EmptyInput fact set and run it through the ordinary rule path
   // (rules.json's `empty-input` rule, category analyzer-integrity) so the REVIEW_REQUIRED
   // outcome is produced by data, not a special case in the classifier itself.
-  const findings: Finding[] =
+  const rawFindings: Finding[] =
     statements.length === 0
       ? [emptyInputFinding(rules)]
       : statements.map((stmt, statementIndex) => {
           const facts = inspectStatement(stmt);
           return buildFinding(statementIndex, facts, classifyFacts(facts, rules.rules));
         });
+
+  // D-10: deterministic order first, so the D-09 pairing pass below sees statements in genuine
+  // file order (its own "earlier"/"later" comparisons depend on it) -- then the same-file
+  // safe-form pairing pass, which can only ever RAISE no verdict and only ever LOWER a naive
+  // REVIEW_REQUIRED to SAFE for the three named safe forms (D-09), never a floor operation
+  // (D-02, enforced inside applySafeFormPairing itself).
+  const orderedFindings = [...rawFindings].sort(compareFindings);
+  const findings = applySafeFormPairing(orderedFindings, rules.rules);
 
   const verdict = findings.reduce(
     (worst, finding) => (VERDICT_SEVERITY[finding.verdict] > VERDICT_SEVERITY[worst] ? finding.verdict : worst),

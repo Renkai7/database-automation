@@ -204,6 +204,27 @@
       "match": { "statementKind": "EmptyInput" },
       "verdict": "REVIEW_REQUIRED",
       "rationale": "The analyzer found no executable statement in this migration file (empty, whitespace-only, or comment-only input). SAFE must be earned by a matching rule (D-06), and a migration file with nothing executable in it is anomalous enough to be worth a human glance."
+    },
+    {
+      "id": "pair-not-valid-validated",
+      "category": "usually-safe",
+      "match": { "statementKind": "ValidateConstraint", "notValid": true },
+      "verdict": "SAFE",
+      "rationale": "The constraint was added NOT VALID (instant, no scan) and later validated by its own VALIDATE CONSTRAINT statement (SHARE UPDATE EXCLUSIVE only) naming the exact same constraint in this same file -- the complete two-step safe form for adding a validated constraint without ever taking a table-scanning lock. This rule id is applied only by the applySafeFormPairing pass (classify.ts), never by ordinary per-statement matching: its match object (ValidateConstraint with notValid true) can never be satisfied by a real finding, because PostgreSQL's grammar has no NOT VALID form of VALIDATE CONSTRAINT -- this entry exists purely so the pairing pass can look up a stable id and this rationale, the same way D-03 requires of every other rule."
+    },
+    {
+      "id": "pair-concurrent-index-unique",
+      "category": "usually-safe",
+      "match": { "statementKind": "AddUniqueConstraint", "concurrently": true },
+      "verdict": "SAFE",
+      "rationale": "The unique index backing this constraint was already built CONCURRENTLY (SHARE UPDATE EXCLUSIVE only) in this same file, so attaching it via ADD CONSTRAINT ... UNIQUE USING INDEX is a metadata-only operation -- the complete two-step safe form for adding a unique constraint without blocking writes during the index build. This rule id is applied only by the applySafeFormPairing pass: its match object (AddUniqueConstraint with concurrently true) can never be satisfied by a real finding, because the inspector never sets `concurrently` for an AddUniqueConstraint fact (only CreateIndex/DropIndex carry that flag) -- this entry exists purely for pairing's id/rationale lookup, per D-03."
+    },
+    {
+      "id": "pair-validated-check-set-not-null",
+      "category": "usually-safe",
+      "match": { "statementKind": "SetNotNull", "checkProvesNotNull": true },
+      "verdict": "SAFE",
+      "rationale": "A CHECK (col IS NOT NULL) constraint proving this exact column non-nullable was already added and validated in this same file, so PostgreSQL 12+ detects the validated check constraint and skips SET NOT NULL's own table scan -- the complete safe form for enforcing NOT NULL without an ACCESS EXCLUSIVE scan. This rule id is applied only by the applySafeFormPairing pass: its match object (SetNotNull with checkProvesNotNull true) can never be satisfied by a real finding, because the inspector never sets `checkProvesNotNull` for a SetNotNull fact (only AddCheckConstraint's branch touches that field) -- this entry exists purely for pairing's id/rationale lookup, per D-03."
     }
   ]
 }

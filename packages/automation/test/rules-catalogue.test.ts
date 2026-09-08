@@ -160,7 +160,7 @@ describe("rules catalogue (03-02-PLAN.md task 2, ANLZ-03/D-04)", () => {
 
   it("rules exist in all five categories, and the four rename/compatibility rules use category compatibility, not lock-hazard", () => {
     const rulesFile = parseRulesFile(loadRawRulesFile());
-    const categoriesPresent = new Set(rulesFile.rules.map((rule) => rule.category));
+    const categoriesPresent = new Set<string>(rulesFile.rules.map((rule) => rule.category));
     for (const category of VALID_CATEGORIES) {
       expect(categoriesPresent.has(category), `expected at least one rule in category "${category}"`).toBe(true);
     }

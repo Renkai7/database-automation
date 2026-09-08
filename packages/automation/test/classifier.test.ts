@@ -2,24 +2,25 @@
 import { describe, expect, it } from "vitest";
 import { classifyFacts } from "../src/classifier/classify";
 import { loadDefaultRules, analyzeSql } from "../src/analyze";
+import type { Rule } from "../src/classifier/rules-schema";
 import { EMPTY_FACTS, type StatementFacts } from "../src/types";
 
 describe("classifyFacts severity resolution (03-02-PLAN.md task 3, D-10)", () => {
   it("a fact set matched by two rules of different severity produces the more severe verdict and both rule ids, sorted ascending", () => {
     const facts: StatementFacts = { ...EMPTY_FACTS, statementKind: "AddColumn", defaultVolatility: "volatile" };
-    const rules = [
+    const rules: Rule[] = [
       {
         id: "z-safe-rule",
-        category: "usually-safe" as const,
+        category: "usually-safe",
         match: { statementKind: "AddColumn" },
-        verdict: "SAFE" as const,
+        verdict: "SAFE",
         rationale: "A generic add-column rule with no volatility awareness, matching by statement kind alone.",
       },
       {
         id: "a-review-rule",
-        category: "lock-hazard" as const,
+        category: "lock-hazard",
         match: { defaultVolatility: "volatile" },
-        verdict: "REVIEW_REQUIRED" as const,
+        verdict: "REVIEW_REQUIRED",
         rationale: "A volatile default forces a full table rewrite under ACCESS EXCLUSIVE, unlike a non-volatile one.",
       },
     ];
