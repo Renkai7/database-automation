@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Migration Runner & History Tests
-status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-09-08T22:54:36.899Z"
+status: verifying
+stopped_at: Completed 04-07-PLAN.md -- Phase 4 (all 7 plans) complete, ready for verification
+last_updated: "2026-09-08T23:17:50.675Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 04 execution started
-state_head: fef768b87fc500579bcfa48b094d5863c5fc1764
+state_head: d708471757fd3e55b0b87e0eae75786396d6114d
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 27
-  completed_plans: 26
+  completed_plans: 27
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 Phase: 04 (Migration Runner & History Tests) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-08 — Phase 04 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -86,6 +86,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P04 | 17min | 2 tasks | 7 files |
 | Phase 04 P05 | 55min | 3 tasks | 11 files |
 | Phase 04 P06 | 24 min | 3 tasks | 18 files |
+| Phase 04 P07 | 21min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 04]: [Phase 04] 04-06: EXPECTED_FULL_HISTORY_COLUMNS actually lives in tests/history/support.ts, edited there rather than tests/history/empty-db-full-history.test.ts as the plan's read_first named — That is where the constant this task must update actually lives; the test file merely imports it
 - [Phase 04]: [Phase 04] 04-06: tests/history/existing-db-newest-only.test.ts's RUN-06 assertion widened from a table-added check to a full schema-shape inequality check — The real newest migrations now alter existing tables' columns rather than creating tables, so the original table-list assumption no longer held
 - [Phase 04]: [Phase 04] 04-06: docs/30-squawk-comparison.md updated by hand against a disposable squawk probe over exactly the three new real migrations, never through the full generator script — Regenerating would have destroyed every hand-filled disagreement analysis already committed to that file; followed the CR-02/Phase-4-plan-02 append-at-end precedent already established there
+- [Phase 04]: 04-07: BLOCKED demonstration's real generated SQL diverges from the Phase 3 hand-written mirror (quoted identifier, added CASCADE) -- both fixtures kept side by side rather than one replacing the other.
+- [Phase 04]: 04-07: pnpm db:reset does not forward db:migrate's own console output (scripts/db-reset.ts's execa call carries no stdio: inherit) -- verified live, confirmed harmless via direct query against runner.migration_runs, recorded as a documentation finding rather than fixed (file outside this plan's files_modified).
+- [Phase 04]: 04-07: Did not tick RUN-07/APP-02 checkboxes in REQUIREMENTS.md per this plan's own explicit acceptance criterion -- a deliberate divergence from the generic executor workflow's default close-out behavior.
 
 ### Pending Todos
 
@@ -184,6 +188,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T22:54:36.844Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-09-08T23:17:50.619Z
+Stopped at: Completed 04-07-PLAN.md -- Phase 4 (all 7 plans) complete, ready for verification
 Resume file: None
