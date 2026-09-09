@@ -17,6 +17,7 @@ import { execa } from "execa";
 import { readFileSync } from "node:fs";
 import { posix as posixPath } from "node:path";
 import { describe, expect, it } from "vitest";
+import { loadRules, RulesFileError } from "../packages/automation/src/index";
 
 const ALLOWED_ROOT_FILES = ["package.json", "docker-compose.yml", ".env.example"];
 
@@ -149,6 +150,39 @@ function escapingRelativeImports(filePath: string, source: string): string[] {
   }
 
   return escapes;
+}
+
+// 05-07-PLAN.md Task 2: a synthetic-but-schema-valid rules file that correctly protects every
+// D-02/D-07/D-17 floor operation -- the "known good" baseline both weakened-rules-file tests
+// below start from, so each test deviates from a genuinely floor-safe starting point by exactly
+// one change, isolating which self-check (assertFloorNotWeakened vs assertUnmatchedDefaultsToReview)
+// each test actually proves. Held only in memory; never read from or written to disk. The
+// `disarms-timeout-guc`-shaped rule below matches on `disarmsTimeout` alone (never statementKind),
+// which is what makes it cover all four D17_FLOOR_FACTS entries (SetGuc, AlterSystem,
+// AlterDatabaseSet, AlterRoleSet) with one rule, exactly as the real rules.json does.
+function floorSafeSyntheticRules(): Array<Record<string, unknown>> {
+  return [
+    { id: "drop-table", category: "irreversible-data-loss", match: { statementKind: "DropTable" }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "drop-schema", category: "irreversible-data-loss", match: { statementKind: "DropSchema" }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "drop-database", category: "irreversible-data-loss", match: { statementKind: "DropDatabase" }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "truncate", category: "irreversible-data-loss", match: { statementKind: "Truncate" }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "drop-column", category: "irreversible-data-loss", match: { statementKind: "DropColumn" }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "delete-without-where", category: "irreversible-data-loss", match: { statementKind: "Delete", hasWhereClause: false }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "update-without-where", category: "irreversible-data-loss", match: { statementKind: "Update", hasWhereClause: false }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "unresolvable-dynamic-sql", category: "analyzer-integrity", match: { statementKind: "ExecuteDynamic", dynamicSqlUnresolved: true }, verdict: "BLOCKED", rationale: "synthetic" },
+    { id: "disarms-timeout-guc", category: "analyzer-integrity", match: { disarmsTimeout: true }, verdict: "BLOCKED", rationale: "synthetic" },
+  ];
+}
+
+/** Calls `fn`, returning the thrown value (or `null` if it did not throw) rather than letting a
+ * caller wrap every assertion below in its own try/catch. */
+function captureThrown(fn: () => unknown): unknown {
+  try {
+    fn();
+    return null;
+  } catch (error) {
+    return error;
+  }
 }
 
 describe("structural guardrails", () => {
@@ -622,5 +656,119 @@ describe("structural guardrails", () => {
         ).not.toContain(needle);
       }
     }
+  });
+
+  it("loadRules refuses a synthetic rules file that weakens a floor operation below BLOCKED (D-11, first half)", () => {
+    // 05-07-PLAN.md Task 2: drives the real loadRules (imported from packages/automation, never
+    // re-implemented here) against an in-memory synthetic rules file, never against the real
+    // committed rules file and never written to disk. Proves the property by behaviour: a grep
+    // for assertFloorNotWeakened would still pass even if the call were deleted from the load
+    // path -- this proves it is actually invoked and actually refuses to load.
+    const weakenedRulesFile = {
+      version: 1,
+      rules: floorSafeSyntheticRules().map((rule) =>
+        rule.id === "drop-table" ? { ...rule, verdict: "SAFE" } : rule,
+      ),
+    };
+
+    const error = captureThrown(() => loadRules(weakenedRulesFile));
+    expect(error, "loadRules must throw for a rules file weakening a floor operation").toBeInstanceOf(
+      RulesFileError,
+    );
+    expect(
+      (error as Error).message,
+      "the thrown message must name the offending floor operation",
+    ).toContain("DropTable");
+  });
+
+  it("loadRules refuses a synthetic rules file whose unmatched-statement default is weaker than REVIEW REQUIRED (D-11, first half)", () => {
+    // Same in-memory-only discipline as the test above, proving the opposite end of D-06's
+    // default: a rule broad enough to grant blanket SAFE to every uncatalogued statement (here,
+    // matching on statementKind "Unrecognized" alone -- the shape CLUSTER/REINDEX/ALTER SYSTEM
+    // and any other uncatalogued DDL all resolve to) defeats "SAFE must be earned" without ever
+    // touching a D-02/D-07/D-17 floor rule. The floor-safe baseline is included unmodified so
+    // this test isolates assertUnmatchedDefaultsToReview specifically, rather than incidentally
+    // failing on the floor check first.
+    const unmatchedWeakenedRulesFile = {
+      version: 1,
+      rules: [
+        ...floorSafeSyntheticRules(),
+        {
+          id: "blanket-safe-unrecognized",
+          category: "usually-safe",
+          match: { statementKind: "Unrecognized" },
+          verdict: "SAFE",
+          rationale: "synthetic exploit rule",
+        },
+      ],
+    };
+
+    const error = captureThrown(() => loadRules(unmatchedWeakenedRulesFile));
+    expect(
+      error,
+      "loadRules must throw for a rules file weakening the unmatched-statement default",
+    ).toBeInstanceOf(RulesFileError);
+    expect(
+      (error as Error).message,
+      "the thrown message must name the unmatched statement kind",
+    ).toContain("Unrecognized");
+  });
+
+  it("the ruleset's required-check contexts and pr-gate.yml's job names are exactly the same set, with no duplicate job name (D-11, second half)", () => {
+    // The property this test actually proves, recorded honestly: deleting or renaming a job
+    // means its named required check never reports, and a required check that never reports
+    // blocks the merge rather than passing it -- confirmed against GitHub's own troubleshooting
+    // documentation (05-RESEARCH.md) and observed live in plan 05-08. This test cannot prove
+    // GitHub's own behaviour; it proves the names agree, which is the half this repository owns.
+    const rulesetPayload = JSON.parse(
+      readFileSync(".github/rulesets/main-protection.json", "utf-8"),
+    ) as {
+      rules: Array<{ type: string; parameters?: { required_status_checks?: Array<{ context: string }> } }>;
+    };
+    const requiredStatusChecksRule = rulesetPayload.rules.find(
+      (rule) => rule.type === "required_status_checks",
+    );
+    expect(
+      requiredStatusChecksRule?.parameters?.required_status_checks,
+      "the ruleset payload must define a required_status_checks rule with a context list",
+    ).toBeDefined();
+    const contexts = requiredStatusChecksRule!.parameters!.required_status_checks!.map(
+      (entry) => entry.context,
+    );
+
+    expect(
+      contexts.length,
+      "the extracted context list must not be empty -- a broken extraction must not pass by " +
+        "comparing two empty sets",
+    ).toBeGreaterThan(0);
+
+    // Comment lines stripped first, matching this file's established idiom. Job-level `name:`
+    // sits at exactly 4-space indentation with no leading `-` (workflow-level `name:` is
+    // 0-indent; step-level `name:` is nested under a `- ` list item at 6-space indentation) --
+    // verified against the real file's exact whitespace before writing this pattern.
+    const workflowCodeOnly = readFileSync(".github/workflows/pr-gate.yml", "utf-8")
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    const jobNamePattern = /^ {4}name:[ \t]*(\S.*)$/gm;
+    const jobNames = [...workflowCodeOnly.matchAll(jobNamePattern)].map((match) => match[1].trim());
+
+    expect(
+      jobNames.length,
+      "the extracted job-name list must not be empty -- a broken extraction must not pass by " +
+        "comparing two empty sets",
+    ).toBeGreaterThan(0);
+
+    expect(
+      new Set(jobNames).size,
+      "no two jobs in pr-gate.yml may share a name: value -- two contexts that are equal collide",
+    ).toBe(jobNames.length);
+
+    expect(
+      [...contexts].sort(),
+      "T-05-44/D-11: every required-check context must match exactly one job name, and every " +
+        "job name must be a required-check context, in both directions -- a context adjacent to " +
+        "no job is orphaned, and a job with no required context is unprotected",
+    ).toEqual([...jobNames].sort());
   });
 });
