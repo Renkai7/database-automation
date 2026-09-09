@@ -157,10 +157,20 @@ jobs:
   # newest-only), unmodified from Phase 4. No `services:` block -- the suite starts its own
   # ephemeral postgres:17 Testcontainers per test file; Docker is available on the runner by
   # default.
+  #
+  # LIVE FINDING (05-06): this job still needs RECIPE_DEV_DATABASE_URL even though it opens no
+  # socket against it -- the same Pitfall 5 shape as check-schema-drift.ts, one level removed.
+  # tests/history/support.ts imports scripts/env.ts (for EXPECTED_DEV_DATABASE_NAME), and that
+  # import triggers scripts/env.ts's own module-load-time EnvSchema.parse(process.env) before a
+  # single test runs -- confirmed live (a real CI run failed every test file with "RECIPE_DEV_
+  # DATABASE_URL is missing or malformed" before this env block was added, not a test failure).
   test-history:
     name: test-history
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
+      RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
     steps:
       - uses: actions/checkout@v4
         with:
