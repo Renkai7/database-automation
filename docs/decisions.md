@@ -756,7 +756,8 @@ restated at this layer.
 ---
 
 ## D28 — Tamper detection (CI-05) is live as committed; falsification against real pull requests is Task 2's job
-**Status:** ACCEPTED, falsification pending
+**Status:** ACCEPTED. Falsification complete — see D32 below and `docs/40-ci-gate-merge-attempt.md`
+Observations 2 and 3.
 
 `05-CONTEXT.md` D-09/D-10's two checks — append-only diff and schema-drift regeneration — are live
 in `.github/workflows/pr-gate.yml`'s `tamper-checks` job and passed on this plan's own observation
@@ -927,3 +928,93 @@ safety-relevant ones on D-04's standing. What is NOT reversible without its own 
 adding a credential to make `bypass_actors` observable to the required check directly; that
 remains option 1, rejected above, and reopening it later requires arguing against this same
 reasoning explicitly, not merely reverting this entry.
+
+---
+
+## D32 — D-18 performed: the owner could not merge a BLOCKED pull request, and both tamper checks were falsified against real pull requests
+**Status:** ACCEPTED · 2026-09-09
+
+`05-CONTEXT.md` D-18's performed act is complete. `docs/40-ci-gate-merge-attempt.md` records it,
+written from the owner's own verbatim report and the checks' own logs — not composed in advance,
+following `docs/20-restore-runbook.md`'s precedent (`02-CONTEXT.md` D-10).
+
+**Observation 1 — criterion 1, the property this whole phase exists to prove.** Pull request `#4`
+carried a real, `drizzle-kit`-generated `DROP TABLE` migration reproducing Phase 4's own reverted
+`D-32` change. The `analyze` check reported BLOCKED, with every rule id and rationale visible on
+the pull request itself (closing CI-04's remaining half). The owner, signed in with their own
+admin account, attempted to merge and could not: no bypass, administrator-override, or
+merge-without-waiting affordance was offered anywhere on the page — asked explicitly, the owner
+confirmed none appeared. This closes CI-03's pull-request half; D26 above already closed its
+direct-push half. **The gate's honest boundary, restated because it must never be understated:**
+this is proof the merge control holds for one account, observed once, under one confirmed
+configuration — not proof that the underlying ruleset configuration cannot be changed by someone
+with the admin access to change it (D12, D-05).
+
+**Observations 2 and 3 — CI-05, both tamper-check clauses falsified against real pull requests, not
+only fixtures.** Pull request `#5` edited one character of an already-applied migration file;
+`tamper-checks` failed with `assertMigrationFilesAppendOnly`'s exact message, quoted verbatim in
+the record. Pull request `#6` introduced a hand-edited divergence between the committed migration
+history and `schema.ts` (a pure-addition migration generated against a temporarily-edited schema,
+committed alongside the real, unmodified `schema.ts`) — the schema-drift half of `tamper-checks`
+failed and named the files generation produced, also quoted verbatim. Both branches are closed
+unmerged. This resolves D28's "falsification pending" status above.
+
+**A recorded deviation from the plan's literal Task 2 action text, not a defect:** Observation 3
+does not edit an existing committed `.sql` file in place, because doing so trips the append-only
+check first and GitHub Actions skips later steps once an earlier one fails — the schema-drift
+step, and its failure message, would never have run at all. Constructing the divergence as a pure
+addition instead reaches the identical tested property (a hand-edit that changes what the SQL
+does) while actually letting `check-schema-drift.ts` run and report. See
+`docs/40-ci-gate-merge-attempt.md` Observation 3 for the full reasoning.
+
+**All three demonstration pull requests (`#4`, `#5`, `#6`) are closed unmerged**, confirmed by
+`gh pr list --state open` returning zero results at the end of Task 2.
+
+---
+
+## D33 — Phase 5 closed: requirements traceability, the working-mode change, and everything left UNKNOWN
+**Status:** ACCEPTED · 2026-09-09
+
+CI-01 … CI-06 in `.planning/REQUIREMENTS.md` are ticked only where a specific observed artifact
+supports them — the traceability row names the evidence for each requirement individually rather
+than declaring the phase done on implementation alone. This continues the standing this project has
+already held at every prior phase close-out (`.planning/REQUIREMENTS.md`'s own footer: "implementation
+is not verification").
+
+**The working-mode change, restated here because it governs every later phase, not only this one**
+(full detail in D26 above): `main` is protected by the live `main-protection` ruleset. Direct pushes
+are refused. Every commit that must reach `origin/main` — including `.planning/` documentation —
+now travels through a branch and a pull request whose six required checks pass. Local commits are
+unaffected; only publishing to `main` is gated. This plan's own closing commits (this entry among
+them) went through that same path, which is also the final end-to-end confirmation that the gate
+permits legitimate work as readily as it refuses destructive work.
+
+**Recorded as a settled input Phase 7 no longer has to resolve, not reopened here:** D-02's public
+visibility (above) already resolves the Phase 7 environment-protection-bypass blocker
+`.planning/STATE.md` had listed as open — GitHub documents disabling environment-protection bypass
+as public-repo-only on Free/Pro/Team, and this repository is now confirmed public. The owner's
+actual GitHub plan tier remains UNKNOWN and is made not to matter by that same choice.
+
+### Still UNKNOWN after Phase 5
+
+- **Production's PostgreSQL major version** (`docs/decisions.md` D16) — unchanged by this phase,
+  and nothing in this phase's workflows quietly assumed an answer.
+- **Whether migration generation exits non-zero when it does produce a migration**
+  (`05-RESEARCH.md` assumption A4) — `check-schema-drift.ts` deliberately does not depend on the
+  answer (it reads `git status --porcelain`, never the child process's exit code), so this stays
+  open rather than guessed. Observed directly in Observation 3: `db:generate` exited `0` even
+  though it produced new files.
+- **Whether a never-reporting required status check blocks a merge** — documented by GitHub itself,
+  but only ever observed here in its *failing*-check form (`docs/40-ci-gate-merge-attempt.md`
+  Observation 1). Provoking the never-reports case means shipping a ruleset context matching no
+  job, which `05-RESEARCH.md` Pitfall 2 names as a state that permanently blocks every future pull
+  request — deliberately not risked in this phase.
+- **The owner's GitHub plan tier** — still UNKNOWN. This repository's public visibility (D-02) is
+  what makes the tier not matter for CI-03 or for Phase 7's environment-protection gate; it is not
+  a fact this phase established.
+- **Fork pull requests** — the sticky comment cannot post under a fork's read-only token
+  (`05-CONTEXT.md` D-16). Not a case that exists on this solo repository today; a recorded limit,
+  not a solved problem.
+- **Windows-only regressions will surface on the development machine, not in CI**
+  (`05-CONTEXT.md` D-12) — GitHub's Windows runners cannot run the Linux containers this pipeline's
+  migration tests require, so this asymmetry is accepted, not closed.
