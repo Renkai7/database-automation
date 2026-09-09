@@ -5,10 +5,14 @@
 // from a parsed-and-re-serialised object), so the exact reviewed JSON is what GitHub receives.
 //
 // `bypass_actors: []` in the committed payload is D-04's "the bypass list is empty" in the API's
-// own vocabulary -- explicitly present and empty, never omitted (GitHub may apply a different
-// default when the field is absent). `loadRulesetPayload` refuses to proceed if that field, or
-// `enforcement: "active"`, or a non-empty required-status-checks context list, is missing --
-// a payload that cannot be trusted must not be sent.
+// own vocabulary -- explicitly present AND an empty array, never omitted (GitHub may apply a
+// different default when the field is absent) and never present-but-non-empty.
+// `loadRulesetPayload` refuses to proceed if that field is absent, is present but not an empty
+// array, or if `enforcement: "active"`, or a non-empty required-status-checks context list, is
+// missing -- a payload that cannot be trusted must not be sent. Validating the *committed*
+// payload (rather than the live ruleset) needs no API permission at all -- this is the one place
+// in the whole pipeline the empty-bypass-list property can be mechanically enforced with no
+// credential, before the payload ever reaches `gh api`.
 //
 // Deliberately has NO delete path. Nothing in this repository scripts the removal of the gate
 // (D-04's "one-way in intent" standing); `chooseApplyMethod` returns only a create instruction or
@@ -45,10 +49,10 @@ export interface RulesetPayload {
 
 /**
  * Parses and validates the committed ruleset payload. Throws -- never returns a partially valid
- * result -- when `bypass_actors` is absent (not merely non-empty: D-04 requires it explicitly
- * present and empty), when `enforcement` is not `"active"`, or when the
- * `required_status_checks` context list is empty. A payload that cannot be trusted must not be
- * sent to the API.
+ * result -- when `bypass_actors` is absent, or present but not an empty array (not merely
+ * non-empty: D-04 requires it explicitly present AND empty), when `enforcement` is not
+ * `"active"`, or when the `required_status_checks` context list is empty. A payload that cannot
+ * be trusted must not be sent to the API.
  */
 export function loadRulesetPayload(text: string): RulesetPayload {
   const parsed = JSON.parse(text) as Partial<RulesetPayload>;
@@ -58,6 +62,14 @@ export function loadRulesetPayload(text: string): RulesetPayload {
       '[apply-ruleset] The committed payload has no "bypass_actors" field. D-04 requires it to ' +
         "be explicitly present and empty -- an absent field is not the same as an empty list, " +
         "and GitHub may apply a different default when it is omitted.",
+    );
+  }
+  if (!Array.isArray(parsed.bypass_actors) || parsed.bypass_actors.length !== 0) {
+    throw new Error(
+      `[apply-ruleset] The committed payload's "bypass_actors" is not an empty array (got ` +
+        `${JSON.stringify(parsed.bypass_actors)}). D-04 requires the bypass list to be ` +
+        "explicitly present AND empty -- a payload that would widen it must not be sent to the " +
+        "live, public repository.",
     );
   }
   if (parsed.enforcement !== "active") {

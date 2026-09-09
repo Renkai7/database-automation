@@ -176,15 +176,36 @@ export function rulesetsMatchingMain<T extends RulesetSummary>(rulesets: readonl
   });
 }
 
-function loadExpectedContexts(): string[] {
-  const text = readFileSync(RULESET_PAYLOAD_PATH, "utf-8");
+/**
+ * WR-01 (05-REVIEW.md): the pure extraction logic, split out of `loadExpectedContexts` below so
+ * it is unit-testable against synthetic JSON text with no filesystem read -- the same
+ * pure-core/thin-adapter split `apply-ruleset.ts`'s own `loadRulesetPayload(text)` already uses.
+ * Mirrors that sibling function's own guard on the identical read (`contexts.length === 0`
+ * throws) so the two scripts, reading the same committed file, agree. Without this, a broken
+ * extraction (a renamed JSON key, a restructured `parameters` shape) would silently yield `[]`,
+ * and `assertRequiredRules`'s per-context `for` loop would then run zero iterations -- reporting
+ * success without having checked a single required status check is still present on the live
+ * ruleset.
+ */
+export function extractExpectedContexts(text: string): string[] {
   const payload = JSON.parse(text) as {
     rules: Array<{ type: string; parameters?: Record<string, unknown> }>;
   };
   const rule = payload.rules.find((entry) => entry.type === "required_status_checks");
   const contexts =
     (rule?.parameters?.required_status_checks as Array<{ context: string }> | undefined) ?? [];
+  if (contexts.length === 0) {
+    throw new Error(
+      `[check-ruleset-config] "${RULESET_PAYLOAD_PATH}" yielded zero expected required-status-` +
+        "check contexts -- a broken extraction must not silently check nothing.",
+    );
+  }
   return contexts.map((entry) => entry.context);
+}
+
+function loadExpectedContexts(): string[] {
+  const text = readFileSync(RULESET_PAYLOAD_PATH, "utf-8");
+  return extractExpectedContexts(text);
 }
 
 // Exported so scripts/ci/check-ruleset-bypass-audit.ts can resolve the same repository without

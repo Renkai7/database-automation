@@ -8,6 +8,7 @@ import {
   commentBodyForAnalyzerRun,
   introducedMigrationPaths,
   jobExitCodeForAnalyzerExit,
+  resolveAnalyzeGateOutcome,
 } from "../../scripts/ci/analyze-gate";
 
 describe("jobExitCodeForAnalyzerExit", () => {
@@ -106,5 +107,88 @@ describe("commentBodyForAnalyzerRun (Task 3: non-verdict outcomes)", () => {
   it("falls back to the failure comment if a verdict exit code carries unparseable stdout", () => {
     const body = commentBodyForAnalyzerRun(EXIT_CODES.SAFE, "not json", "", introducedPaths);
     expect(body).toContain("could not produce a verdict");
+  });
+});
+
+describe("resolveAnalyzeGateOutcome (WR-02, 05-REVIEW.md)", () => {
+  const introducedPaths = new Set<string>();
+
+  // WR-02: the composition-bug regression this test exists to pin. Before the fix, the job's
+  // exit code was derived purely from jobExitCodeForAnalyzerExit(analyzerExitCode) -- SAFE always
+  // mapped to a passing exit code -- while the comment body was computed independently and could
+  // fall back to the failure comment on unparseable stdout. That combination produced a passing,
+  // required `analyze` check next to a PR comment that said the check failed. Both must now agree.
+  it("WR-02: a SAFE exit code with unparseable stdout FAILS the job (not the passing exit code SAFE alone would produce)", () => {
+    const outcome = resolveAnalyzeGateOutcome(EXIT_CODES.SAFE, "not json", "", introducedPaths);
+    expect(outcome.jobExitCode).toBe(1);
+    expect(outcome.commentBody).toContain("could not produce a verdict");
+  });
+
+  it("WR-02: a REVIEW_REQUIRED exit code with unparseable stdout FAILS the job", () => {
+    const outcome = resolveAnalyzeGateOutcome(
+      EXIT_CODES.REVIEW_REQUIRED,
+      "not json",
+      "",
+      introducedPaths,
+    );
+    expect(outcome.jobExitCode).toBe(1);
+  });
+
+  it("a SAFE exit code with valid, parseable stdout still passes the job", () => {
+    const stdout = JSON.stringify([
+      {
+        path: "apps/recipe-app/drizzle/0001_safe.sql",
+        verdict: "SAFE",
+        findings: [],
+        statementCount: 1,
+        rulesVersion: 1,
+      },
+    ]);
+    const outcome = resolveAnalyzeGateOutcome(EXIT_CODES.SAFE, stdout, "", introducedPaths);
+    expect(outcome.jobExitCode).toBe(0);
+  });
+
+  it("BLOCKED already fails the job regardless of stdout parseability, and stays BLOCKED when stdout is valid", () => {
+    const stdout = JSON.stringify([
+      {
+        path: "apps/recipe-app/drizzle/0002_blocked.sql",
+        verdict: "BLOCKED",
+        findings: [],
+        statementCount: 1,
+        rulesVersion: 1,
+      },
+    ]);
+    const outcome = resolveAnalyzeGateOutcome(EXIT_CODES.BLOCKED, stdout, "", introducedPaths);
+    expect(outcome.jobExitCode).toBe(1);
+    expect(outcome.reason).not.toContain("could not be parsed");
+  });
+
+  it("a render/parse failure's reason is distinct from BLOCKED's own reason -- never collapsed together (03-CONTEXT.md D-08, 04-CONTEXT.md D-08)", () => {
+    const renderFailure = resolveAnalyzeGateOutcome(EXIT_CODES.SAFE, "not json", "", introducedPaths);
+    const blockedFailure = jobExitCodeForAnalyzerExit(EXIT_CODES.BLOCKED);
+    expect(renderFailure.reason).not.toBe(blockedFailure.reason);
+    expect(renderFailure.reason).toMatch(/could not be parsed/);
+  });
+
+  it("PARSE_FAILURE (analyzer exit 30) keeps its own distinct reason, untouched by the WR-02 fix", () => {
+    const outcome = resolveAnalyzeGateOutcome(
+      EXIT_CODES.PARSE_FAILURE,
+      "",
+      "AnalyzerParseError: unexpected token",
+      introducedPaths,
+    );
+    expect(outcome.jobExitCode).toBe(1);
+    expect(outcome.reason).toMatch(/could not parse this SQL/);
+  });
+
+  it("RULES_INVALID (analyzer exit 40) keeps its own distinct reason, untouched by the WR-02 fix", () => {
+    const outcome = resolveAnalyzeGateOutcome(
+      EXIT_CODES.RULES_INVALID,
+      "",
+      "RulesFileError: floor weakened",
+      introducedPaths,
+    );
+    expect(outcome.jobExitCode).toBe(1);
+    expect(outcome.reason).toMatch(/rules file is invalid/);
   });
 });
