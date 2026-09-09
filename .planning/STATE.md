@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: CI Pipeline Gate
-status: executing
-stopped_at: Completed 05-07-PLAN.md
-last_updated: "2026-09-09T17:55:08.506Z"
+status: verifying
+stopped_at: Completed 05-08-PLAN.md -- Phase 5 (CI Pipeline Gate) complete
+last_updated: "2026-09-09T19:24:36.824Z"
 last_activity: 2026-09-09
 last_activity_desc: Completed 05-05-PLAN.md (ruleset payload and self-check)
-state_head: 500c7069089adaaa4e384492a4df137b61e533b2
+state_head: 1313aa6a25737b85e80a6be349bf3f770d199c85
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 Phase: 05 (CI Pipeline Gate) — EXECUTING
 Plan: 8 of 8
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-09 — Completed 05-05-PLAN.md (ruleset payload and self-check)
 
 Progress: [░░░░░░░░░░] 0%
@@ -95,6 +95,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P05 | 15min | 3 tasks | 4 files |
 | Phase 05 P06 | 79 min | 3 tasks | 4 files |
 | Phase 05 P07 | 17min | 3 tasks | 1 files |
+| Phase 05 P08 | 74min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 05]: 05-06: tests/smoke.test.ts's POSIX teardown now kills the whole process group (detached:true + process.kill(-pid)) instead of the direct child alone -- serverProcess.kill() left a next-server grandchild alive holding inherited stdio open, hanging the real CI test job for 17+ minutes (cancelled) against a ~1 minute local baseline.
 - [Phase 05]: [Phase 05] 05-07: CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN includes restore-drill.yml alongside pr-gate.yml (Rule 1 deviation) -- restore-drill.yml carries the identical pinned-target connection string, and now that .github/ is in the guardrail source surface it would otherwise be flagged as a false-positive offender.
 - [Phase 05]: [Phase 05] 05-07: CI-01 and CI-06 not ticked in REQUIREMENTS.md despite being this plan's own declared requirements -- both are also declared by plan 05-08 (not yet complete); requirements.ready-ids confirmed 0/2 ready, deferring to the shared-ID gate.
+- [Phase 05]: D26-D33: The main-protection GitHub ruleset is live with an empty, read-back-confirmed bypass list; the owner personally attempted (and could not complete) a merge past it; both tamper-detection checks were falsified against real pull requests; Phase 5's requirements are ticked only where a specific observed artifact backs them. — D-18 requires a performed act, not a configuration read, because no test inside the system can assert what GitHub refuses to do for a specific human account.
 
 ### Pending Todos
 
@@ -210,6 +212,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T17:55:08.396Z
-Stopped at: Completed 05-07-PLAN.md
+Last session: 2026-09-09T19:24:36.723Z
+Stopped at: Completed 05-08-PLAN.md -- Phase 5 (CI Pipeline Gate) complete
 Resume file: None

@@ -208,7 +208,7 @@ Plans:
   3. A migration file is hand-edited after being generated, or an edit is made to a migration that a previous merge already applied — each is caught mechanically by a CI check and fails the build, without relying on a reviewer noticing.
   4. Inspecting the CI workflow shows migrations run as their own isolated pipeline step, invoked by the pipeline — never triggered by the application container starting up.
 
-**Plans**: 7/8 plans executed
+**Plans**: 8/8 plans executed
 
 Plans:
 
@@ -239,7 +239,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 — the ruleset is applied only after every check name has been reported by a real run)*
 
-- [ ] 05-08-PLAN.md — Apply the ruleset live, perform the merge-refusal attempt personally, falsify both tamper checks on real pull requests, and write the record (D-18)
+- [x] 05-08-PLAN.md — Apply the ruleset live, perform the merge-refusal attempt personally, falsify both tamper checks on real pull requests, and write the record (D-18)
 
 ### Phase 6: Private Staging Connectivity
 
@@ -281,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
 | 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
-| 5. CI Pipeline Gate | 7/8 | In Progress|  |
+| 5. CI Pipeline Gate | 8/8 | In Progress|  |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |
