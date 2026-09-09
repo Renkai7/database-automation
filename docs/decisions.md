@@ -623,3 +623,67 @@ workspace structurally local.
 **Consequence:** RUN-07's proof is necessarily against the one real container this repository
 runs, reusing the smoke test built for exactly this purpose (`01-CONTEXT.md` D-08, D-26) rather
 than against a disposable stand-in.
+
+---
+
+## D25 — The `packages/automation` package boundary is test-held by a frozen, ratcheted debt inventory
+**Status:** ACCEPTED · 2026-09-09
+
+`tests/guardrails.test.ts` now enforces `.planning/v1-MILESTONE-AUDIT.md`'s single recorded
+integration defect (also 03-REVIEW-WR-03): `packages/automation` — the unit Phase 7's package
+extraction (PLAT-01) plans to publish standalone — currently escapes its own package root through
+four relative imports of `scripts/log.ts`'s `safeErrorMessage`, in `cli.ts`,
+`inspector/inspect.ts`, `inspector/inspect-plpgsql.ts`, and `runner/run-migrations.ts`. Those four
+imports bypass the package's declared dependency set entirely; they resolve by filesystem
+relative-path depth, which a future edit to directory structure could silently break or silently
+widen without any test noticing. This decision does **not** remove them. It converts the boundary
+from something held by a developer keeping relative-path depth in sync — remembered caution, the
+exact anti-pattern CLAUDE.md's first non-negotiable names — into something a test fails on.
+
+**Mechanism:** `KNOWN_PACKAGE_BOUNDARY_ESCAPES`, a map of file path to the exact specifier
+strings it escapes with, populated with today's four entries and no others. The guardrail scans
+every TypeScript file under `packages/automation/`, resolves each relative import against the
+package root, and asserts the live result is exactly equal — in both directions — to this
+constant.
+
+**Why this shape over a per-file allowlist** (the `FIXTURE_FILES_WITH_CONNECTION_STRINGS` idiom
+already used twice elsewhere in the same file): an allowlist exempts *files*, so a fifth escaping
+import added to `cli.ts` — a file already on the list — would still pass; nothing in that shape
+can distinguish "one recorded escape" from "one recorded escape plus a new one." The chosen
+inventory shape exempts nothing: it records the exact *specifiers* each file escapes with, so a
+second escape in an already-listed file lengthens that file's array and fails, the one property a
+per-file allowlist structurally cannot have. It is also non-vacuous by construction — the expected
+state is a non-empty four-entry map, so a detector broken by a bad regex, a renamed directory, or
+a gitignore change produces `{}` and fails the comparison — unlike the two `toEqual([])` gates
+already in this same file, which a silently-broken detector satisfies trivially by finding
+nothing.
+
+**Why not the unconditional, zero-exemption shape** used for the `drizzle-kit migrate` ban
+(`tests/guardrails.test.ts`, "a gate with a second door is not a gate"): that ban was unconditional
+because it had zero real instances to accommodate — six prose mentions were reworded to make it
+pass clean, at no cost. This boundary has four real code instances that cannot be removed within
+this task's scope (removing them is Phase 7's decision, not a docs or test-authoring decision).
+Shipping an unconditional ban here would mean shipping a permanently red default suite, and a red
+default suite is precisely the condition under which guardrails get deleted rather than respected.
+The frozen inventory preserves the unconditional ban's actual intent — no second door, no
+exemption — without requiring a debt that is out of scope to pay before the record can exist.
+
+**The inventory is a ratchet.** It may only shrink. Removing one of the four entries without also
+deleting it from `KNOWN_PACKAGE_BOUNDARY_ESCAPES` fails the guardrail (a key present in the
+inventory but absent from the live scan), so the record cannot go quietly stale. Adding an entry —
+recording a new escape rather than removing it — is a deliberate architectural decision requiring
+its own new decision record, not routine test maintenance.
+
+**`apps/recipe-app` is deliberately out of scope.** `src/db/client.ts` and `src/db/seed.ts` both
+import `scripts/env.ts` via a relative path that similarly escapes their own directory tree. They
+are left alone on purpose: an *application* consuming a repo-root shared module is not a
+package-extractability violation the way `packages/automation` doing so is — `packages/automation`
+is the specific unit whose own `package.json` `name` and `exports` imply an isolation these four
+imports break, and it is the only one Phase 7 plans to extract and publish standalone. Widening
+this guardrail to the app would be a different, real decision, and is not made here.
+
+**Consequence, stated without softening:** this closes the audit's single recorded integration
+defect as a *containment*, not as a removal. The boundary can no longer widen undetected by any
+mechanism this test's scan covers. It is not yet clean — the four imports remain exactly as they
+were, and stay someone's open debt until Phase 7's package extraction pays each one down and
+deletes its line from `KNOWN_PACKAGE_BOUNDARY_ESCAPES`.
