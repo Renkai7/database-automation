@@ -188,14 +188,25 @@ jobs:
   # this check. It raises the cost of tampering and makes it visible; it does not make tampering
   # impossible (docs/decisions.md D12).
   #
-  # administration: write is granted on this job ALONE -- the workflow-level default stays
-  # contents: read (T-05-34).
+  # LIVE FINDING (05-06, superseding 05-RESEARCH.md's assumption): `administration` is not a
+  # recognized key in a workflow's `permissions:` block at all -- confirmed against the real
+  # GitHub API (`gh workflow run` on a scratch trigger returned "HTTP 422: Invalid Argument -
+  # failed to parse workflow: Unexpected value 'administration'"), not merely "insufficient".
+  # `GITHUB_TOKEN` cannot be granted repository-administration scope through this declarative
+  # block at all, by any value. This job therefore runs with only the workflow-level default
+  # (contents: read) -- no elevated permission is requested here, because none is grantable.
+  # check-ruleset-config.ts's own `assertBypassListEmpty` already fails CLOSED (not silently
+  # passes) when `bypass_actors` is absent from the API response, which is exactly what this
+  # token will observe. This is a genuine, unresolved phase-blocking finding for plan 05-08 (the
+  # plan that applies the ruleset and first has a real one to query) -- 05-RESEARCH.md's own open
+  # question #1 pre-committed "absent" as one of three possible outcomes requiring a design change
+  # (most likely a fine-grained PAT or GitHub App token with real admin rights, held as a
+  # repository secret); it is now confirmed live rather than left a research-time guess.
   ruleset-config-check:
     name: ruleset-config-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      administration: write
     steps:
       - uses: actions/checkout@v4
         with:
