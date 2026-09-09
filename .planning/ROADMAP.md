@@ -256,13 +256,30 @@ Plans:
 **Plans:** 8 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 06-01-PLAN.md — Tracer: provision staging, prove the private path end-to-end, write the recon record, close D4
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 06-02-PLAN.md — Three-role bootstrap SQL, argument-free runner, privilege-boundary proof, performed run
 - [ ] 06-03-PLAN.md — Three-vantage port proof and the two SSH key-scope attempts
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 06-04-PLAN.md — Fail-closed server-side environment marker in the development guard (CONN-03 automated half)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 06-05-PLAN.md — `db:migrate:staging` entry point, staging dynamic pin, wait-for-port helper
 - [ ] 06-06-PLAN.md — Performed schema-sync refusal record (CONN-03 performed half)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 06-07-PLAN.md — `staging` GitHub Environment and the push-to-`main` staging migration workflow
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 06-08-PLAN.md — End-to-end: a merged schema change reaches staging with no redeploy; phase close-out
 
 ### Phase 7: Production Runner, Environment Gate & Audit Log
