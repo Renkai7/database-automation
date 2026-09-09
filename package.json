@@ -20,6 +20,8 @@
     "db:analyze:migrations": "tsx packages/automation/src/cli.ts --migrations",
     "analyze:squawk-comparison": "tsx packages/automation/scripts/squawk-comparison.ts",
     "dev": "pnpm --filter recipe-app dev",
+    "build": "pnpm --filter recipe-app build",
+    "start": "pnpm --filter recipe-app start",
     "test": "vitest run",
     "test:drill": "vitest run --config vitest.drill.config.ts",
     "test:history": "tsx scripts/history-suite.ts"
