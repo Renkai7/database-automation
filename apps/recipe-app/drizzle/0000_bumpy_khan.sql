@@ -10,3 +10,4 @@ CREATE TABLE "recipes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "recipes_slug_unique" UNIQUE("slug")
 );
+ 
