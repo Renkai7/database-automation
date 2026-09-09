@@ -257,7 +257,13 @@ describe("D30/D31 split: the bypass-list assertion moved out of the required che
   // model blocks every pull request permanently) -- this test fails loudly instead.
   it("runCheckRulesetConfig's own function body never references assertBypassListEmpty", () => {
     const source = readFileSync("scripts/ci/check-ruleset-config.ts", "utf-8");
-    const bodyMatch = source.match(/export async function runCheckRulesetConfig\(\)[\s\S]*?\n\}\n/);
+    // \r?\n, not \n -- this repository's own git config checks TypeScript sources out as CRLF on
+    // Windows (core.autocrlf=true), and a bare \n never matches the \r immediately preceding a
+    // CRLF-terminated closing brace line. A LF-only pattern here would report "could not locate
+    // the function body" on every Windows dev machine while passing cleanly in CI's Linux
+    // checkout (05-CONTEXT.md D-12's asymmetry, in the opposite direction: a false failure local
+    // developers would see and CI would never reproduce).
+    const bodyMatch = source.match(/export async function runCheckRulesetConfig\(\)[\s\S]*?\r?\n\}\r?\n/);
     expect(bodyMatch, "could not locate runCheckRulesetConfig's function body").not.toBeNull();
     expect(
       bodyMatch![0],
@@ -278,8 +284,9 @@ describe("D30/D31 split: the bypass-list assertion moved out of the required che
       /import\s*\{[^}]*assertBypassListEmpty[^}]*\}\s*from\s*["']\.\/check-ruleset-config["']/,
     );
 
+    // \r?\n for the same CRLF-checkout reason as the sibling regex above.
     const bodyMatch = source.match(
-      /export async function runCheckRulesetBypassAudit\(\)[\s\S]*?\n\}\n/,
+      /export async function runCheckRulesetBypassAudit\(\)[\s\S]*?\r?\n\}\r?\n/,
     );
     expect(bodyMatch, "could not locate runCheckRulesetBypassAudit's function body").not.toBeNull();
     expect(bodyMatch![0]).toContain("assertBypassListEmpty");
