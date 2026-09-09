@@ -208,7 +208,7 @@ Plans:
   3. A migration file is hand-edited after being generated, or an edit is made to a migration that a previous merge already applied — each is caught mechanically by a CI check and fails the build, without relying on a reviewer noticing.
   4. Inspecting the CI workflow shows migrations run as their own isolated pipeline step, invoked by the pipeline — never triggered by the application container starting up.
 
-**Plans**: 4/8 plans executed
+**Plans**: 6/8 plans executed
 
 Plans:
 
@@ -227,11 +227,11 @@ Plans:
 **Wave 4** *(blocked on Wave 3; the two plans touch disjoint files and run in parallel)*
 
 - [x] 05-04-PLAN.md — Tamper detection: file-level append-only, journal entry-level append-only, and schema drift, each with synthetic-fixture tests (D-09, D-10)
-- [ ] 05-05-PLAN.md — The committed ruleset payload, its idempotent apply script, and the self-check that fails closed on an unreadable bypass list (D-04, D-05)
+- [x] 05-05-PLAN.md — The committed ruleset payload, its idempotent apply script, and the self-check that fails closed on an unreadable bypass list (D-04, D-05)
 
 **Wave 5** *(blocked on Wave 4 — the workflow invokes both plans' scripts)*
 
-- [ ] 05-06-PLAN.md — The full six-job required-check set, the isolated migrate job, and the scheduled restore drill (D-12, D-13, D-14)
+- [x] 05-06-PLAN.md — The full six-job required-check set, the isolated migrate job, and the scheduled restore drill (D-12, D-13, D-14)
 
 **Wave 6** *(blocked on Wave 5 — the guardrails assert properties of the completed workflow)*
 
@@ -281,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
 | 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
-| 5. CI Pipeline Gate | 5/8 | In Progress|  |
+| 5. CI Pipeline Gate | 6/8 | In Progress|  |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |

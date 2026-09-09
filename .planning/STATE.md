@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: CI Pipeline Gate
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-09-09T16:22:05.000Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-09-09T17:36:18.997Z"
 last_activity: 2026-09-09
 last_activity_desc: Completed 05-05-PLAN.md (ruleset payload and self-check)
-state_head: 3851cba2c2b2a0e443b3bae66d94ca614c205995
+state_head: decd398996a7a56aa3551b2d3c489c38a25983a0
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 33
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 05 (CI Pipeline Gate) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-09-09 — Completed 05-05-PLAN.md (ruleset payload and self-check)
 
@@ -93,6 +93,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P03 | 45min | 3 tasks | 6 files |
 | Phase 05 P04 | 20min | 3 tasks | 6 files |
 | Phase 05 P05 | 15min | 3 tasks | 4 files |
+| Phase 05 P06 | 79 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,9 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 05]: [Phase 05] 05-03: Real pull request proof (Renkai7/database-automation#1) confirmed the analyze check reports exactly 'analyze' as its check name, gh 2.100.0 is on the runner, and the sticky comment persists as one comment across repeated pushes -- settles 05-RESEARCH.md assumptions A1/A3 for plan 05-08's ruleset config.
 - [Phase 05]: 05-04: No production-code deviations; gsd_run check tdd-red-evidence cannot classify Vitest TAP output (missing Node --test summary footer), RED verified manually across all 3 tasks — Vitest tap/tap-flat reporters lack the # tests/# pass/# fail footer parseNodeTestSummary expects; the classifier still lists every failing test name correctly, but misreads the missing footer as zero_tests_discovered even on genuine RED
 - [Phase 05]: 05-05: No production-code deviations. Did not tick CI-03 in REQUIREMENTS.md despite it being this plan's own declared requirement -- CI-03 describes live ruleset enforcement, and this plan's own objective/verification explicitly defer applying the ruleset to the live repository to plan 05-08. check-ruleset-config.ts imports RULESET_PAYLOAD_PATH from apply-ruleset.ts rather than re-declaring the payload path, so the two scripts can never read from different files.
+- [Phase 05]: 05-06: administration:write is not a grantable GITHUB_TOKEN permissions key (confirmed live via gh workflow run HTTP 422) -- ruleset-config-check runs with contents:read only and fails closed on absent bypass_actors; flagged as an open finding for plan 05-08 to resolve.
+- [Phase 05]: 05-06: the test job provisions Postgres via docker compose (pnpm db:up), not a GitHub Actions services: container -- tests/migrate.test.ts's own pnpm db:reset manages the dev database via docker compose and conflicted with a services: container on the same port; migrate (which never runs pnpm test) keeps its services: container.
+- [Phase 05]: 05-06: tests/smoke.test.ts's POSIX teardown now kills the whole process group (detached:true + process.kill(-pid)) instead of the direct child alone -- serverProcess.kill() left a next-server grandchild alive holding inherited stdio open, hanging the real CI test job for 17+ minutes (cancelled) against a ~1 minute local baseline.
 
 ### Pending Todos
 
@@ -181,6 +185,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - **Phase 7**: Whether this repository's GitHub plan tier permits disabling environment-protection bypass on a private repo is unconfirmed (documented as public-repo-only on Free/Pro/Team). Until verified, the production REVIEW REQUIRED gate is only conditionally non-bypassable.
 - **Phase 7 (honesty constraint, not a defect to fix)**: A solo founder can self-approve a GitHub environment review. The REVIEW REQUIRED gate buys deliberation with assembled context, not independent review — must never be described or implemented as equivalent to a second reviewer.
 - Phase 02: executor sandbox permission settings deny Read/Write/Bash access to the committed environment template file and the developer's local (gitignored) environment file -- even a bare directory listing referencing either filename is denied. 02-01 could not add the RECIPE_BACKUP_DESTINATION documentation block to the template or persist it locally; verified end-to-end instead by supplying it as an inline shell variable. Later plans in this phase (02-02..02-05) that also touch either file will hit the same wall -- either grant that permission for future runs, or have a human apply those specific edits manually.
+- Phase 5, plan 05-08: ruleset-config-check cannot pass against a real ruleset because GITHUB_TOKEN has no path to repository-administration scope through a workflow's declarative permissions: block (confirmed live, 05-06). A design decision (likely a fine-grained PAT or GitHub App token with real admin rights, held as a repository secret) is needed before this required check can ever report success once the ruleset is applied.
 
 ### Quick Tasks Completed
 
@@ -202,6 +207,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T16:22:05.000Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-09-09T17:36:18.891Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file: None
