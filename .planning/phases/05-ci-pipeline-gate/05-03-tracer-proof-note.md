@@ -11,3 +11,8 @@ run exercises the non-trivial tier rather than an all-SAFE one.
 
 This file, and the pull request it travels in, will be closed unmerged once the observation is
 recorded in `05-03-SUMMARY.md`. Nothing here needs to land on `main`.
+
+## Trivial second-push marker
+
+This line exists solely to trigger a `synchronize` event and prove the sticky-comment property:
+the `analyze` job's verdict comment should be edited in place, not duplicated.
