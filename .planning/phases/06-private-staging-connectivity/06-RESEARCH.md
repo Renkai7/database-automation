@@ -538,17 +538,41 @@ async function readEnvironmentMarker(client: QueryableClient): Promise<string | 
 
 **If this table is empty:** N/A — see entries above; none of them are load-bearing for the phase's core decisions (D-01 through D-16 are already locked), only for specific command/path details the recon and the one-time setup steps will confirm live.
 
-## Open Questions
+## Open Questions (RESOLVED — disposition only)
+
+**Read the marker literally.** "RESOLVED" below means each question's *disposition* is settled and
+carried by a named plan task — it does **not** mean an answer was found. Both answers are still
+UNKNOWN and stay UNKNOWN until the named blocking-human checkpoint is actually performed. Recording
+a deferral as an answer is exactly what `CLAUDE.md`'s "mark unverified things UNKNOWN — do not
+record assumptions as facts" non-negotiable forbids.
 
 1. **Does the recipe app's existing Coolify deployment (if any exists yet — `06-CONTEXT.md` D-13 implies it does not) already have a database "resource" provisioned, or does this phase provision it from zero?**
    - What we know: `docs/00-current-state.md` §4 states "nothing for *this* app has been provisioned" as of Phase 5's close.
    - What's unclear: whether provisioning the Postgres resource is itself gated by any Coolify-side prerequisite (e.g., a project/environment must exist in Coolify's own UI first) beyond what D-13 already scopes.
    - Recommendation: fold into D-03's recon — this is exactly the kind of Coolify-instance-specific mechanic the recon exists to close.
+   - **RESOLVED — DEFERRED to live confirmation, not answered here.** Closed by **plan `06-01`, Task 2
+     ("Capture the hands-on recon of this Coolify instance"), item 7** — "whether Coolify manages
+     databases as first-class *resources* or as services inside a compose stack on this instance, and
+     which one `recipe_staging` is" — with the from-zero provisioning itself carried by that plan's
+     `user_setup.dashboard_config` entry "Create a PostgreSQL 17 resource in Coolify whose database
+     name is exactly `recipe_staging`". That checkpoint's own verification requires an explicit
+     UNKNOWN-with-reason for any item the owner could not establish, so a still-unanswered
+     prerequisite surfaces as UNKNOWN in `docs/50-staging-connectivity-recon.md` rather than as a
+     silent assumption. **Answer status until then: UNKNOWN.**
 
 2. **Exact deployment-branch-policy REST path (A2 above).**
    - What we know: the environment-creation `PUT` endpoint and its `deployment_branch_policy.custom_branch_policies` field are confirmed live.
    - What's unclear: the separate endpoint's exact path/verb for adding `main` as an allowed pattern.
    - Recommendation: confirm with a single `gh api` call against the real repository before the plan's one-time setup task depends on it, exactly as Phase 5 did for the ruleset payload shape.
+   - **RESOLVED — DEFERRED to live confirmation, not answered here.** Closed by **plan `06-07`, Task 1
+     ("Create the staging Environment, its main-only branch policy, its secrets and the CI key"),
+     item 3**, which names this document's Assumption A2 by name, states it "was NOT verified", and
+     requires the owner to "confirm it with a live `gh api` call and paste both the command and the
+     response" — with item 4's read-back (`gh api repos/{owner}/{repo}/environments/staging`) proving
+     the policy took effect rather than merely having been submitted. That task's `<verification>`
+     makes "the deployment-branch-policies endpoint path actually used is recorded, closing
+     06-RESEARCH.md Assumption A2" an acceptance condition. **Answer status until then: UNKNOWN — the
+     path in A2 remains an assumption, and no plan step may depend on it without the live call.**
 
 ## Environment Availability
 
