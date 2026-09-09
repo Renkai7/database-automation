@@ -99,22 +99,32 @@ function requireEnv(name: string): string {
   return value;
 }
 
-/** Task 3: selects which renderer produces the comment body for a given analyzer run. A verdict
- * exit code (SAFE/REVIEW_REQUIRED/BLOCKED) has a real AnalysisResult[] on stdout and renders via
- * renderPrComment; every other exit code (PARSE_FAILURE, RULES_INVALID, or anything this module
- * does not recognise) has no AnalysisResult[] at all and renders via
- * renderAnalyzerFailureComment instead -- attempting JSON.parse on non-JSON output would throw
- * before the comment could ever be posted, and D-20 requires posting SOMETHING that explains
- * why the check failed. A verdict-exit JSON parse failure (the analyzer's own contract broken)
- * also falls back to the failure comment rather than propagating an uncaught exception. Exported
- * for direct unit testing -- this is the one piece of branching logic in this file that is worth
- * testing without spawning a real process. */
-export function commentBodyForAnalyzerRun(
+export interface AnalyzeGateOutcome {
+  commentBody: string;
+  jobExitCode: number;
+  reason: string;
+}
+
+/** WR-02 (05-REVIEW.md): the single function whose output determines BOTH the posted PR comment
+ * and the job's own exit code, so the two can never independently disagree about whether the
+ * check actually passed. Previously the job's exit code was derived purely from
+ * `analyzerExitCode` via `jobExitCodeForAnalyzerExit`, while the comment body was computed
+ * separately and could fall back to the failure-comment renderer (whose text says "the check
+ * still fails") on a verdict exit code (SAFE/REVIEW_REQUIRED) whose JSON output could not be
+ * parsed or rendered -- producing a *passing*, required `analyze` check next to a PR comment that
+ * directly contradicted it. Now: a verdict exit code whose stdout cannot be parsed and rendered
+ * fails the job (`jobExitCode: 1`), using the SAME reason string that lands in the comment. This
+ * stays distinct from both a genuinely passing verdict and a genuine BLOCKED verdict -- "the
+ * analyzer's own JSON contract is broken" is never collapsed into "this migration is destructive"
+ * (03-CONTEXT.md D-08, 04-CONTEXT.md D-08); PARSE_FAILURE (exit 30) and RULES_INVALID (exit 40)
+ * keep their own distinct reasons via `jobExitCodeForAnalyzerExit`, untouched by this function. */
+export function resolveAnalyzeGateOutcome(
   analyzerExitCode: number,
   stdout: string,
   stderr: string,
   introducedPaths: ReadonlySet<string>,
-): string {
+): AnalyzeGateOutcome {
+  const { exitCode: jobExitCode, reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
   const isVerdictExit =
     analyzerExitCode === EXIT_CODES.SAFE ||
     analyzerExitCode === EXIT_CODES.REVIEW_REQUIRED ||
@@ -123,18 +133,45 @@ export function commentBodyForAnalyzerRun(
   if (isVerdictExit) {
     try {
       const files = JSON.parse(stdout) as AnalyzedFile[];
-      return renderPrComment(files, { introducedPaths });
+      return { commentBody: renderPrComment(files, { introducedPaths }), jobExitCode, reason };
     } catch (error) {
-      return renderAnalyzerFailureComment(
-        "The analyzer reported a verdict exit code but its JSON output could not be parsed.",
-        safeErrorMessage(error),
-      );
+      const renderFailureReason =
+        "The analyzer reported a verdict exit code but its JSON output could not be parsed.";
+      return {
+        commentBody: renderAnalyzerFailureComment(renderFailureReason, safeErrorMessage(error)),
+        // WR-02: a render/parse failure on what would otherwise be a passing (SAFE/
+        // REVIEW_REQUIRED) or BLOCKED exit must fail the job -- a check that could not actually
+        // report its verdict is not a check that passed (01-CONTEXT.md D-20, 02-CONTEXT.md
+        // D-19/D-20). This is deliberately `1`, not `jobExitCode`, so a SAFE/REVIEW_REQUIRED
+        // analyzer exit paired with corrupted stdout can never pass silently.
+        jobExitCode: 1,
+        reason: renderFailureReason,
+      };
     }
   }
 
-  const { reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
   const detail = stderr.trim().length > 0 ? stderr.trim() : "(no further detail captured on stderr)";
-  return renderAnalyzerFailureComment(reason, detail);
+  return { commentBody: renderAnalyzerFailureComment(reason, detail), jobExitCode, reason };
+}
+
+/** Task 3: selects which renderer produces the comment body for a given analyzer run. A verdict
+ * exit code (SAFE/REVIEW_REQUIRED/BLOCKED) has a real AnalysisResult[] on stdout and renders via
+ * renderPrComment; every other exit code (PARSE_FAILURE, RULES_INVALID, or anything this module
+ * does not recognise) has no AnalysisResult[] at all and renders via
+ * renderAnalyzerFailureComment instead -- attempting JSON.parse on non-JSON output would throw
+ * before the comment could ever be posted, and D-20 requires posting SOMETHING that explains
+ * why the check failed. A verdict-exit JSON parse failure (the analyzer's own contract broken)
+ * also falls back to the failure comment rather than propagating an uncaught exception. Retained
+ * as a thin wrapper around `resolveAnalyzeGateOutcome` (the single source of truth WR-02 added)
+ * for the existing direct unit tests of the comment-body branching in isolation, and exported for
+ * the same reason. */
+export function commentBodyForAnalyzerRun(
+  analyzerExitCode: number,
+  stdout: string,
+  stderr: string,
+  introducedPaths: ReadonlySet<string>,
+): string {
+  return resolveAnalyzeGateOutcome(analyzerExitCode, stdout, stderr, introducedPaths).commentBody;
 }
 
 /** Runs the whole `analyze` job and returns the intended process exit code. Posts the comment
@@ -169,8 +206,9 @@ async function runAnalyzeGate(): Promise<number> {
     { reject: false },
   );
   const analyzerExitCode = analyzeResult.exitCode ?? 1;
-  const { exitCode: jobExitCode, reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
-  const commentBody = commentBodyForAnalyzerRun(
+  // WR-02 (05-REVIEW.md): commentBody and jobExitCode both come from this one call now, so they
+  // can never independently disagree about whether the check passed.
+  const { commentBody, jobExitCode, reason } = resolveAnalyzeGateOutcome(
     analyzerExitCode,
     analyzeResult.stdout,
     analyzeResult.stderr,
