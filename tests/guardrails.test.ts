@@ -15,6 +15,7 @@
 // list is a deliberate, reviewable decision, not routine maintenance.
 import { execa } from "execa";
 import { readFileSync } from "node:fs";
+import { posix as posixPath } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ALLOWED_ROOT_FILES = ["package.json", "docker-compose.yml", ".env.example"];
@@ -68,6 +69,71 @@ async function sourceSurfaceFiles(): Promise<string[]> {
     });
 }
 
+// The single source of truth for "inside the extractable package" used by both the detector
+// below and the frozen debt inventory further down -- defined once so the two cannot drift
+// apart. No trailing slash: containment is tested against `${AUTOMATION_PACKAGE_ROOT}/` below,
+// never against a bare prefix, so a sibling directory that merely starts with the same
+// characters (e.g. a hypothetical "packages/automation-legacy") cannot be mistaken for a child.
+const AUTOMATION_PACKAGE_ROOT = "packages/automation";
+
+// Captures the quoted specifier following any of the four import positions used in this
+// codebase: an import/export from-clause ("from ..."), a bare side-effect import
+// ("import ..."), a dynamic import call ("import(...)"), and a require call ("require(...)").
+// Group 1 is the opening quote character, group 2 is the specifier itself, matched with a
+// negative-lookahead run so a specifier containing the other quote character (rare, but not
+// impossible) does not truncate the match early.
+const IMPORT_SPECIFIER_PATTERN = /\b(?:from|import|require)\b\s*\(?\s*(['"])((?:(?!\1).)*)\1/g;
+
+/**
+ * Reports every relative import specifier in `source` (a file whose repo-root-relative path is
+ * `filePath`) that resolves outside `packages/automation/` -- the invariant this enforces is "a
+ * module in this package resolves only to modules in this package," and it is deliberately
+ * general: reaching into the repo-root `scripts/` directory is the instance that exists today,
+ * not the rule, so an escape into `apps/` or `drizzle/` instead is caught the same way.
+ *
+ * `filePath` must be a repo-root-relative, forward-slash path exactly as `git ls-files` emits.
+ * Development happens on Windows, so the resolution below uses `node:path`'s POSIX API
+ * explicitly rather than the platform-default API, which would otherwise compare
+ * backslash-separated and slash-separated paths incorrectly.
+ *
+ * Returned in source order, duplicates preserved -- this reports occurrences, not a set, so two
+ * escaping imports in one file are visible as two entries rather than collapsed to one.
+ */
+function escapingRelativeImports(filePath: string, source: string): string[] {
+  // Drop any line whose trimmed form begins with a line-comment marker, a block-comment
+  // opener, or a bare JSDoc/block continuation star -- extends the comment-stripping idiom
+  // already used elsewhere in this file (D-06, D-20/D-21) to also cover block-comment shapes,
+  // so a header comment describing this very constraint (as this file's own comments do)
+  // cannot trip the check that enforces it. Only the line's LEADING characters are tested, so
+  // a trailing comment on a real import line does not hide that import (T-QUICK-03).
+  const codeOnly = source
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !(trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*"));
+    })
+    .join("\n");
+
+  const dir = posixPath.dirname(filePath);
+  const escapes: string[] = [];
+
+  for (const match of codeOnly.matchAll(IMPORT_SPECIFIER_PATTERN)) {
+    const specifier = match[2];
+    // Bare package specifiers (e.g. "libpg-query", "node:fs") are not relative imports and
+    // cannot escape a filesystem boundary they never crossed in the first place.
+    if (!specifier.startsWith(".")) continue;
+
+    const resolved = posixPath.normalize(posixPath.join(dir, specifier));
+    const isInsidePackageRoot =
+      resolved === AUTOMATION_PACKAGE_ROOT || resolved.startsWith(`${AUTOMATION_PACKAGE_ROOT}/`);
+    if (!isInsidePackageRoot) {
+      escapes.push(specifier);
+    }
+  }
+
+  return escapes;
+}
+
 describe("structural guardrails", () => {
   it("sourceSurfaceFiles() actually enumerates packages/ (and the other claimed roots), so the D-11/Pitfall 3 checks below cannot pass vacuously (03-07-PLAN.md Task 3)", async () => {
     // 03-VALIDATION.md's last row: a `--reporter verbose` run only prints test NAMES, never the
@@ -96,6 +162,88 @@ describe("structural guardrails", () => {
           "relies on it pass vacuously.",
       ).toBeGreaterThan(0);
     }
+  });
+
+  it("escapingRelativeImports() detects package-boundary escapes on synthetic input only -- never a real source file (WR-04)", () => {
+    // Synthetic in-memory strings throughout. A prior review finding (WR-04) rejected a test
+    // that mutated shipped data on disk to prove a detector non-vacuous; this test proves the
+    // same property against strings that are never written, read, or touched on the real
+    // filesystem.
+
+    // Escaping import in a nested file resolves and is reported.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/x.ts",
+        'import { safeErrorMessage } from "../../../scripts/log";',
+      ),
+      "a relative import three levels up from packages/automation/src/x.ts escapes the package " +
+        "and must be reported, verbatim, as a one-element array",
+    ).toEqual(["../../../scripts/log"]);
+
+    // Deeper nesting is handled by real path math, not by counting dot-dot segments: the same
+    // logical import written with one more level up, from a file one directory deeper.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/inspector/y.ts",
+        'import { safeErrorMessage } from "../../../../scripts/log";',
+      ),
+      "the same logical escape, one directory deeper and one dot-dot segment longer, must " +
+        "still resolve outside the package root and be reported",
+    ).toEqual(["../../../../scripts/log"]);
+
+    // In-package relative imports are NOT reported.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/inspector/z.ts",
+        [
+          'import { a } from "./sibling";',
+          'import { b } from "../classifier/thing";',
+        ].join("\n"),
+      ),
+      "imports that resolve inside packages/automation/ must never be reported, regardless of " +
+        "how many dot-dot segments they use",
+    ).toEqual([]);
+
+    // Bare package specifiers are NOT reported.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/x.ts",
+        ['import { parse } from "libpg-query";', 'import { readFile } from "node:fs";'].join(
+          "\n",
+        ),
+      ),
+      "bare package specifiers are not relative imports and cannot escape a filesystem " +
+        "boundary they never crossed",
+    ).toEqual([]);
+
+    // Comment-only lines are NOT reported, across all three comment shapes this file's own
+    // header comments use.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/x.ts",
+        [
+          '// import { safeErrorMessage } from "../../../scripts/log";',
+          '/* import { safeErrorMessage } from "../../../scripts/log"; */',
+          ' * import { safeErrorMessage } from "../../../scripts/log";',
+        ].join("\n"),
+      ),
+      "a matching import inside a line-comment, a block-comment opener, or a bare JSDoc " +
+        "continuation star must not be reported -- a header comment describing this very " +
+        "constraint must not trip the check that enforces it",
+    ).toEqual([]);
+
+    // Two escaping imports in one source yield a two-element array -- occurrences, not a set.
+    expect(
+      escapingRelativeImports(
+        "packages/automation/src/x.ts",
+        [
+          'import { safeErrorMessage } from "../../../scripts/log";',
+          'import { other } from "../../../scripts/other";',
+        ].join("\n"),
+      ),
+      "two distinct escaping imports in one file must both be reported, as two entries, not " +
+        "collapsed to one",
+    ).toEqual(["../../../scripts/log", "../../../scripts/other"]);
   });
 
   it("docker-compose.yml publishes the database port on loopback only, never all-interfaces (D-18)", () => {
