@@ -218,7 +218,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 — nothing is published until the audit is signed off)*
 
-- [ ] 05-02-PLAN.md — The public repository and the first push, with visibility, commit count and Actions default permissions read back rather than assumed (D-01, D-02)
+- [x] 05-02-PLAN.md — The public repository and the first push, with visibility, commit count and Actions default permissions read back rather than assumed (D-01, D-02)
 
 **Wave 3** *(blocked on Wave 2 — the tracer needs a repository to open a pull request against)*
 

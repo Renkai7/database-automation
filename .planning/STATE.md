@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: CI Pipeline Gate
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-09-09T14:51:00.126Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-09-09T15:26:09.832Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 05 execution started
-state_head: b0c7874ff4247f62de8a701c8afd0dbbdcb46e99
+state_head: f224b3912f3934f0e989ab9723a618341720bf2a
 progress:
   total_phases: 7
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 05 (CI Pipeline Gate) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-09-09 — Phase 05 execution started
 
@@ -89,6 +89,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P06 | 24 min | 3 tasks | 18 files |
 | Phase 04 P07 | 21min | 3 tasks | 8 files |
 | Phase 05-ci-pipeline-gate P01 | 14 min | 3 tasks | 3 files |
+| Phase 05-ci-pipeline-gate P02 | 35 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 04]: 04-07: pnpm db:reset does not forward db:migrate's own console output (scripts/db-reset.ts's execa call carries no stdio: inherit) -- verified live, confirmed harmless via direct query against runner.migration_runs, recorded as a documentation finding rather than fixed (file outside this plan's files_modified).
 - [Phase 04]: 04-07: Did not tick RUN-07/APP-02 checkboxes in REQUIREMENTS.md per this plan's own explicit acceptance criterion -- a deliberate divergence from the generic executor workflow's default close-out behavior.
 - [Phase 05-ci-pipeline-gate]: [Phase 05] 05-01: D-03 owner decision accept-all -- every finding in docs/40-public-release-audit.md (3123 rows, all 2784 UNKNOWN_HIGH_ENTROPY entries included) dispositioned ACCEPT-AS-PUBLIC via dated 2026-09-09 sign-off. No history rewrite; SHAs cited by existing phase records keep resolving. Plan 05-02 cleared to proceed. — Decision rests on file-level distribution evidence (single .env.example path ever added, always placeholder-only; findings dominated by planning-doc prose, test fixtures, lockfile hashes/cited SHAs) plus the confirmed fact this project has never connected to a real staging/production database (D2/D3). The sign-off explicitly records that the 3123 rows' individual diff content was not read one by one -- strong evidence, not exhaustive proof of absence, per CLAUDE.md's mark-unverified-UNKNOWN discipline.
+- [Phase 05-ci-pipeline-gate]: D-01 authorized (push-now, conditional on re-audit): owner required the pre-publication audit refreshed to live HEAD before the push. Re-ran the scanner (250 commits, 9323 findings), extended the existing accept-all disposition without reopening it, and recorded the bounded residual gap (this refresh's own recording commit is structurally unscanned) before proceeding. — The owner's condition made re-auditing a prerequisite to the irreversible push, not optional diligence -- doing it first kept the audit record honest about what was actually being published.
+- [Phase 05-ci-pipeline-gate]: D-02 confirmed public: repository created with --public, and gh repo view reads back visibility PUBLIC, matching D-02's recorded choice rather than the flag alone. — Removes CI-03's plan-tier risk and resolves the Phase 7 environment-protection-bypass blocker; the owner's actual plan tier stays UNKNOWN and is made not to matter.
 
 ### Pending Todos
 
@@ -192,6 +195,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T14:51:00.023Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-09-09T15:26:09.726Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
