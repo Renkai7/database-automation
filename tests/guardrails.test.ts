@@ -38,6 +38,23 @@ const FIXTURE_FILES_WITH_CONNECTION_STRINGS = [
 // silently re-widen whichever check has the smaller genuine need.
 const FIXTURE_FILES_READING_DEV_CONNECTION_VARIABLE = ["scripts/env.test.ts"];
 
+// KNOWN_PACKAGE_BOUNDARY_ESCAPES is an inventory of known debt, not an exemption list -- unlike
+// the two allowlists above, no file listed here is excused from anything. It is compared by
+// exact equality in both directions (see the guardrail test near D-28 below), so it fails on a
+// growth (a new key, or a longer array for an existing key) AND on an un-recorded shrink (a key
+// silently dropped without editing this constant). Entries may only be REMOVED: removing one is
+// the intended end state as Phase 7's package extraction (PLAT-01) closes these sites one at a
+// time. Adding an entry is a deliberate architectural decision requiring a docs/decisions.md
+// record (see D25), never routine maintenance -- the same bar 03-REVIEW's own finding (WR-04
+// lineage) held this file to elsewhere. The four entries below are attributed to
+// .planning/v1-MILESTONE-AUDIT.md's single recorded integration defect and to 03-REVIEW-WR-03.
+const KNOWN_PACKAGE_BOUNDARY_ESCAPES: Readonly<Record<string, readonly string[]>> = {
+  "packages/automation/src/cli.ts": ["../../../scripts/log"],
+  "packages/automation/src/inspector/inspect.ts": ["../../../../scripts/log"],
+  "packages/automation/src/inspector/inspect-plpgsql.ts": ["../../../../scripts/log"],
+  "packages/automation/src/runner/run-migrations.ts": ["../../../../scripts/log"],
+};
+
 // Built at runtime, not as a literal, so this check's own needle never appears in this file's
 // source as a literal substring -- matching the init-script and direct-sync tokens below. This
 // is what keeps this file passing against its own assertion once the blanket *.test.ts
@@ -499,6 +516,43 @@ describe("structural guardrails", () => {
       ).not.toContain(fromPgNeedle);
       expect(content, `D-28: "${file}" must not require("pg")`).not.toContain(requirePgNeedle);
     }
+  });
+
+  it("packages/automation's package boundary is held by a ratcheted debt inventory, not developer discipline (D-25)", async () => {
+    // Mirrors the D-28 test immediately above: filter first, assert the filtered list is
+    // non-empty BEFORE examining anything, so a renamed directory or a gitignore change cannot
+    // make this check silently examine nothing (T-QUICK-02). Restricted to TypeScript files
+    // deliberately -- the package also ships a SQL statement corpus and a JSON default-rules
+    // file, and the invariant here is about TypeScript module resolution, not about those.
+    const files = (await sourceSurfaceFiles()).filter(
+      (file) => file.startsWith(`${AUTOMATION_PACKAGE_ROOT}/`) && file.endsWith(".ts"),
+    );
+    expect(
+      files.length,
+      "escapingRelativeImports() must actually examine at least one packages/automation/*.ts " +
+        "file, or this guardrail passes having checked nothing",
+    ).toBeGreaterThan(0);
+
+    const liveEscapes: Record<string, string[]> = {};
+    for (const file of files) {
+      const escapes = escapingRelativeImports(file, readFileSync(file, "utf-8"));
+      if (escapes.length > 0) {
+        liveEscapes[file] = escapes;
+      }
+    }
+
+    expect(
+      liveEscapes,
+      "T-QUICK-01/T-QUICK-02 (D-25): the live set of packages/automation package-boundary " +
+        "escapes no longer matches KNOWN_PACKAGE_BOUNDARY_ESCAPES exactly. If this run found " +
+        "MORE than the inventory records (a new key, or a longer array for an existing key), " +
+        "the package boundary just widened -- remove the new relative import rather than " +
+        "recording it here; no file in this inventory is exempt from that rule, including " +
+        "files already listed. If this run found FEWER (a key present in the inventory but " +
+        "absent from the live scan), debt was paid -- delete that entry from " +
+        "KNOWN_PACKAGE_BOUNDARY_ESCAPES rather than leaving a stale record. CLAUDE.md: " +
+        "\"prefer architectural enforcement over remembered caution.\"",
+    ).toEqual(KNOWN_PACKAGE_BOUNDARY_ESCAPES);
   });
 
   it("apps/recipe-app/drizzle.config.ts calls the shared target assertion (D-16, closes the PARTIAL key link)", () => {
