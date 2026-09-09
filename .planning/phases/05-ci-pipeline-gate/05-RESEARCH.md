@@ -1,6 +1,11 @@
 # Phase 5: CI Pipeline Gate - Research
 
 **Researched:** 2026-09-09
+**Amended:** 2026-09-09 — `## Open Questions` given explicit dispositions during planning; see that
+section (now `## Open Questions (RESOLVED)`) for which plan and task owns each. "RESOLVED" there
+means the status is recorded and owned, **not** that the answer is known: questions 1 and 2 are
+settled by live observation once the repository exists, and question 3 (`generate`'s exit code,
+assumption A4) stays **UNKNOWN on purpose** — plan `05-04` deliberately does not depend on it.
 **Domain:** GitHub repository rulesets, GitHub Actions CI gating, pull-request-surfaced safety verdicts, migration-file tamper detection
 **Confidence:** MEDIUM-HIGH (GitHub ruleset/Actions mechanics are HIGH where an official doc page loaded cleanly; MEDIUM where only a community source or a partial doc excerpt was available — each claim below is tagged individually. Two claims are session-verified live against this repository's own code and are the highest-confidence findings in this document.)
 
@@ -511,19 +516,34 @@ Binding the service container to `127.0.0.1:5432` (not the bare `5432:5432` shor
 | A4 | `drizzle-kit generate`'s exit code does not distinguish "no drift" from "drift found" (only the git working-tree diff does) | Pitfall 4 | Medium — only the no-drift case (exit succeeded, no file created) was actually observed live this session; the drift-found case was not independently tested. If `drizzle-kit generate` does in fact exit non-zero on drift, the recommended git-diff-based check is still correct and strictly safer (works regardless of exit-code behavior), so this assumption being wrong does not invalidate the recommendation, only means an additional signal (exit code) could optionally be layered on top |
 | A5 | Third-party marketplace Actions (e.g. sticky-comment Actions) are real, actively maintained projects as characterized by WebSearch results, rather than independently verified via the Package Legitimacy Gate (which targets npm/PyPI/crates registries, not the GitHub Actions marketplace) | Standard Stack — Alternatives Considered | Low — these are explicitly NOT recommended for this phase (the `gh` CLI is), so this assumption is informational context for the "why not" column, not a load-bearing recommendation |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+**All three questions below were given an explicit disposition during phase planning
+(2026-09-09).** Each carries an inline RESOLVED marker naming the plan and task that owns it, so a
+reader can tell a deferred-with-a-plan question from a forgotten one.
+
+Read "RESOLVED" here as **the status is recorded and owned**, not as "the answer is now known."
+Two of the three are settled by a live observation that cannot be made until the repository
+exists; they are dispositioned with their failure path pre-committed rather than left to be
+improvised on the day. The third stays **UNKNOWN on purpose** — nothing in this phase depends on
+its answer, and CLAUDE.md's first working-style rule is that an unverified thing stays marked
+UNKNOWN rather than being upgraded to a fact to make a section look closed. Do not read any line
+below as a claim that a live check has already been performed.
 
 1. **Does `administration: read` suffice to see `bypass_actors` in the ruleset API response, or is `administration: write` required?**
    - What we know: GitHub's docs state "write access to the ruleset" is required for the field to appear.
    - What's unclear: whether a `GITHUB_TOKEN` `permissions:` block set to `administration: write` (the only two levels GitHub Actions exposes for this permission are `read`/`write`/none) actually satisfies "write access to the ruleset" as the docs mean it, versus requiring true repository-admin identity that a bot token can never have regardless of the `permissions:` block.
    - Recommendation: grant `administration: write` on the D-05 job and confirm with a real `gh api` call against the real ruleset once it exists (unavoidable — the repository/ruleset do not exist during this research pass); if `bypass_actors` still does not appear, the fallback is to fail the check loudly and treat this as a phase-blocking finding requiring a design change (e.g., a PAT with genuine admin rights stored as a repo secret — which then reopens a "credential beyond GITHUB_TOKEN" question the CONTEXT.md's own constraints explicitly want to avoid).
+   - **RESOLVED — owned by `05-05` Task 2 and `05-08` Task 1. The answer itself remains UNKNOWN until observed live; what is settled is that the project no longer needs it in advance to be safe.** `05-05` Task 2 builds `assertBypassListEmpty` so an *absent* `bypass_actors` field throws with a message distinct from the non-empty case — absence and emptiness are never conflated, so the unreadable outcome fails closed instead of passing (threat `T-05-26`). `05-08` Task 1 then calls the real API against the real ruleset with the token carrying `administration: write` and records verbatim whether the field appeared. Three outcomes are pre-committed: present-and-empty (passes), present-and-non-empty (fails, correctly), absent (fails loudly and becomes a phase-blocking finding requiring the design change this question's own recommendation names). Nothing here asserts which outcome will occur.
 
 2. **Does GitHub Actions' `pull_request` event on a same-repository (non-fork) PR reliably grant a write-capable `GITHUB_TOKEN` by default, or does this depend on a repository setting that must itself be checked/set?**
    - What we know: fork PRs get a read-only token; D-16 already documents this limitation.
    - What's unclear: whether the *default* Actions permissions setting for a brand-new public repository (created fresh in D-01) is "read and write" or "read only" — this is a per-repository setting under Settings → Actions → General, and GitHub has changed the default for newly created repositories over time.
    - Recommendation: explicitly verify (and if needed set) the repository's default workflow permissions during D-01's repository setup, rather than assuming the sticky-comment step will work on the first real PR.
+   - **RESOLVED — owned by `05-02` Task 3; the recommendation was taken as written.** That task reads `gh api repos/{owner}/{repo}/actions/permissions/workflow` during repository setup, sets it explicitly if the read-back is not `write`, asserts the read-back value in its acceptance criteria, records the observed value in `docs/40-public-release-audit.md`, and carries the read-only-default failure mode as threat `T-05-09`. `05-03` re-checks that recorded value as its stated trigger if the comment step ever fails. The general question — what GitHub's default is for a brand-new repository today — is deliberately **not** answered: the plan reads the actual value on the actual repository, which is what makes the general answer unnecessary rather than known.
 
 3. **Exact behavior of `drizzle-kit generate`'s exit code when it does produce a new migration file** (A4 above) — settle by a disposable local test (deliberately introduce a schema change, run `generate`, observe the exit code) before finalizing whether the D-09 schema-drift check should also gate on exit code as a secondary signal.
+   - **RESOLVED as a disposition only — the underlying fact stays UNKNOWN, deliberately, and must not be recorded as anything else.** Owned by `05-04` Task 3, which **declines** the secondary signal this question was asked in service of. The drift check keys entirely on `git status --porcelain` before and after generation: a file appearing is the signal, and that signal is correct whichever exit code generation returns. The disposable local test recommended above was therefore not run, and no exit-code behaviour is claimed anywhere in this document. Assumption **A4 stays UNKNOWN** in the Assumptions Log; `05-04`'s `<flagged_assumptions>` block carries it forward explicitly; `05-04` Task 3 additionally logs the observed exit code as an observation while stating in the log that it is recorded rather than relied on; and `05-08` Task 3 closes the phase recording it as a live unknown rather than a closed one. If a future phase ever wants the exit code as a signal, this question reopens with its recommendation intact.
 
 ## Sources
 
