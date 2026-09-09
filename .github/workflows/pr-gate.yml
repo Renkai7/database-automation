@@ -1,0 +1,63 @@
+# D-04/D-06/D-16 (05-CONTEXT.md): the pull-request gate. At this plan it carries the `analyze`
+# job only -- `tamper-checks`, `test`, `test-history`, `migrate`, and `ruleset-config-check` are
+# later plans in this phase. The `analyze` job's `name:` is a published contract: plan 05-08
+# copies it verbatim into the repository ruleset's required_status_checks list (Pitfall 2,
+# 05-RESEARCH.md), so it must never be renamed casually once the ruleset exists.
+#
+# Plain `pull_request`, never `pull_request_target` (05-RESEARCH.md Pitfall 6, T-05-12): this
+# repository has no fork pull requests today, and the elevated fork-token trigger is an
+# anti-pattern this phase deliberately declines to reach for.
+name: PR Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Workflow-level default is read-only (T-05-16); pull-requests: write is granted on the analyze
+# job alone, the only job that needs it.
+permissions:
+  contents: read
+
+# CI-04: two runs of `analyze` for the same pull request can never be posting a comment at once.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Explicit head-SHA checkout, never the default pull_request merge ref (05-RESEARCH.md
+      # Architecture Pattern 3). fetch-depth: 0 is required for scripts/ci/analyze-gate.ts's
+      # base/head diff to resolve at all (Pitfall 3).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Settles 05-RESEARCH.md assumption A1 (gh preinstalled on the runner) from the first real
+      # run, rather than trusting it.
+      - name: Confirm the GitHub CLI is available
+        run: gh --version
+
+      - name: Run the analyze gate
+        run: pnpm exec tsx scripts/ci/analyze-gate.ts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}

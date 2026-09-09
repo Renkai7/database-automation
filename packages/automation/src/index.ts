@@ -7,6 +7,10 @@ export { loadDefaultRules } from "./adapter/default-rules";
 export { loadRules } from "./classifier/classify";
 export * from "./types";
 
+// D-16/D-17 (05-CONTEXT.md): the pure PR-comment renderer for the `analyze` job.
+export { PR_COMMENT_MARKER, renderPrComment } from "./render/pr-comment";
+export type { AnalyzedFile } from "./render/pr-comment";
+
 // D-27: Phase 4's runner core -- the local entry point (scripts/db-migrate.ts) and any future
 // harness (Testcontainers history tests) import exclusively from here, never by reaching into
 // individual src/runner/ modules directly.
