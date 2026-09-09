@@ -253,7 +253,17 @@ Plans:
   3. Running `drizzle-kit push` from a developer machine against the staging connection variable fails or is structurally impossible — proven by attempting it — while it continues to work normally against the local development container.
   4. A schema change merged to the staging branch/pipeline reaches the staging database automatically, with no application redeploy and no one pasting a command into a Coolify terminal, using a migration credential that is different from — and more restricted than — the application's own runtime database credential.
 
-**Plans**: TBD
+**Plans:** 8 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Tracer: provision staging, prove the private path end-to-end, write the recon record, close D4
+- [ ] 06-02-PLAN.md — Three-role bootstrap SQL, argument-free runner, privilege-boundary proof, performed run
+- [ ] 06-03-PLAN.md — Three-vantage port proof and the two SSH key-scope attempts
+- [ ] 06-04-PLAN.md — Fail-closed server-side environment marker in the development guard (CONN-03 automated half)
+- [ ] 06-05-PLAN.md — `db:migrate:staging` entry point, staging dynamic pin, wait-for-port helper
+- [ ] 06-06-PLAN.md — Performed schema-sync refusal record (CONN-03 performed half)
+- [ ] 06-07-PLAN.md — `staging` GitHub Environment and the push-to-`main` staging migration workflow
+- [ ] 06-08-PLAN.md — End-to-end: a merged schema change reaches staging with no redeploy; phase close-out
 
 ### Phase 7: Production Runner, Environment Gate & Audit Log
 
