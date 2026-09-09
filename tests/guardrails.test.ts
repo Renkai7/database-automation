@@ -565,4 +565,62 @@ describe("structural guardrails", () => {
         "env module at all.",
     ).toContain("assertLocalDevelopmentTarget");
   });
+
+  it("no file in the application's own source (or its Next.js startup-hook files) triggers a migration at boot (D-15, CI-06)", async () => {
+    // 05-07-PLAN.md Task 1: nothing in apps/recipe-app/src, next.config.ts, or an
+    // instrumentation*.ts startup hook may reference the migration entry point, the runner's
+    // exported symbols, or the schema-sync sub-command -- migrations reach the database only
+    // through the pipeline-invoked runner (scripts/db-migrate.ts), never through the
+    // application's own startup path (docs/decisions.md D8). Enumerated by prefix, not a
+    // hand-typed file list, so a file added later is covered by default rather than exempt by
+    // default.
+    const { stdout } = await execa("git", ["ls-files"]);
+    const allFiles = stdout.split("\n").filter(Boolean);
+    const applicationBootFiles = allFiles.filter(
+      (file) =>
+        file.startsWith("apps/recipe-app/src/") ||
+        file === "apps/recipe-app/next.config.ts" ||
+        file.startsWith("apps/recipe-app/instrumentation"),
+    );
+
+    expect(
+      applicationBootFiles.length,
+      "D-15/CI-06: the enumerated application-source file list must actually contain files -- " +
+        "a renamed directory or a gitignore change would otherwise make this check pass having " +
+        "examined nothing.",
+    ).toBeGreaterThan(0);
+
+    // Built at runtime, not as literals, so this test file's own source never contains the
+    // forbidden expressions it searches for -- matching this file's established idiom.
+    const migrateScriptNeedle = ["db", ":migrate"].join("");
+    const runMigrationsNeedle = ["run", "Migrations"].join("");
+    const ensureDrizzleLedgerNeedle = ["ensure", "DrizzleLedger"].join("");
+    const enumerateMigrationFilesNeedle = ["enumerate", "MigrationFiles"].join("");
+    const schemaSyncNeedle = ["drizzle-kit", "push"].join(" ");
+    const needles = [
+      migrateScriptNeedle,
+      runMigrationsNeedle,
+      ensureDrizzleLedgerNeedle,
+      enumerateMigrationFilesNeedle,
+      schemaSyncNeedle,
+    ];
+
+    for (const file of applicationBootFiles) {
+      // Comment-only lines stripped first, matching this file's established idiom, so a comment
+      // describing this very constraint cannot trip the check that enforces it.
+      const content = readFileSync(file, "utf-8")
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n");
+
+      for (const needle of needles) {
+        expect(
+          content,
+          `D-15/CI-06: "${file}" must not reference "${needle}" -- migrations reach the ` +
+            "database only through the pipeline-invoked runner (scripts/db-migrate.ts), never " +
+            "through the application's own startup path.",
+        ).not.toContain(needle);
+      }
+    }
+  });
 });
