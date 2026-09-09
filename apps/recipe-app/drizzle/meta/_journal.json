@@ -36,6 +36,13 @@
       "when": 1788907107307,
       "tag": "0004_redundant_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788978616328,
+      "tag": "0005_lumpy_starjammers",
+      "breakpoints": true
     }
   ]
 }
