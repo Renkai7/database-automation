@@ -27,6 +27,10 @@ jobs:
   analyze:
     name: analyze
     runs-on: ubuntu-latest
+    # WR-01 (05-REVIEW.md): every job that runs untrusted-adjacent tooling (the WASM parser and a
+    # `gh pr comment` call) needs the same hang guard `test` and `test-history` already carry,
+    # rather than falling back to GitHub's default 360-minute ceiling.
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
@@ -73,6 +77,10 @@ jobs:
   tamper-checks:
     name: tamper-checks
     runs-on: ubuntu-latest
+    # WR-01 (05-REVIEW.md): this job spawns `git log -p`-scale diffing and a `pnpm db:generate`
+    # child process with `stdio: "inherit"`, so a prompt it doesn't expect could hang indefinitely
+    # rather than erroring -- guard it the same way `test` and `test-history` already are.
+    timeout-minutes: 10
     env:
       RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
       RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
@@ -226,6 +234,8 @@ jobs:
   ruleset-config-check:
     name: ruleset-config-check
     runs-on: ubuntu-latest
+    # WR-01 (05-REVIEW.md): same hang guard as the other jobs in this workflow.
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -264,6 +274,8 @@ jobs:
   ruleset-bypass-audit:
     name: ruleset-bypass-audit
     runs-on: ubuntu-latest
+    # WR-01 (05-REVIEW.md): same hang guard as the other jobs in this workflow.
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -297,6 +309,9 @@ jobs:
   migrate:
     name: migrate
     runs-on: ubuntu-latest
+    # WR-01 (05-REVIEW.md): this job drives a real Postgres service container; guard it against
+    # burning Actions minutes for up to six hours per occurrence the same way the other jobs are.
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:17
