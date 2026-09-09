@@ -4,10 +4,10 @@ current_phase: 5
 current_phase_name: CI Pipeline Gate
 status: planning
 stopped_at: Phase 04 complete, ready to plan Phase 5
-last_updated: "2026-09-08T23:36:14.223Z"
-last_activity: 2026-09-08
-last_activity_desc: Phase 04 complete, transitioned to Phase 5
-state_head: 2cacbd9ae2721a29c8dbacefb4b53ff62a5ecaae
+last_updated: "2026-09-08T23:41:37.437Z"
+last_activity: 2026-09-09
+last_activity_desc: "Quick task 260909-a83: package-boundary guardrail test"
+state_head: ca84e77816d8db1b9e97098faf3340af0abe7b78
 progress:
   total_phases: 7
   completed_phases: 1
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 5 — CI Pipeline Gate
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-09-08 — Phase 04 complete, transitioned to Phase 5
+Last activity: 2026-09-09 - Completed quick task 260909-a83: add guardrail test forbidding ../../../scripts imports from packages/automation/src
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -177,6 +177,7 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 | 260907-ir1 | Fix UAT gap G-01-2: raise tablet body-copy type scale in recipe-app globals.css | 2026-09-07 | f598dea | [260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop](./quick/260907-ir1-fix-uat-gap-g-01-2-raise-tablet-body-cop/) |
 | 260907-r6z | Add decision D15 to docs/decisions.md documenting the proposed packaging/reuse strategy for the backup-restore-drill tooling | 2026-09-07 | 2699dc5 | [260907-r6z-add-decision-d15-to-docs-decisions-md-do](./quick/260907-r6z-add-decision-d15-to-docs-decisions-md-do/) |
 | 260908-kdl | tick APP-01 and refresh the REQUIREMENTS.md footer note | 2026-09-08 | 3af8bfb | [260908-kdl-tick-app-01-and-refresh-the-requirements](./quick/260908-kdl-tick-app-01-and-refresh-the-requirements/) |
+| 260909-a83 | add guardrail test forbidding ../../../scripts imports from packages/automation/src | 2026-09-09 | 642022d | [260909-a83-add-guardrail-test-forbidding-scripts-im](./quick/260909-a83-add-guardrail-test-forbidding-scripts-im/) |
 
 ## Deferred Items
 
