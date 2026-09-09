@@ -16,8 +16,14 @@
 import { execa } from "execa";
 import { readFileSync } from "node:fs";
 import { posix as posixPath } from "node:path";
+import { parse as parseConnectionString } from "pg-connection-string";
 import { describe, expect, it } from "vitest";
 import { loadRules, RulesFileError } from "../packages/automation/src/index";
+import {
+  DEV_DATABASE_HOST_ALLOWLIST,
+  EXPECTED_DEV_DATABASE_NAME,
+  EXPECTED_DEV_DATABASE_PORT,
+} from "../scripts/env";
 
 const ALLOWED_ROOT_FILES = ["package.json", "docker-compose.yml", ".env.example"];
 
@@ -62,6 +68,25 @@ const KNOWN_PACKAGE_BOUNDARY_ESCAPES: Readonly<Record<string, readonly string[]>
 // exemption is gone (this file is deliberately not a member of either allowlist above).
 const CONNECTION_STRING_SCHEME_PREFIX = ["postgres", "://"].join("");
 
+// 05-07-PLAN.md Task 3: the only workflow file(s) permitted to carry a PostgreSQL
+// connection-string scheme prefix. Unlike FIXTURE_FILES_WITH_CONNECTION_STRINGS above, this is
+// D25's shape, not a plain exemption: every listed file's connection strings are still checked
+// below (the constrained-connection-string test) against the pinned host/port/database
+// components -- the entry swaps a ban for a constraint, it does not excuse the file from
+// scrutiny. `pr-gate.yml`'s `tamper-checks`/`test`/`test-history`/`migrate` jobs, and
+// `restore-drill.yml`'s `drill` job, each declare a throwaway, per-job container credential
+// guarding nothing that outlives the job (T-05-38). Deviation from 05-07-PLAN.md Task 3's own
+// action text, which names only `pr-gate.yml`: `restore-drill.yml` (05-06) carries the identical
+// pinned-target connection string and, now that .github/ is in the source surface, would
+// otherwise be flagged as an offender by the connection-string-prefix test below for the exact
+// same non-issue pr-gate.yml's entry exists to resolve -- the plan's own must_haves truth ("any
+// PostgreSQL connection string appearing in a CI workflow file...") is not scoped to one file,
+// so both are listed (Rule 1: the plan text undercounted, the invariant it states did not).
+const CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN = [
+  ".github/workflows/pr-gate.yml",
+  ".github/workflows/restore-drill.yml",
+];
+
 async function sourceSurfaceFiles(): Promise<string[]> {
   const { stdout } = await execa("git", ["ls-files"]);
   return stdout
@@ -81,6 +106,13 @@ async function sourceSurfaceFiles(): Promise<string[]> {
       // connection-string, direct-sync, and direct-environment-read checks below should cover
       // this source the same way they cover scripts/ and tests/.
       if (file.startsWith("packages/")) return true;
+      // 05-07-PLAN.md Task 3: .github/ did not exist when this enumeration was written, so it
+      // was never in scope either -- an oversight, not a deliberate exclusion like .planning/
+      // and docs/ below. A workflow file is now a place a second ungated path to schema state
+      // could appear, so the schema-sync ban, the migrate-sub-command ban and the
+      // direct-connection-variable-read ban below should cover it exactly as they cover
+      // scripts/ and tests/.
+      if (file.startsWith(".github/")) return true;
       // Deliberately excluded: .planning/ and docs/ are prose ABOUT these constraints and
       // would otherwise match every assertion below that they describe.
       return false;
@@ -338,9 +370,15 @@ describe("structural guardrails", () => {
 
   it("only .env.example and the enumerated fixture files carry a PostgreSQL connection-string scheme prefix (D-19, WR-01)", async () => {
     // WR-01: excludes only the explicitly enumerated fixture allowlist, not every *.test.ts
-    // file -- a new test file is covered by this check by default.
+    // file -- a new test file is covered by this check by default. 05-07-PLAN.md Task 3:
+    // CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN is excluded here too, but -- unlike the fixture
+    // allowlist -- is not left unexamined: the constrained-connection-string test immediately
+    // below parses every connection string in each of those files and asserts it targets the
+    // pinned development host, port and database.
     const files = (await sourceSurfaceFiles()).filter(
-      (file) => !FIXTURE_FILES_WITH_CONNECTION_STRINGS.includes(file),
+      (file) =>
+        !FIXTURE_FILES_WITH_CONNECTION_STRINGS.includes(file) &&
+        !CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN.includes(file),
     );
     const offenders = files.filter((file) => {
       if (file === ".env.example") return false;
@@ -348,8 +386,9 @@ describe("structural guardrails", () => {
     });
     expect(
       offenders,
-      `D-19/WR-01: no committed file other than .env.example or an enumerated fixture may ` +
-        `contain a ${CONNECTION_STRING_SCHEME_PREFIX} connection-string prefix`,
+      `D-19/WR-01: no committed file other than .env.example, an enumerated fixture, or a ` +
+        `listed CI workflow file may contain a ${CONNECTION_STRING_SCHEME_PREFIX} ` +
+        "connection-string prefix",
     ).toEqual([]);
 
     const envExample = readFileSync(".env.example", "utf-8");
@@ -357,6 +396,61 @@ describe("structural guardrails", () => {
       envExample,
       ".env.example's connection string must be a placeholder, never a working credential",
     ).toContain("PLACEHOLDER");
+  });
+
+  it("every connection string in a listed CI workflow file targets the pinned development host, port and database (D25 shape, 05-07-PLAN.md Task 3)", async () => {
+    // The allowlist above swaps a ban for a constraint rather than merely exempting the file --
+    // every connection string CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN's files carry is parsed and
+    // checked against the same three pinned target components scripts/env.ts's own
+    // assertLocalDevelopmentTarget enforces, imported here rather than re-typed, so the two
+    // pins can never independently drift. Makes D-14's "shape the CI database to fit the pin,
+    // never loosen the pin to fit CI" a tested property, not just a hope.
+    expect(
+      CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN.length,
+      "CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN must not be empty -- an empty allowlist would make " +
+        "this check pass having examined nothing.",
+    ).toBeGreaterThan(0);
+
+    const trackedFiles = await sourceSurfaceFiles();
+    for (const file of CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN) {
+      expect(
+        trackedFiles,
+        `CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN names "${file}", which must exist in git ls-files ` +
+          "-- a renamed workflow file must fail loudly here, not quietly disable the constraint.",
+      ).toContain(file);
+    }
+
+    const connectionStringPattern = /postgres(?:ql)?:\/\/[^\s"'$]+/g;
+    for (const file of CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN) {
+      const content = readFileSync(file, "utf-8");
+      const connectionStrings = [...content.matchAll(connectionStringPattern)].map((match) => match[0]);
+      expect(
+        connectionStrings.length,
+        `"${file}" is listed in CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN but carries no connection ` +
+          "string to constrain -- if this file no longer needs the exemption, remove it from " +
+          "the allowlist instead of leaving a stale entry.",
+      ).toBeGreaterThan(0);
+
+      for (const connectionString of connectionStrings) {
+        const parsed = parseConnectionString(connectionString);
+        expect(
+          (DEV_DATABASE_HOST_ALLOWLIST as readonly string[]).includes(parsed.host ?? ""),
+          `"${file}" carries a connection string whose host is not in the pinned development ` +
+            `allowlist (${DEV_DATABASE_HOST_ALLOWLIST.join(", ")}) -- a CI connection string ` +
+            "must never point anywhere else.",
+        ).toBe(true);
+        expect(
+          String(parsed.port ?? ""),
+          `"${file}" carries a connection string whose port does not match the pinned ` +
+            `development port (${EXPECTED_DEV_DATABASE_PORT}).`,
+        ).toBe(EXPECTED_DEV_DATABASE_PORT);
+        expect(
+          parsed.database,
+          `"${file}" carries a connection string whose database name does not match the pinned ` +
+            `development database name (${EXPECTED_DEV_DATABASE_NAME}).`,
+        ).toBe(EXPECTED_DEV_DATABASE_NAME);
+      }
+    }
   });
 
   it("scripts/db-query.ts never reads process.env directly (D-16)", () => {
@@ -430,7 +524,7 @@ describe("structural guardrails", () => {
     ).toEqual(["127.0.0.1", "::1", "[::1]", "localhost"].sort());
   });
 
-  it("no command script reads process.argv, stdin, or an interactive prompt library (D-06)", () => {
+  it("no command script reads process.argv, stdin, or an interactive prompt library (D-06)", async () => {
     // 02-03-PLAN.md Task 3: makes "no command in this phase can be pointed at another database"
     // permanent rather than plan-time -- a command that accepts an argument is the command that
     // later accepts a target. Needles are built at runtime, matching this file's own convention
@@ -438,12 +532,31 @@ describe("structural guardrails", () => {
     // literal expressions it searches for. Widened beyond Phase 2 (04-05-PLAN.md Task 2) to cover
     // `scripts/db-migrate-recover.ts` too -- the same no-target rule applies to every command
     // script in this repository, not just the ones Phase 2 happened to introduce first.
+    //
+    // 05-07-PLAN.md Task 3: also widened to cover every `scripts/ci/*.ts` module this phase
+    // added, derived from `git ls-files scripts/ci` rather than a hand-typed array, so a
+    // seventh CI script added later is covered by default rather than exempt by default. Every
+    // one of them takes its configuration from the Actions environment, so this costs nothing
+    // today and makes "a command that accepts an argument is the command that later accepts a
+    // target" hold for the CI surface too. `scripts/db-migrate.ts` is deliberately NOT in
+    // either list -- its `--migrations-dir <path>` flag names a directory, never a database
+    // target (D-23), which this unconditional ban does not apply to.
+    const { stdout: ciScriptsStdout } = await execa("git", ["ls-files", "scripts/ci"]);
+    const ciCommandScripts = ciScriptsStdout.split("\n").filter(Boolean);
+    expect(
+      ciCommandScripts.length,
+      "git ls-files scripts/ci must actually enumerate at least one file -- an enumeration that " +
+        "silently yields nothing would make the widened coverage below pass having examined " +
+        "nothing.",
+    ).toBeGreaterThan(0);
+
     const commandScripts = [
       "scripts/backup.ts",
       "scripts/restore.ts",
       "scripts/restore-cluster.ts",
       "scripts/drill.ts",
       "scripts/db-migrate-recover.ts",
+      ...ciCommandScripts,
     ];
     const argvNeedle = ["process", ".argv"].join("");
     const stdinNeedle = ["process", ".stdin"].join("");
