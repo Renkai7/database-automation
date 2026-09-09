@@ -10,13 +10,29 @@
 // is `docs/decisions.md` D12's bypassability spectrum, and this check sits on it like every other
 // gate upstream of the migration runner.
 //
-// The single most important property this module has: GitHub's own docs state that
-// `bypass_actors` is returned only when the calling token has write access to the ruleset ("to
-// prevent leaking sensitive information") -- so an omitted field means "cannot confirm", never
-// "confirmed empty". `assertBypassListEmpty` fails CLOSED on absence, on `null`, and on a
-// non-array, distinguishing "confirmed empty" from "could not confirm" in the message text
-// itself, because the warning sign 05-RESEARCH.md names is a check that passes on its very first
-// run without ever having been given elevated permissions.
+// SPLIT DECISION (docs/decisions.md D30/D31): a workflow's own `GITHUB_TOKEN` cannot observe
+// `bypass_actors` at all under this repository's permission model -- confirmed live, D30. A
+// required status check that can never succeed under that model blocks every pull request
+// permanently, so `runCheckRulesetConfig` below is narrowed to assert only what a `contents: read`
+// token can genuinely observe: `enforcement` is `"active"`, and every required rule type
+// (`deletion`, `non_fast_forward`, `pull_request`, `required_status_checks`) and required-check
+// context is present. It no longer calls `assertBypassListEmpty`. That assertion still exists,
+// still exported, and is still exercised on every pull request -- by
+// `scripts/ci/check-ruleset-bypass-audit.ts`, a separate, deliberately NON-required job
+// (`ruleset-bypass-audit` in `.github/workflows/pr-gate.yml`) that imports and reuses it
+// unmodified, so its fail-closed behavior (never passes on an absent, null, or non-array field) is
+// identical here and there, not reimplemented. The empty-bypass-list property is therefore no
+// longer a hard merge gate -- it is verified continuously only in that advisory job, and by the
+// one-time observation already recorded in `docs/decisions.md` D26. Do not describe the combined
+// gate as stronger than that.
+//
+// The single most important property `assertBypassListEmpty` itself has, unchanged by the split:
+// GitHub's own docs state that `bypass_actors` is returned only when the calling token has write
+// access to the ruleset ("to prevent leaking sensitive information") -- so an omitted field means
+// "cannot confirm", never "confirmed empty". It fails CLOSED on absence, on `null`, and on a
+// non-array, distinguishing "confirmed empty" from "could not confirm" in the message text itself,
+// because the warning sign 05-RESEARCH.md names is a check that passes on its very first run
+// without ever having been given elevated permissions.
 //
 // Reads no process.argv -- every command in this repository refuses arguments (01-CONTEXT.md
 // D-16, 02-CONTEXT.md D-06). Never terminates the process directly -- sets process.exitCode once
@@ -171,7 +187,10 @@ function loadExpectedContexts(): string[] {
   return contexts.map((entry) => entry.context);
 }
 
-async function resolveRepository(): Promise<string> {
+// Exported so scripts/ci/check-ruleset-bypass-audit.ts can resolve the same repository without
+// re-typing this fallback -- the required check and the advisory audit must never independently
+// drift on which repository they are even asking about.
+export async function resolveRepository(): Promise<string> {
   if (process.env.GITHUB_REPOSITORY) {
     return process.env.GITHUB_REPOSITORY;
   }
@@ -200,22 +219,23 @@ async function fetchRulesetDetail(repository: string, id: number): Promise<Rules
 }
 
 /**
- * Runs every assertion against every ruleset that targets `main`. If NO ruleset matches `main` at
- * all, that is itself a failure -- the gate is absent, which is worse than misconfigured, not a
- * pass. Collects every ruleset's failure (rather than stopping at the first) so a second ruleset
- * added alongside `main-protection` cannot hide behind the first one's success.
+ * Returns every ruleset targeting `refs/heads/main`, each already resolved to its full detail
+ * response (the only endpoint that carries `conditions` and `bypass_actors` both -- Pitfall 1 and
+ * the 05-08 live finding below). Exported so both the required `runCheckRulesetConfig` and the
+ * advisory `check-ruleset-bypass-audit.ts` fetch and filter identically -- the two checks must
+ * never independently drift on which rulesets they are even looking at.
  *
  * LIVE FINDING (05-08): the LIST rulesets endpoint's response omits `conditions` entirely --
  * confirmed against the real API, not merely undocumented. `rulesetsMatchingMain` was previously
- * called against the list-endpoint summaries, so `matching` was always empty and this check
+ * called against the list-endpoint summaries, so the match set was always empty and this check
  * reported "no ruleset targets main" even with `main-protection` live and correctly configured --
  * the exact false-negative shape this check exists to refuse elsewhere (Pitfall 1). Every
  * ruleset's detail is now fetched first (the detail response does carry `conditions`, confirmed
  * live), and `rulesetsMatchingMain` is applied to those details instead.
  */
-export async function runCheckRulesetConfig(): Promise<void> {
-  const expectedContexts = loadExpectedContexts();
-  const repository = await resolveRepository();
+export async function fetchMatchingRulesetDetails(
+  repository: string,
+): Promise<Array<{ summary: RulesetSummary; detail: RulesetDetail }>> {
   const summaries = await fetchRulesetSummaries(repository);
   const details = await Promise.all(
     summaries.map(async (summary) => ({
@@ -223,9 +243,26 @@ export async function runCheckRulesetConfig(): Promise<void> {
       detail: await fetchRulesetDetail(repository, summary.id),
     })),
   );
-  const matching = details.filter(
+  return details.filter(
     ({ detail }) => rulesetsMatchingMain([detail as unknown as RulesetSummary]).length > 0,
   );
+}
+
+/**
+ * Runs the required-gate assertions against every ruleset that targets `main`. If NO ruleset
+ * matches `main` at all, that is itself a failure -- the gate is absent, which is worse than
+ * misconfigured, not a pass. Collects every ruleset's failure (rather than stopping at the first)
+ * so a second ruleset added alongside `main-protection` cannot hide behind the first one's
+ * success.
+ *
+ * SPLIT DECISION (docs/decisions.md D30/D31): deliberately does NOT call `assertBypassListEmpty`.
+ * That property is checked continuously by the separate, non-required `ruleset-bypass-audit` job
+ * instead -- see this module's header comment for why.
+ */
+export async function runCheckRulesetConfig(): Promise<void> {
+  const expectedContexts = loadExpectedContexts();
+  const repository = await resolveRepository();
+  const matching = await fetchMatchingRulesetDetails(repository);
 
   if (matching.length === 0) {
     throw new Error(
@@ -237,7 +274,6 @@ export async function runCheckRulesetConfig(): Promise<void> {
   const failures: string[] = [];
   for (const { summary, detail } of matching) {
     try {
-      assertBypassListEmpty(detail);
       assertEnforcementActive(detail);
       assertRequiredRules(detail, expectedContexts);
     } catch (error) {
@@ -259,9 +295,11 @@ if (import.meta.main) {
     .then(() => {
       process.exitCode = 0;
       console.log(
-        "[check-ruleset-config] Every ruleset targeting main has an empty bypass list, active " +
-          "enforcement, and every required rule and status check. Note: this check runs inside " +
-          "the thing it audits and cannot make tampering impossible, only visible.",
+        "[check-ruleset-config] Every ruleset targeting main has active enforcement and every " +
+          "required rule and status check. Note: this check runs inside the thing it audits and " +
+          "cannot make tampering impossible, only visible. It does NOT assert the bypass list is " +
+          "empty -- see scripts/ci/check-ruleset-bypass-audit.ts (advisory, not required) and " +
+          "docs/decisions.md D30/D31 for why.",
       );
     })
     .catch((error: unknown) => {
