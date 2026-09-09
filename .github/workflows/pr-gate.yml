@@ -214,3 +214,49 @@ jobs:
         run: pnpm exec tsx scripts/ci/check-ruleset-config.ts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # D-14 (05-CONTEXT.md), CI-06: migrations run as their own, structurally separate pipeline
+  # step -- invoked BY the pipeline, and nothing in the application's own startup path triggers
+  # them (docs/decisions.md D8; tests/guardrails.test.ts mechanically enforces the second half of
+  # that claim, plan 05-07). This job's entire body, after the shared preamble, is a single step
+  # running the real `pnpm db:migrate` entry point (scripts/db-migrate.ts) unmodified -- no
+  # build, no seed, no test, no application boot. With the database reachable at
+  # 127.0.0.1:5432/recipe_dev, assertLocalDevelopmentTarget's pin (host/port/database name) is
+  # satisfied honestly and scripts/env.ts is never loosened to fit CI.
+  migrate:
+    name: migrate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: recipe_app
+          POSTGRES_PASSWORD: ci_ephemeral_not_a_secret
+          POSTGRES_DB: recipe_dev
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U recipe_app -d recipe_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
+      RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run migrations -- the CI-06 demonstration
+        run: pnpm db:migrate
