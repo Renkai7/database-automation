@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { integer, numeric, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 // D-09: this task creates the recipes table only — ingredients and steps are added by
 // plan 01-03, which exercises the generate -> inspect -> migrate loop a second time.
@@ -19,26 +19,6 @@ export const recipes = pgTable("recipes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   notes: text("notes"),
 });
-
-// D-09 (plan 01-03): the two remaining recipe-core tables. Quantities are stored as
-// authored per the recipe's base_servings and scaled at read time (never pre-scaled here) —
-// see Recipe Page.dc.html's `mult = servings / base_servings` and per-ingredient `round(...)`
-// at render time. `unit` defaults to the empty string rather than null because the design's
-// spring-onions row genuinely has no unit (a real value, not a missing one).
-export const ingredients = pgTable(
-  "ingredients",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    recipeId: uuid("recipe_id")
-      .notNull()
-      .references(() => recipes.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
-    unit: text("unit").notNull().default(""),
-    position: integer("position").notNull(),
-  },
-  (table) => [unique().on(table.recipeId, table.position)],
-);
 
 // `position` is D-09's required ordering column. `timerLabel` was nullable through Phase 1-3,
 // with a step with no timer storing SQL null to preserve the source design's conditional timer
@@ -64,12 +44,7 @@ export const steps = pgTable(
 );
 
 export const recipesRelations = relations(recipes, ({ many }) => ({
-  ingredients: many(ingredients),
   steps: many(steps),
-}));
-
-export const ingredientsRelations = relations(ingredients, ({ one }) => ({
-  recipe: one(recipes, { fields: [ingredients.recipeId], references: [recipes.id] }),
 }));
 
 export const stepsRelations = relations(steps, ({ one }) => ({
