@@ -204,7 +204,7 @@ describe("structural guardrails", () => {
         "packages/ would pass having examined nothing.",
     ).toBeGreaterThan(0);
 
-    for (const root of ["scripts/", "tests/", "apps/recipe-app/"]) {
+    for (const root of ["scripts/", "tests/", "apps/recipe-app/", ".github/"]) {
       const rootFiles = files.filter((file) => file.startsWith(root));
       expect(
         rootFiles.length,
