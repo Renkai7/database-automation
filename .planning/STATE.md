@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: CI Pipeline Gate
 status: executing
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-09-09T17:36:18.997Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-09-09T17:55:08.506Z"
 last_activity: 2026-09-09
 last_activity_desc: Completed 05-05-PLAN.md (ruleset payload and self-check)
-state_head: decd398996a7a56aa3551b2d3c489c38a25983a0
+state_head: 500c7069089adaaa4e384492a4df137b61e533b2
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 35
-  completed_plans: 33
+  completed_plans: 34
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 05 (CI Pipeline Gate) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-09-09 — Completed 05-05-PLAN.md (ruleset payload and self-check)
 
@@ -94,6 +94,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P04 | 20min | 3 tasks | 6 files |
 | Phase 05 P05 | 15min | 3 tasks | 4 files |
 | Phase 05 P06 | 79 min | 3 tasks | 4 files |
+| Phase 05 P07 | 17min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,8 @@ Decisions are logged in `docs/decisions.md` (D1-D12). Recent decisions affecting
 - [Phase 05]: 05-06: administration:write is not a grantable GITHUB_TOKEN permissions key (confirmed live via gh workflow run HTTP 422) -- ruleset-config-check runs with contents:read only and fails closed on absent bypass_actors; flagged as an open finding for plan 05-08 to resolve.
 - [Phase 05]: 05-06: the test job provisions Postgres via docker compose (pnpm db:up), not a GitHub Actions services: container -- tests/migrate.test.ts's own pnpm db:reset manages the dev database via docker compose and conflicted with a services: container on the same port; migrate (which never runs pnpm test) keeps its services: container.
 - [Phase 05]: 05-06: tests/smoke.test.ts's POSIX teardown now kills the whole process group (detached:true + process.kill(-pid)) instead of the direct child alone -- serverProcess.kill() left a next-server grandchild alive holding inherited stdio open, hanging the real CI test job for 17+ minutes (cancelled) against a ~1 minute local baseline.
+- [Phase 05]: [Phase 05] 05-07: CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN includes restore-drill.yml alongside pr-gate.yml (Rule 1 deviation) -- restore-drill.yml carries the identical pinned-target connection string, and now that .github/ is in the guardrail source surface it would otherwise be flagged as a false-positive offender.
+- [Phase 05]: [Phase 05] 05-07: CI-01 and CI-06 not ticked in REQUIREMENTS.md despite being this plan's own declared requirements -- both are also declared by plan 05-08 (not yet complete); requirements.ready-ids confirmed 0/2 ready, deferring to the shared-ID gate.
 
 ### Pending Todos
 
@@ -207,6 +210,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T17:36:18.891Z
-Stopped at: Completed 05-06-PLAN.md
+Last session: 2026-09-09T17:55:08.396Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
