@@ -1,0 +1,94 @@
+# D-13 (05-CONTEXT.md): `pnpm test:drill` runs on a schedule instead of as a required
+# per-pull-request check, so 02-CONTEXT.md D-19's 30-day staleness gate stops depending on the
+# owner remembering to run it locally -- this project's own "architectural enforcement over
+# remembered caution" applied to the brief's single confirmed operational risk (a database
+# backup restore had never been tested before Phase 2). Weekly is chosen against that 30-day
+# staleness window: four runs land inside every staleness window, so up to three consecutive
+# failures can occur before the 30-day gate would have fired anyway -- close enough margin to
+# catch a regression well before staleness alone would flag it, without running a slow,
+# Docker-heavy suite more often than needed.
+#
+# This workflow is DELIBERATELY NOT in .github/rulesets/main-protection.json's
+# required_status_checks list, and must never be added there "for completeness" -- a slow,
+# Docker-dependent suite in the merge path is exactly the one that eventually gets marked
+# skipped over time (02-CONTEXT.md D-16). It has no pull request to comment on, so a failure is
+# surfaced onto a single tracking issue instead (see the last step below).
+name: Restore Drill
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    name: drill
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    # D-13/D-16 (02-CONTEXT.md): container pulls plus the full backup/restore/assert sequence are
+    # not instant -- generous headroom over vitest.drill.config.ts's own 180000ms per-test timeout.
+    timeout-minutes: 30
+    env:
+      # Throwaway per-job container credential guarding nothing that outlives the job -- reviewed
+      # and deliberately committed as a non-secret (T-05-38, accepted), matching pr-gate.yml's own
+      # convention. RECIPE_DEV_DB_PASSWORD drives docker-compose.yml's POSTGRES_PASSWORD
+      # interpolation for `pnpm db:up`; RECIPE_DEV_DATABASE_URL is the same value assembled into a
+      # connection string satisfying scripts/env.ts's pin.
+      RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
+      RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
+      # Must be an absolute path outside this checkout's working tree (assertBackupDestination,
+      # scripts/env.ts) -- runner.temp is a directory outside the repository checkout on every
+      # GitHub-hosted runner.
+      RECIPE_BACKUP_DESTINATION: ${{ runner.temp }}/restore-drill-backups
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # scripts/drill.ts's runBackup() step shells out to `docker compose exec -T db pg_dump
+      # ...` -- it needs the real docker-compose.yml service running under Docker Compose, not a
+      # GitHub Actions `services:` container (which is not addressable via `docker compose exec`).
+      - name: Start the local development database (docker compose)
+        run: pnpm db:up
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Seed the database
+        run: pnpm db:seed
+
+      - name: Run the automated restore drill
+        run: pnpm test:drill
+
+      # This is the one place in this phase where a conditional step is correct: it is not a
+      # required check, and the condition is "something already failed", not "skip the check".
+      # Searches for an existing open issue with the exact title first, so repeated failures land
+      # on one issue rather than accumulating a new one every week.
+      - name: Open or update the tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TITLE="Restore drill failed (scheduled run)"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          BODY="The scheduled restore-drill workflow failed. Run: ${RUN_URL}"
+          EXISTING=$(gh issue list --search "\"${TITLE}\" in:title" --state open --json number --jq '.[0].number // empty')
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body "${BODY}"
+          else
+            gh issue create --title "${TITLE}" --body "${BODY}"
+          fi
