@@ -198,6 +198,18 @@ describe("rulesetsMatchingMain", () => {
       0,
     );
   });
+
+  it("LIVE FINDING (05-08): a bare list-endpoint summary with no `conditions` key never matches -- runCheckRulesetConfig must fetch each ruleset's detail before filtering, never filter on the list response alone", () => {
+    // Confirmed live against the real GitHub API: GET /repos/{owner}/{repo}/rulesets (the list
+    // endpoint) omits `conditions` entirely from every entry -- only the per-ruleset GET returns
+    // it. A caller that runs rulesetsMatchingMain directly against list-endpoint summaries (as
+    // this repository's own runCheckRulesetConfig did before this fix) always gets zero matches,
+    // even when a correctly configured ruleset targeting main is live -- reporting "the gate is
+    // absent" for a gate that is actually present and correct.
+    const listEndpointShape = [{ id: 1, name: "main-protection" }] as RulesetSummary[];
+
+    expect(rulesetsMatchingMain(listEndpointShape)).toHaveLength(0);
+  });
 });
 
 describe("a second ruleset targeting main with a non-empty bypass list fails verification", () => {

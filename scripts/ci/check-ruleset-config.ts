@@ -204,12 +204,28 @@ async function fetchRulesetDetail(repository: string, id: number): Promise<Rules
  * all, that is itself a failure -- the gate is absent, which is worse than misconfigured, not a
  * pass. Collects every ruleset's failure (rather than stopping at the first) so a second ruleset
  * added alongside `main-protection` cannot hide behind the first one's success.
+ *
+ * LIVE FINDING (05-08): the LIST rulesets endpoint's response omits `conditions` entirely --
+ * confirmed against the real API, not merely undocumented. `rulesetsMatchingMain` was previously
+ * called against the list-endpoint summaries, so `matching` was always empty and this check
+ * reported "no ruleset targets main" even with `main-protection` live and correctly configured --
+ * the exact false-negative shape this check exists to refuse elsewhere (Pitfall 1). Every
+ * ruleset's detail is now fetched first (the detail response does carry `conditions`, confirmed
+ * live), and `rulesetsMatchingMain` is applied to those details instead.
  */
 export async function runCheckRulesetConfig(): Promise<void> {
   const expectedContexts = loadExpectedContexts();
   const repository = await resolveRepository();
   const summaries = await fetchRulesetSummaries(repository);
-  const matching = rulesetsMatchingMain(summaries);
+  const details = await Promise.all(
+    summaries.map(async (summary) => ({
+      summary,
+      detail: await fetchRulesetDetail(repository, summary.id),
+    })),
+  );
+  const matching = details.filter(
+    ({ detail }) => rulesetsMatchingMain([detail as unknown as RulesetSummary]).length > 0,
+  );
 
   if (matching.length === 0) {
     throw new Error(
@@ -219,9 +235,8 @@ export async function runCheckRulesetConfig(): Promise<void> {
   }
 
   const failures: string[] = [];
-  for (const summary of matching) {
+  for (const { summary, detail } of matching) {
     try {
-      const detail = await fetchRulesetDetail(repository, summary.id);
       assertBypassListEmpty(detail);
       assertEnforcementActive(detail);
       assertRequiredRules(detail, expectedContexts);
