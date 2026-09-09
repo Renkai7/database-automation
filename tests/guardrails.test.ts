@@ -827,12 +827,26 @@ describe("structural guardrails", () => {
     ).toContain("Unrecognized");
   });
 
-  it("the ruleset's required-check contexts and pr-gate.yml's job names are exactly the same set, with no duplicate job name (D-11, second half)", () => {
-    // The property this test actually proves, recorded honestly: deleting or renaming a job
-    // means its named required check never reports, and a required check that never reports
+  it("the ruleset's required-check contexts and pr-gate.yml's job names agree, with a deliberate advisory-job exception and no duplicate job name (D-11, second half; narrowed by docs/decisions.md D30/D31)", () => {
+    // The property this test actually proves, recorded honestly: deleting or renaming a REQUIRED
+    // job means its named required check never reports, and a required check that never reports
     // blocks the merge rather than passing it -- confirmed against GitHub's own troubleshooting
     // documentation (05-RESEARCH.md) and observed live in plan 05-08. This test cannot prove
     // GitHub's own behaviour; it proves the names agree, which is the half this repository owns.
+    //
+    // D30/D31 (docs/decisions.md): pr-gate.yml now carries one deliberate, named exception --
+    // `ruleset-bypass-audit`, a job that runs on every pull request but is NOT a required status
+    // check (a workflow's own GITHUB_TOKEN cannot observe bypass_actors at all, and a required
+    // check that can never succeed blocks every pull request permanently, which is exactly what
+    // happened live on PR #3 before this split). ADVISORY_NON_REQUIRED_JOBS is that exception,
+    // enumerated explicitly -- matching CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN's idiom above: a
+    // named exception with its own reasoning, not a loosened check. The strict, unconditional
+    // direction is preserved in full: every required context must still correspond to a real job
+    // (the FATAL direction -- a required context with no job blocks every pull request forever,
+    // Pitfall 2, 05-RESEARCH.md), and every job that is not a required context must be this one,
+    // explicitly enumerated exception, not merely "close enough".
+    const ADVISORY_NON_REQUIRED_JOBS = ["ruleset-bypass-audit"];
+
     const rulesetPayload = JSON.parse(
       readFileSync(".github/rulesets/main-protection.json", "utf-8"),
     ) as {
@@ -877,11 +891,48 @@ describe("structural guardrails", () => {
       "no two jobs in pr-gate.yml may share a name: value -- two contexts that are equal collide",
     ).toBe(jobNames.length);
 
+    // FATAL direction, unconditional -- every required-check context must match a real job. A
+    // required context with no job behind it means that context never reports, which blocks every
+    // pull request forever (Pitfall 2, 05-RESEARCH.md). No exception list applies here.
+    for (const context of contexts) {
+      expect(
+        jobNames,
+        `T-05-44/D-11: required-check context "${context}" has no matching job in pr-gate.yml -- ` +
+          "a required context with no job never reports, which blocks every pull request forever",
+      ).toContain(context);
+    }
+
+    // The other direction, narrowed by D30/D31: every job must be either a required context, or
+    // one of the explicitly enumerated advisory jobs above -- never simply unaccounted for. A job
+    // with no required context AND no advisory-list entry is unprotected by accident, not design.
+    const unexplainedJobs = jobNames.filter(
+      (name) => !contexts.includes(name) && !ADVISORY_NON_REQUIRED_JOBS.includes(name),
+    );
     expect(
-      [...contexts].sort(),
-      "T-05-44/D-11: every required-check context must match exactly one job name, and every " +
-        "job name must be a required-check context, in both directions -- a context adjacent to " +
-        "no job is orphaned, and a job with no required context is unprotected",
-    ).toEqual([...jobNames].sort());
+      unexplainedJobs,
+      "D-11/D30/D31: every job in pr-gate.yml must be either a required-check context or a " +
+        "job explicitly named in ADVISORY_NON_REQUIRED_JOBS above (with its own recorded reason) " +
+        "-- a job that is neither is unprotected by accident, which this test exists to catch",
+    ).toEqual([]);
+
+    // The advisory list itself must not go stale: every entry must actually exist as a job in
+    // pr-gate.yml (a renamed or removed advisory job must fail loudly here, not silently stop
+    // being checked at all), and must NOT also appear in the ruleset's required contexts (an
+    // advisory job that is simultaneously required would defeat the entire point of D30/D31 --
+    // the required check would still depend on a fact the token cannot observe).
+    for (const advisoryJob of ADVISORY_NON_REQUIRED_JOBS) {
+      expect(
+        jobNames,
+        `ADVISORY_NON_REQUIRED_JOBS names "${advisoryJob}", which must exist as a job in ` +
+          "pr-gate.yml -- a renamed or removed advisory job must fail here, not quietly stop " +
+          "being covered by this guardrail at all",
+      ).toContain(advisoryJob);
+      expect(
+        contexts,
+        `"${advisoryJob}" is listed in ADVISORY_NON_REQUIRED_JOBS and must NOT also appear in ` +
+          "the ruleset's required_status_checks -- an advisory job that is simultaneously " +
+          "required defeats D30/D31's entire point",
+      ).not.toContain(advisoryJob);
+    }
   });
 });
