@@ -35,6 +35,11 @@ the problem and designing the architecture before building.
 
 Start here: **[docs/00-current-state.md](docs/00-current-state.md)**
 
+## CI
+
+Every pull request runs six independent, required checks: `analyze`, `tamper-checks`, `test`,
+`test-history`, `migrate`, `ruleset-config-check`. See `.github/workflows/pr-gate.yml`.
+
 ## Layout
 
 ```
