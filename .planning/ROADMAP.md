@@ -208,7 +208,38 @@ Plans:
   3. A migration file is hand-edited after being generated, or an edit is made to a migration that a previous merge already applied — each is caught mechanically by a CI check and fails the build, without relying on a reviewer noticing.
   4. Inspecting the CI workflow shows migrations run as their own isolated pipeline step, invoked by the pipeline — never triggered by the application container starting up.
 
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — The publish gate: a tested full-history secret detector, the audit record written from real output, and the owner's per-finding disposition (D-03)
+
+**Wave 2** *(blocked on Wave 1 — nothing is published until the audit is signed off)*
+
+- [ ] 05-02-PLAN.md — The public repository and the first push, with visibility, commit count and Actions default permissions read back rather than assumed (D-01, D-02)
+
+**Wave 3** *(blocked on Wave 2 — the tracer needs a repository to open a pull request against)*
+
+- [ ] 05-03-PLAN.md — Tracer: one real pull request whose `analyze` check runs the analyzer over the whole committed history and posts the complete verdict onto the pull request itself
+
+**Wave 4** *(blocked on Wave 3; the two plans touch disjoint files and run in parallel)*
+
+- [ ] 05-04-PLAN.md — Tamper detection: file-level append-only, journal entry-level append-only, and schema drift, each with synthetic-fixture tests (D-09, D-10)
+- [ ] 05-05-PLAN.md — The committed ruleset payload, its idempotent apply script, and the self-check that fails closed on an unreadable bypass list (D-04, D-05)
+
+**Wave 5** *(blocked on Wave 4 — the workflow invokes both plans' scripts)*
+
+- [ ] 05-06-PLAN.md — The full six-job required-check set, the isolated migrate job, and the scheduled restore drill (D-12, D-13, D-14)
+
+**Wave 6** *(blocked on Wave 5 — the guardrails assert properties of the completed workflow)*
+
+- [ ] 05-07-PLAN.md — Guardrails: no migration at application boot, a weakened rules file refuses to load, and the ruleset contexts provably equal the workflow's job names (D-11, D-15)
+
+**Wave 7** *(blocked on Wave 6 — the ruleset is applied only after every check name has been reported by a real run)*
+
+- [ ] 05-08-PLAN.md — Apply the ruleset live, perform the merge-refusal attempt personally, falsify both tamper checks on real pull requests, and write the record (D-18)
 
 ### Phase 6: Private Staging Connectivity
 
@@ -250,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
 | 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
-| 5. CI Pipeline Gate | 0/TBD | Not started | - |
+| 5. CI Pipeline Gate | 0/8 | Planned | - |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |
