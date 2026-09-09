@@ -3,10 +3,19 @@
 // migration, matching this repo's own WR-04/tamper-then-refuse.test.ts precedent.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  assertJournalEntriesAppendOnly,
   assertMigrationFilesAppendOnly,
   parseNameStatus,
   runCheckAppendOnly,
 } from "../../scripts/ci/check-append-only";
+
+function journalText(entries: Array<{ idx: number; tag: string; when: number }>): string {
+  return JSON.stringify({
+    version: "7",
+    dialect: "postgresql",
+    entries: entries.map((e) => ({ ...e, version: "7", breakpoints: true })),
+  });
+}
 
 describe("parseNameStatus", () => {
   it("parses a simple added-file line into one entry with status A", () => {
@@ -76,6 +85,101 @@ describe("assertMigrationFilesAppendOnly", () => {
     expect(() =>
       assertMigrationFilesAppendOnly([{ status: "M", path: "apps/recipe-app/src/db/schema.ts" }]),
     ).not.toThrow();
+  });
+});
+
+describe("assertJournalEntriesAppendOnly", () => {
+  const base = journalText([
+    { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+    { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+    { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778821 },
+    { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+    { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+  ]);
+
+  it("passes when the head journal is identical plus a new idx 5", () => {
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778821 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+      { idx: 5, tag: "0005_new_migration", when: 1788907200000 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).not.toThrow();
+  });
+
+  it("throws when idx 2's tag changed, naming idx 2", () => {
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_renamed", when: 1788906778821 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).toThrow(/idx 2/);
+  });
+
+  it("throws when idx 2's when changed, naming idx 2", () => {
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778822 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).toThrow(/idx 2/);
+  });
+
+  it("throws when idx 3 is absent, naming idx 3 and its base tag", () => {
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778821 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).toThrow(
+      /idx 3.*0003_backfill_steps_timer_label|0003_backfill_steps_timer_label.*idx 3/,
+    );
+  });
+
+  it("passes when entries are reordered but every idx/tag/when is unchanged", () => {
+    const head = journalText([
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778821 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).not.toThrow();
+  });
+
+  it("throws when an existing entry's idx is renumbered (closing the re-run-as-new dodge)", () => {
+    // idx 2 is renumbered to 10; the original idx 2 slot disappears entirely.
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 10, tag: "0002_oval_maelstrom", when: 1788906778821 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).toThrow();
+  });
+
+  it("throws when the base journal text is not valid JSON, naming the base side", () => {
+    expect(() => assertJournalEntriesAppendOnly("{not json", journalText([]))).toThrow(/base/i);
+  });
+
+  it("throws when the head journal has a duplicated idx", () => {
+    const head = journalText([
+      { idx: 0, tag: "0000_bumpy_khan", when: 1788741236355 },
+      { idx: 1, tag: "0001_busy_thunderbolt", when: 1788742285126 },
+      { idx: 2, tag: "0002_oval_maelstrom", when: 1788906778821 },
+      { idx: 2, tag: "0002_duplicate", when: 1788906778822 },
+      { idx: 3, tag: "0003_backfill_steps_timer_label", when: 1788907090609 },
+      { idx: 4, tag: "0004_redundant_apocalypse", when: 1788907107307 },
+    ]);
+    expect(() => assertJournalEntriesAppendOnly(base, head)).toThrow();
   });
 });
 

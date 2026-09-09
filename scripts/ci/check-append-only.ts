@@ -22,6 +22,7 @@
 // every other scripts/*.ts entry point in this repo (packages/automation/src/cli.ts's own
 // header documents the reproduced Windows libuv crash this convention exists to avoid).
 import { execa } from "execa";
+import type { Journal, JournalEntry } from "../../packages/automation/src/index";
 import { safeErrorMessage } from "../log";
 
 const MIGRATIONS_DIR_PREFIX = "apps/recipe-app/drizzle/";
@@ -67,6 +68,13 @@ export function assertMigrationFilesAppendOnly(entries: readonly NameStatusEntry
       );
     }
   }
+}
+
+// D-10 (05-CONTEXT.md), CI-05, Task 2: journal entry-level append-only.
+// STUB: RED-phase placeholder (never throws). GREEN phase implements the real comparison.
+export function assertJournalEntriesAppendOnly(_baseJournalText: string, _headJournalText: string): void {
+  const _unused: [Journal | undefined, JournalEntry | undefined] = [undefined, undefined];
+  void _unused;
 }
 
 function requireEnv(name: string): string {

@@ -20,7 +20,10 @@ export const DEFAULT_MIGRATIONS_DIR = "apps/recipe-app/drizzle";
 /** Repository-relative path to the recipe app's committed Drizzle migration journal. */
 export const DEFAULT_JOURNAL_PATH = "apps/recipe-app/drizzle/meta/_journal.json";
 
-interface JournalEntry {
+// D-10 (05-CONTEXT.md), CI-05, Task 2: exported (visibility only, no field change) so
+// scripts/ci/check-append-only.ts can import this exact shape type-only through the barrel
+// instead of re-declaring a second, silently-divergable copy of what a journal entry is.
+export interface JournalEntry {
   idx: number;
   version: string;
   when: number;
@@ -28,7 +31,7 @@ interface JournalEntry {
   breakpoints: boolean;
 }
 
-interface Journal {
+export interface Journal {
   version: string;
   dialect: string;
   entries: JournalEntry[];
