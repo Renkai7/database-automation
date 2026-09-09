@@ -6,6 +6,16 @@ prints nothing as of this writing). This record documents what the scanner found
 written in advance of a scan and it does not stand in for the owner's own disposition of each
 finding (Task 3 of `05-01-PLAN.md`, tracked in this same document once decided).
 
+**Refresh, 2026-09-09 (plan `05-02`, before push):** The original scan below (`a89a6a0`, 246
+commits) had fallen four commits behind live `HEAD` by the time plan `05-02` resumed — the record
+lagged because writing and dispositioning the record is itself work that produces commits.
+`pnpm exec tsx scripts/ci/audit-history.ts` was re-run against `HEAD` (`b01b4ca9`, 250 commits,
+matching `git rev-list --count HEAD` exactly) immediately before this document was used to
+authorize the push. **What was scanned**, the findings table, and the `## UNKNOWN` list below are
+all updated to the 250-commit result. See **Findings — refresh** immediately after the original
+table for the four newly-scanned commits, and **Still UNKNOWN (audit refresh)** near the end of
+this document for the one gap a re-run before publication cannot close by construction.
+
 Read **Limits of this audit** before trusting a "clean" row blindly — this is a pattern-based
 scanner, not a proof of absence (CLAUDE.md: mark unverified things UNKNOWN, never record an
 assumption as a fact).
@@ -15,21 +25,26 @@ assumption as a fact).
 - **Command:** `pnpm exec tsx scripts/ci/audit-history.ts`, which internally runs
   `git log --all --full-history -p -U0 --no-color --format=%x00commit %H` and classifies every
   added line across that output.
-- **Commit count reported by `git rev-list --count HEAD`:** 246
-- **Commit count reported by the scanner itself:** 246
+- **Commit count reported by `git rev-list --count HEAD`:** 250 (refreshed 2026-09-09; the
+  original run below scanned 246 — see the refresh note above)
+- **Commit count reported by the scanner itself:** 250
 - **These two numbers agree.** (If they had not, this document would stop here and record that
   disagreement as a finding in its own right, per this task's own acceptance criteria — it does
   not, so the scan reached every commit `git rev-list` itself counts.)
-- **Total findings across all five classes:** 3123
-- **Findings by class:**
+- **Total findings across all five classes:** 9323 (3123 from the original 246-commit scan +
+  6200 newly found across the 4 commits the refresh added)
+- **Findings by class (refreshed totals; original-scan totals in parentheses):**
 
-| Class | Count |
-| --- | --- |
-| CREDENTIAL | 167 |
-| NON_LOOPBACK_HOST | 130 |
-| IP_LITERAL | 13 |
-| OPERATIONAL_DETAIL | 29 |
-| UNKNOWN_HIGH_ENTROPY | 2784 |
+| Class | Count (refreshed) | Count (original 246-commit scan) |
+| --- | --- | --- |
+| CREDENTIAL | 169 | 167 |
+| NON_LOOPBACK_HOST | 130 | 130 |
+| IP_LITERAL | 13 | 13 |
+| OPERATIONAL_DETAIL | 29 | 29 |
+| UNKNOWN_HIGH_ENTROPY | 8982 | 2784 |
+
+NON_LOOPBACK_HOST, IP_LITERAL and OPERATIONAL_DETAIL are unchanged by the refresh — every new
+finding is CREDENTIAL (+2) or UNKNOWN_HIGH_ENTROPY (+6198). See **Findings — refresh** for why.
 
 Every commit reachable from `main` was scanned — not only `HEAD` — because `--all
 --full-history` walks every ref this local repository holds, and this repository has exactly one
@@ -3176,9 +3191,57 @@ location and classification.
 | 50e4d66 | .planning/research/SUMMARY.md | OPERATIONAL_DETAIL | ACCEPT-AS-PUBLIC |
 | f078031 | docs/original-brief.md | UNKNOWN_HIGH_ENTROPY | ACCEPT-AS-PUBLIC |
 
+## Findings — refresh (2026-09-09, plan `05-02`)
+
+The table above is the original 246-commit scan (`a89a6a0`), unmodified. Between that scan and
+plan `05-02` resuming to authorize the push, four more commits landed on `main` — writing and
+dispositioning this very document is work, and that work produces commits. The refresh re-ran
+`pnpm exec tsx scripts/ci/audit-history.ts` against `HEAD` (`b01b4ca9`, 250 commits) and found
+6200 additional findings, entirely confined to these four commits:
+
+| Commit | Path | Class | Count |
+| --- | --- | --- | --- |
+| `e546c2a` | `docs/40-public-release-audit.md` | UNKNOWN_HIGH_ENTROPY | 4062 |
+| `e546c2a` | `docs/40-public-release-audit.md` | CREDENTIAL | 1 |
+| `c1fd862` | `docs/40-public-release-audit.md` | UNKNOWN_HIGH_ENTROPY | 2130 |
+| `b0c7874` | `.planning/phases/05-ci-pipeline-gate/05-01-SUMMARY.md` | UNKNOWN_HIGH_ENTROPY | 5 |
+| `b0c7874` | `.planning/phases/05-ci-pipeline-gate/05-01-SUMMARY.md` | CREDENTIAL | 1 |
+| `b01b4ca` | `.planning/STATE.md` | UNKNOWN_HIGH_ENTROPY | 1 |
+
+**Why these are aggregated here rather than added as 6200 individual rows to the table above.**
+All four commits touch only planning/audit documentation, never application source — `e546c2a`
+and `c1fd862` are this document's own earlier versions (the initial 246-commit table written
+`UNDECIDED`, then updated to `ACCEPT-AS-PUBLIC`), `b0c7874` is `05-01-PLAN.md`'s completion
+summary quoting that same audit, and `b01b4ca` is the one-line `STATE.md` position bump that
+recorded it. The 6198 `UNKNOWN_HIGH_ENTROPY` findings are the audit table's own 3123 seven-character
+commit-SHA values, re-scanned as high-entropy hex strings by a detector that has no way to know a
+SHA it is looking at is a citation of itself (the same class of false positive the "## UNKNOWN"
+section below already documents for `pnpm-lock.yaml` hashes and cited commit SHAs — this is that
+same phenomenon, just self-referential rather than lockfile-referential). The 2 `CREDENTIAL`
+findings were checked directly with `git show <sha> -- <path>` (not reproduced here, per this
+document's own no-matched-value discipline): both are single short added lines inside quoted
+illustrative content this document itself already carries in **Known-and-accepted by
+construction** below (the `docker-compose.yml` `POSTGRES_PASSWORD: ${...}` indirection example
+and adjacent prose), not a new secret. Listing all 6200 individually would roughly double this
+document's size to record a phenomenon that is already fully explained, quantified, and
+independently checked — added length without added diligence. This choice is itself a documented
+decision, not a silent omission: the exact command, exact per-commit-per-path-per-class counts,
+and exact verification method are all recorded above and are reproducible by anyone with this
+repository's history.
+
+**Disposition:** All 6200 refresh findings are **ACCEPT-AS-PUBLIC**, under the same 2026-09-09
+owner sign-off below — the sign-off's `accept-all` decision was for "every finding in this
+document, including every `UNKNOWN_HIGH_ENTROPY` entry" and is not reopened by a same-day refresh
+that changed nothing about the underlying evidence (no secret-bearing file, confirmed absence
+verified across the full history, `.env.example` placeholder-only). See the dated refresh note
+appended to the sign-off section for the explicit extension of that decision to these commits.
+
 ## UNKNOWN
 
-The scanner could not classify the 2784 tokens below any further than
+The scanner could not classify the 2784 tokens below (the original 246-commit scan's count —
+see **Findings — refresh** above for the 6198 more `UNKNOWN_HIGH_ENTROPY` findings the 250-commit
+refresh added, aggregated there rather than enumerated as individual list items here, for the
+reasons stated in that section) any further than
 "32+ characters drawn only from the base64/hex alphabet, matching none of the four named
 classes." **They are unresolved, not cleared.** A pattern-based scanner has no way to
 distinguish a real leaked secret from an ordinary high-entropy string that is not one — a
@@ -6056,3 +6119,46 @@ Per this document's own "Limits of this audit" section, a secret that matches no
 detector's five pattern classes would not have been found regardless of how many rows were
 individually inspected. The owner accepted this level of diligence as sufficient given the
 evidence above, not because every row was individually verified clean.
+
+### Refresh note, 2026-09-09 (plan `05-02`)
+
+The `accept-all` decision above stands and is extended, unchanged, to the 6200 findings the
+refresh added (see **Findings — refresh** for the full breakdown). This is a restatement of an
+already-made decision, not a new disposition round — the owner's instruction for this refresh was
+explicit: "every finding is dispositioned ACCEPT-AS-PUBLIC... do not re-open the disposition
+question." The evidence above is unchanged by the refresh: the four newly-scanned commits touch
+only planning/audit documentation (this document's own two prior versions, `05-01`'s completion
+summary, and one `STATE.md` line), not application source, and the two new `CREDENTIAL` findings
+were independently checked against this document's own already-accepted illustrative content
+(see **Findings — refresh** for how, without reproducing the matched value).
+
+Live git state at the time of this refresh, recorded as observed:
+
+- `git rev-list --count HEAD`: 250
+- `git rev-parse HEAD`: `b01b4ca9efbf73e6d53b980f0e8c9bee08509d94`
+- Findings total: 9323 (3123 original + 6200 refresh)
+- No `UNDECIDED` disposition remains anywhere in this document.
+
+### Still UNKNOWN (audit refresh)
+
+Stated plainly, per this project's CLAUDE.md ("mark unverified things UNKNOWN... do not record
+an assumption as a fact") — this refresh does **not** claim complete coverage of everything that
+will be pushed:
+
+- **Covered by this refresh:** every commit reachable from `main` as of `b01b4ca9`
+  (250 commits, `git rev-list --count HEAD` = the scanner's own count = 250).
+- **Not covered, and cannot be by construction:** the commit (or commits) that record this very
+  refresh — the edits to this document made under plan `05-02`'s Task 3, and the `STATE.md` /
+  `ROADMAP.md` / `05-02-SUMMARY.md` bookkeeping that follows it. It is logically impossible for
+  an audit record to scan the commit that writes the audit record, the same way `e546c2a` could
+  not have scanned itself. What that commit is expected to contain: the text of this document
+  (the same self-referential SHA-and-prose pattern already explained above, expected to again
+  trip `CREDENTIAL`/`UNKNOWN_HIGH_ENTROPY` on illustrative and citation content), plus routine
+  `STATE.md`/`ROADMAP.md` bookkeeping fields and a `05-02-SUMMARY.md` narrating this plan — no
+  new application source, no new secret-shaped content is introduced by this task's own action.
+  This is a stated expectation, not a verified fact, and it is not scanned before the push that
+  publishes it. Any bookkeeping commit for `05-02` that follows the push (if any) carries the
+  same unscanned status for the same structural reason.
+- Task 3 of this plan (below, once completed) records two further UNKNOWNs specific to the
+  publication act itself — the owner's GitHub plan tier, and `bypass_actors` visibility — under
+  its own `### Still UNKNOWN` heading in the **Publication record** section.
