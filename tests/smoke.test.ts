@@ -37,6 +37,13 @@ beforeAll(async () => {
   serverProcess = execa("pnpm", ["--filter", "recipe-app", "start", "-p", String(PORT)], {
     stdio: "inherit",
     reject: false,
+    // D-12 (05-CONTEXT.md) live finding: `pnpm --filter recipe-app start` runs the `start`
+    // script through a nested shell, which itself execs the real `next-server` process as a
+    // grandchild -- on EITHER platform, not just Windows (the comment below previously
+    // described this as Windows-only; it is not). `detached: true` puts this whole tree in
+    // its own process group on POSIX (pgid === the returned pid), so afterAll below can
+    // signal the group, not just the direct child.
+    detached: true,
   });
 
   await waitForReady(SEEDED_URL, 60000);
@@ -47,15 +54,25 @@ afterAll(async () => {
 
   const pid = serverProcess.pid;
   if (process.platform === "win32" && pid) {
-    // `pnpm --filter recipe-app start` runs the `start` script through a nested shell,
-    // which itself spawns the actual `next-server` process as a grandchild. Killing only
-    // the top-level pnpm process does not terminate that grandchild on Windows (there is
-    // no POSIX process-group SIGTERM cascade), leaving an orphaned server holding the
-    // port for any later run of this same test (or its Phase 4/5 reuse) to collide with.
-    // `taskkill /T` kills the whole process tree.
+    // `taskkill /T` kills the whole process tree -- the Windows-specific mechanism, unchanged.
     await execa("taskkill", ["/pid", String(pid), "/T", "/F"], { reject: false });
-  } else {
-    serverProcess.kill();
+  } else if (pid) {
+    // LIVE FINDING (05-06): confirmed on a real ubuntu-latest CI run -- `serverProcess.kill()`
+    // (plain SIGTERM to the direct child only) does not terminate the `next-server` grandchild.
+    // Because the server was spawned with `stdio: "inherit"`, the surviving grandchild keeps
+    // the job step's own stdout/stderr file descriptors open, and the CI step hung indefinitely
+    // (observed: 17+ minutes with zero step progress, against a ~1 minute local baseline) --
+    // never merely slow, a genuine hang, first surfaced here because this suite had never
+    // previously run on Linux (D-12's own "a Windows-only regression will surface locally
+    // rather than in CI" cuts both ways: this is the Linux-only regression Windows could never
+    // have caught). A negative pid signals the whole process GROUP (only meaningful because
+    // `detached: true` above made this process its own group leader) -- the direct pnpm process
+    // and everything it execs/forks beneath it, mirroring the win32 `/T` flag's effect exactly.
+    try {
+      process.kill(-pid, "SIGTERM");
+    } catch {
+      // ESRCH: the group is already gone -- nothing left to signal.
+    }
   }
 
   // Wait for the process to actually exit so the port is released before the next test
