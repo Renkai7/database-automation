@@ -12,6 +12,7 @@ name: PR Gate
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch: {}
 
 # Workflow-level default is read-only (T-05-16); pull-requests: write is granted on the analyze
 # job alone, the only job that needs it.
