@@ -6162,3 +6162,61 @@ will be pushed:
 - Task 3 of this plan (below, once completed) records two further UNKNOWNs specific to the
   publication act itself — the owner's GitHub plan tier, and `bypass_actors` visibility — under
   its own `### Still UNKNOWN` heading in the **Publication record** section.
+
+## Publication record
+
+**Date:** 2026-09-09
+**Repository URL:** https://github.com/Renkai7/database-automation
+
+The repository was created and the full history pushed with:
+
+```
+gh repo create database-automation --public --source=. --remote=origin --push
+```
+
+`gh --version` output at the time of this run:
+
+```
+gh version 2.86.0 (2026-01-21)
+https://github.com/cli/cli/releases/tag/v2.86.0
+```
+
+Every value below is what the API/CLI actually reported after the push completed, read back
+independently rather than assumed from the flags passed to `gh repo create`:
+
+| Observed value | Command | Result |
+| --- | --- | --- |
+| Visibility | `gh repo view --json visibility` | `PUBLIC` |
+| Default branch | `gh repo view --json defaultBranchRef` | `main` |
+| Local commit count | `git rev-list --count HEAD` | 251 |
+| Remote commit count | `git rev-list --count origin/main` (after `git fetch origin`) | 251 |
+| Local HEAD SHA | `git rev-parse HEAD` | `64464ac100f892075954dd6309e96591543a8c8` |
+| Remote HEAD SHA | `git rev-parse origin/main` | `64464ac100f892075954dd6309e96591543a8c8` |
+| Actions default workflow permission, observed **before** any change | `gh api repos/Renkai7/database-automation/actions/permissions/workflow` | `read` |
+| Actions default workflow permission, observed **after** the fix | same endpoint, after `gh api --method PUT ... -f default_workflow_permissions=write` | `write` |
+
+Local and remote agree on both commit count and HEAD SHA — the push carried the full history,
+not a squash or a shallow push. The local commit count (251) is the 250 scanned by the
+audit-refresh above plus the one commit that recorded that refresh (`64464ac1`, the commit
+immediately preceding this Publication record entry) — consistent with the bounded gap already
+stated in **Still UNKNOWN (audit refresh)**: that commit was never itself scanned before this
+push, by construction.
+
+The Actions default workflow permission came back `read` on the newly created repository, exactly
+the risk `05-RESEARCH.md`'s Open Questions flagged: a read-only default would silently break
+D-16's sticky-comment posting on the first real pull request. It has been set to `write` and the
+read-back above confirms the change took effect.
+
+### Still UNKNOWN
+
+Two things this task does not settle, recorded rather than assumed:
+
+- **The owner's actual GitHub plan tier.** `gh api repos/Renkai7/database-automation` and `gh
+  repo view` do not surface billing-plan information, and no billing endpoint was queried — this
+  publication deliberately does not depend on knowing it. D-02's public visibility is what makes
+  the unknown not load-bearing: repository rulesets (CI-03) are documented free on public
+  repositories regardless of the account's plan.
+- **Whether `administration: write` on a workflow `GITHUB_TOKEN` is sufficient to see a
+  ruleset's `bypass_actors`.** Not tested here — this task creates the repository and pushes,
+  nothing more. That question is settled in plan `05-08`, when the ruleset itself is created and
+  read back.
