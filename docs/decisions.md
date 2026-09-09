@@ -786,7 +786,7 @@ plan's Task 2 human-check step 6 reads it directly to confirm no drift.
 ---
 
 ## D30 — Open Question 1 is settled: a workflow's own `GITHUB_TOKEN` cannot observe `bypass_actors` at all, confirmed live — a phase-blocking finding, not resolved by this entry
-**Status:** OPEN — blocking; requires an explicit owner decision before any pull request, including this plan's own, can merge through the gate
+**Status:** OPEN finding, ACCEPTED as fact — resolved by D31's split decision below. This entry's own observation stands unmodified; only its "no option chosen yet" closing sentence is superseded.
 
 `05-RESEARCH.md`'s open question — whether a workflow token under `administration: write` can read
 an existing ruleset's `bypass_actors` — is answered as an observed fact, and the answer is the
@@ -840,3 +840,90 @@ none selected by this entry:
    observation in D26 above.
 
 No option is chosen here. This plan does not proceed past this finding by picking one silently.
+
+---
+
+## D31 — D30 resolved: split the check rather than add a credential
+**Status:** ACCEPTED · 2026-09-09
+
+The owner's decision, made explicitly rather than assumed, is a combination of D30's options 2 and
+3: **`ruleset-config-check` stays required**, narrowed to assert only what a `contents: read`
+`GITHUB_TOKEN` can genuinely observe — `enforcement` is `"active"`, and every required rule type
+(`deletion`, `non_fast_forward`, `pull_request`, `required_status_checks`) and required-check
+context is present. It no longer asserts `bypass_actors` is empty. A second, separate job —
+`ruleset-bypass-audit` — runs on every pull request, is deliberately **not** listed in
+`.github/rulesets/main-protection.json`'s `required_status_checks`, and asserts `bypass_actors` is
+present and empty using the exact same `assertBypassListEmpty` function `ruleset-config-check` used
+to call, imported and reused unmodified rather than reimplemented, so its fail-closed behavior
+(never passes on an absent, `null`, or non-array field — the Pitfall 1 false negative D-05 exists
+to refuse) is identical in both places.
+
+**Option 1 — a fine-grained PAT or GitHub App token held as a repository secret — was explicitly
+rejected, not merely left unchosen:**
+- `05-CONTEXT.md`'s own domain section states the phase boundary plainly: "No credentials in CI
+  beyond the default `GITHUB_TOKEN`." That boundary exists for a sequencing reason — adding a
+  credential before Phase 6's connectivity decision inverts this project's own sequencing
+  constraint (no remote access until the safety architecture exists and has been tested).
+- `05-CONTEXT.md` D-18 already rejected a credential-holding CI automation on exactly these
+  grounds, for a different mechanism (a fully automated merge-refusal test) — "a credential-holding
+  automation inside the repository whose purpose is minimising credential surface." The reasoning
+  is identical here: a PAT scoped to ruleset-read is a smaller blast radius than a merge-capable
+  token, but it is still a new standing credential added to close a gap this phase's entire premise
+  is to avoid opening.
+- An expiring PAT would additionally re-create the exact "no pull request can merge" outage D30
+  just produced, on a timer, the next time it lapses — an unacceptable operational hazard for a
+  solo founder with no team to notice and rotate it before every pull request starts failing again.
+
+**Why not option 2 alone (remove the required check entirely, keep it only as a visible signal):**
+that would drop D-05's continuous re-verification of enforcement, rule types, and required-check
+contexts from the required gate too — properties a `contents: read` token genuinely CAN observe,
+and which D-05 explicitly names as readable this way. `ruleset-config-check` narrowed (this entry)
+keeps those two properties hard-gated exactly as D-05 intended; only the one property the token
+cannot see moves out.
+
+**Why not option 3 alone (narrow the required check and stop there):** that would silently drop
+continuous verification of the empty bypass list altogether, leaving it checked only by the D26
+one-time observation. The owner's decision preserves D-05's visibility function for that property
+by keeping `ruleset-bypass-audit` running and loud on every pull request — it is degraded from a
+hard gate to a visible signal, not removed.
+
+**D-05's own two stated properties, and which stays hard-gated (05-CONTEXT.md D-05):**
+1. "A required check has been removed" — stays hard-gated. `ruleset-config-check`'s
+   `assertRequiredRules` still fails if any of the six contexts, or any of the four rule types
+   (including `pull_request`, the direct-push block), disappears from the live ruleset.
+2. "Direct-push blocking has been disabled" — stays hard-gated, via the same `assertRequiredRules`
+   call asserting the `pull_request` and `non_fast_forward`/`deletion` rule types are present.
+3. **The bypass list is non-empty** — this is the property that moves from hard-gated to
+   advisory-only. It is still checked, on every pull request, by `ruleset-bypass-audit`; it no
+   longer blocks a merge if it fails.
+
+**The residual honest limit, stated plainly so this gate is never described as stronger than it
+is:** the empty bypass list is no longer continuously verified as a hard merge gate. It is verified
+continuously only by the advisory `ruleset-bypass-audit` job (which fails loudly and visibly, but
+does not block a merge), and by the one-time performed observation already recorded in D26 above
+(`bypass_actors` read back present and empty via the owner's own admin-scoped `gh` credential at
+the moment the ruleset was applied). This is `05-CONTEXT.md` D-05's own bypassability spectrum,
+one notch further down than D-05 originally described: the check that audits the ruleset already
+ran inside the thing it audits and could be deleted by whoever could edit the ruleset; this split
+additionally means the specific bypass-list assertion no longer blocks a merge on its own even
+while it is running. It raises the cost of an unnoticed non-empty bypass list; it does not prevent
+one from merging silently if `ruleset-bypass-audit`'s red run goes unread.
+
+**No new credential was added.** This is the load-bearing constraint the whole decision turns on,
+and it holds: neither script gained a new secret, a new token, or a new permission scope. Both
+`ruleset-config-check` and `ruleset-bypass-audit` run with only the workflow-level default
+(`contents: read`).
+
+**Guardrail consequence, recorded so it is not rediscovered as a surprise:** `tests/guardrails.test.ts`'s
+D-11 second-half job/context set-equality guardrail is narrowed, not loosened or deleted, to allow
+`ruleset-bypass-audit` as a single, explicitly enumerated, commented exception
+(`ADVISORY_NON_REQUIRED_JOBS`) — matching the `CI_WORKFLOW_FILES_WITH_EPHEMERAL_DSN` idiom already
+used elsewhere in that file. The fatal direction (every required context must have a matching job)
+remains unconditional.
+
+**Reversibility:** the split itself is reversible in either direction — folding the advisory check
+back into the required gate, or dropping it, are both ordinary configuration changes, not
+safety-relevant ones on D-04's standing. What is NOT reversible without its own decision record is
+adding a credential to make `bypass_actors` observable to the required check directly; that
+remains option 1, rejected above, and reopening it later requires arguing against this same
+reasoning explicitly, not merely reverting this entry.
