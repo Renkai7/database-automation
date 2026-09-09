@@ -208,13 +208,13 @@ Plans:
   3. A migration file is hand-edited after being generated, or an edit is made to a migration that a previous merge already applied — each is caught mechanically by a CI check and fails the build, without relying on a reviewer noticing.
   4. Inspecting the CI workflow shows migrations run as their own isolated pipeline step, invoked by the pipeline — never triggered by the application container starting up.
 
-**Plans**: 8 plans
+**Plans**: 1/8 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — The publish gate: a tested full-history secret detector, the audit record written from real output, and the owner's per-finding disposition (D-03)
+- [x] 05-01-PLAN.md — The publish gate: a tested full-history secret detector, the audit record written from real output, and the owner's per-finding disposition (D-03)
 
 **Wave 2** *(blocked on Wave 1 — nothing is published until the audit is signed off)*
 
@@ -281,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
 | 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
-| 5. CI Pipeline Gate | 0/8 | Planned | - |
+| 5. CI Pipeline Gate | 1/8 | In Progress|  |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |
