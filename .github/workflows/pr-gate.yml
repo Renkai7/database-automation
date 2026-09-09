@@ -112,6 +112,11 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+    # Rule 2 defensive addition (05-06): a hung `next start` process (see the tests/smoke.test.ts
+    # fix in this same commit) could otherwise run until GitHub's own default 6-hour job ceiling,
+    # burning the repository's Actions minutes silently. 15 minutes is generous over the ~1
+    # minute local baseline for the full 531-test suite including the production build.
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:17
