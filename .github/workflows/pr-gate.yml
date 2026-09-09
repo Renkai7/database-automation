@@ -61,3 +61,156 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+  # D-09/D-10 (05-CONTEXT.md), CI-05: the two tamper-detection checks. Deliberately no
+  # `services:` block -- check-append-only.ts never opens a database connection at all, and
+  # check-schema-drift.ts needs RECIPE_DEV_DATABASE_URL only because
+  # apps/recipe-app/drizzle.config.ts asserts the pinned target at module-load time (Pitfall 5,
+  # 05-RESEARCH.md) -- it never opens a socket either. The value below is a throwaway,
+  # per-job container credential guarding nothing that outlives the job (T-05-38, accepted;
+  # reviewed and deliberately committed as a non-secret, named so this is obvious in the file
+  # itself).
+  tamper-checks:
+    name: tamper-checks
+    runs-on: ubuntu-latest
+    env:
+      RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
+      RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
+    steps:
+      # fetch-depth: 0 (not the default 1) so PR_BASE_SHA and PR_HEAD_SHA are both resolvable
+      # for check-append-only.ts's diff (Pitfall 3, 05-RESEARCH.md) -- a diff that could not be
+      # computed must fail this check, never pass silently as an empty one.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert migrations are append-only (files and journal entries) -- D-09/D-10
+        run: pnpm exec tsx scripts/ci/check-append-only.ts
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Assert schema.ts and the committed migration history agree (no drift) -- D-09
+        run: pnpm exec tsx scripts/ci/check-schema-drift.ts
+
+  # CI-01: the application test suite, including tests/smoke.test.ts, which performs a real
+  # production build and boots the application. That is exactly why D-14 requires the dedicated
+  # `migrate` job below to be a structurally separate job from this one -- the migrate step here
+  # is test-fixture setup invoked explicitly by this job's own steps, never the CI-06
+  # demonstration, and never an application startup hook (D8, docs/decisions.md).
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: recipe_app
+          POSTGRES_PASSWORD: ci_ephemeral_not_a_secret
+          POSTGRES_DB: recipe_dev
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U recipe_app -d recipe_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
+      RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations (test-fixture setup, not the CI-06 demonstration -- see the migrate job)
+        run: pnpm db:migrate
+
+      - name: Seed the database
+        run: pnpm db:seed
+
+      - name: Run the application test suite
+        run: pnpm test
+
+  # CI-01: both migration history test axes (empty-database full history, existing-database
+  # newest-only), unmodified from Phase 4. No `services:` block -- the suite starts its own
+  # ephemeral postgres:17 Testcontainers per test file; Docker is available on the runner by
+  # default.
+  test-history:
+    name: test-history
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run both migration history test axes (empty-database, existing-database)
+        run: pnpm test:history
+
+  # D-05 (05-CONTEXT.md), CI-03: continuously re-verifies the live ruleset's own configuration --
+  # the runner does not trust that it applied its own migrations, it re-queries and refuses if
+  # the state does not read back as expected; this check applies the identical scepticism to the
+  # ruleset one layer up. Its honest limit, stated here and in every failure message this check
+  # emits: it runs INSIDE the thing it audits. Someone who can edit the ruleset can also delete
+  # this check. It raises the cost of tampering and makes it visible; it does not make tampering
+  # impossible (docs/decisions.md D12).
+  #
+  # administration: write is granted on this job ALONE -- the workflow-level default stays
+  # contents: read (T-05-34).
+  ruleset-config-check:
+    name: ruleset-config-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      administration: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert the live ruleset has an empty bypass list, active enforcement, and every required check
+        run: pnpm exec tsx scripts/ci/check-ruleset-config.ts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
