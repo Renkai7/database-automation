@@ -208,7 +208,7 @@ Plans:
   3. A migration file is hand-edited after being generated, or an edit is made to a migration that a previous merge already applied — each is caught mechanically by a CI check and fails the build, without relying on a reviewer noticing.
   4. Inspecting the CI workflow shows migrations run as their own isolated pipeline step, invoked by the pipeline — never triggered by the application container starting up.
 
-**Plans**: 1/8 plans executed
+**Plans**: 3/8 plans executed
 
 Plans:
 
@@ -222,7 +222,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 — the tracer needs a repository to open a pull request against)*
 
-- [ ] 05-03-PLAN.md — Tracer: one real pull request whose `analyze` check runs the analyzer over the whole committed history and posts the complete verdict onto the pull request itself
+- [x] 05-03-PLAN.md — Tracer: one real pull request whose `analyze` check runs the analyzer over the whole committed history and posts the complete verdict onto the pull request itself
 
 **Wave 4** *(blocked on Wave 3; the two plans touch disjoint files and run in parallel)*
 
@@ -281,6 +281,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Backup & Restore Drill | 5/5 | Complete    | 2026-09-07 |
 | 3. Safety Analyzer | 7/7 | Complete    | 2026-09-08 |
 | 4. Migration Runner & History Tests | 7/7 | Complete    | 2026-09-08 |
-| 5. CI Pipeline Gate | 1/8 | In Progress|  |
+| 5. CI Pipeline Gate | 3/8 | In Progress|  |
 | 6. Private Staging Connectivity | 0/TBD | Not started | - |
 | 7. Production Runner, Environment Gate & Audit Log | 0/TBD | Not started | - |

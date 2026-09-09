@@ -47,10 +47,10 @@
 
 ### Pipeline Gate (CI)
 
-- [ ] **CI-01**: Every pull request runs the analyzer, both migration test axes, and the application tests
-- [ ] **CI-02**: A BLOCKED classification fails the build
+- [x] **CI-01**: Every pull request runs the analyzer, both migration test axes, and the application tests
+- [x] **CI-02**: A BLOCKED classification fails the build
 - [ ] **CI-03**: The gate is enforced by a GitHub repository ruleset with an empty bypass list, so it cannot be waved through by the repository owner
-- [ ] **CI-04**: The safety classification and its reasoning are surfaced on the pull request itself
+- [x] **CI-04**: The safety classification and its reasoning are surfaced on the pull request itself
 - [ ] **CI-05**: Hand-edited migration files, and edits to already-applied migrations, are detected mechanically
 - [ ] **CI-06**: Migrations run as their own pipeline step and never at application startup
 
