@@ -10,10 +10,10 @@
 // scripts/*.ts entry point in this repo (packages/automation/src/cli.ts's own header documents
 // the reproduced Windows libuv crash this convention exists to avoid).
 //
-// This tracer task (05-03 Task 1) wires the proven verdict path only: the analyzer's --json
-// output is parsed and handed straight to renderPrComment. The non-verdict outcomes (analyzer
-// exit 30/40, where there is no AnalysisResult[] to parse at all) are deliberately left for
-// Task 3 to wire, per this plan's own tracer-then-expand structure.
+// Task 3: the non-verdict outcomes. When the analyzer exits PARSE_FAILURE (30) or RULES_INVALID
+// (40) there is no AnalysisResult[] to parse -- commentBodyForAnalyzerRun below routes those two
+// codes (and any exit code this module cannot otherwise recognise as a verdict) to
+// renderAnalyzerFailureComment instead of attempting JSON.parse on non-JSON output.
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +21,7 @@ import { execa } from "execa";
 import {
   DEFAULT_MIGRATIONS_DIR,
   EXIT_CODES,
+  renderAnalyzerFailureComment,
   renderPrComment,
   type AnalyzedFile,
 } from "../../packages/automation/src/index";
@@ -98,6 +99,44 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/** Task 3: selects which renderer produces the comment body for a given analyzer run. A verdict
+ * exit code (SAFE/REVIEW_REQUIRED/BLOCKED) has a real AnalysisResult[] on stdout and renders via
+ * renderPrComment; every other exit code (PARSE_FAILURE, RULES_INVALID, or anything this module
+ * does not recognise) has no AnalysisResult[] at all and renders via
+ * renderAnalyzerFailureComment instead -- attempting JSON.parse on non-JSON output would throw
+ * before the comment could ever be posted, and D-20 requires posting SOMETHING that explains
+ * why the check failed. A verdict-exit JSON parse failure (the analyzer's own contract broken)
+ * also falls back to the failure comment rather than propagating an uncaught exception. Exported
+ * for direct unit testing -- this is the one piece of branching logic in this file that is worth
+ * testing without spawning a real process. */
+export function commentBodyForAnalyzerRun(
+  analyzerExitCode: number,
+  stdout: string,
+  stderr: string,
+  introducedPaths: ReadonlySet<string>,
+): string {
+  const isVerdictExit =
+    analyzerExitCode === EXIT_CODES.SAFE ||
+    analyzerExitCode === EXIT_CODES.REVIEW_REQUIRED ||
+    analyzerExitCode === EXIT_CODES.BLOCKED;
+
+  if (isVerdictExit) {
+    try {
+      const files = JSON.parse(stdout) as AnalyzedFile[];
+      return renderPrComment(files, { introducedPaths });
+    } catch (error) {
+      return renderAnalyzerFailureComment(
+        "The analyzer reported a verdict exit code but its JSON output could not be parsed.",
+        safeErrorMessage(error),
+      );
+    }
+  }
+
+  const { reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
+  const detail = stderr.trim().length > 0 ? stderr.trim() : "(no further detail captured on stderr)";
+  return renderAnalyzerFailureComment(reason, detail);
+}
+
 /** Runs the whole `analyze` job and returns the intended process exit code. Posts the comment
  * BEFORE returning a failing exit code -- a BLOCKED run is exactly the run whose reasoning must
  * reach the pull request. If the `gh` call itself fails, that failure alone fails the job
@@ -131,9 +170,12 @@ async function runAnalyzeGate(): Promise<number> {
   );
   const analyzerExitCode = analyzeResult.exitCode ?? 1;
   const { exitCode: jobExitCode, reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
-
-  const files = JSON.parse(analyzeResult.stdout) as AnalyzedFile[];
-  const commentBody = renderPrComment(files, { introducedPaths });
+  const commentBody = commentBodyForAnalyzerRun(
+    analyzerExitCode,
+    analyzeResult.stdout,
+    analyzeResult.stderr,
+    introducedPaths,
+  );
 
   const commentFile = join(tmpdir(), `analyze-gate-comment-${process.pid}.md`);
   await writeFile(commentFile, commentBody, "utf-8");

@@ -4,7 +4,12 @@
 // pre-existing grouping, and the worst-verdict heading.
 import { describe, expect, it } from "vitest";
 import { EMPTY_FACTS, type Finding } from "../types";
-import { renderPrComment, PR_COMMENT_MARKER, type AnalyzedFile } from "./pr-comment";
+import {
+  renderAnalyzerFailureComment,
+  renderPrComment,
+  PR_COMMENT_MARKER,
+  type AnalyzedFile,
+} from "./pr-comment";
 
 function finding(overrides: Partial<Finding> = {}): Finding {
   return {
@@ -97,5 +102,69 @@ describe("renderPrComment", () => {
     expect(output).toContain("whole committed migration history");
     expect(output).toContain("presentation only");
     expect(output).toContain("not an audit record");
+  });
+
+  it("renders an explicit statement, not an empty section, when every file is SAFE with zero findings", () => {
+    const allSafeNoFindings = [
+      analyzedFile({ path: "apps/recipe-app/drizzle/0000.sql", verdict: "SAFE", findings: [] }),
+      analyzedFile({ path: "apps/recipe-app/drizzle/0001.sql", verdict: "SAFE", findings: [] }),
+    ];
+    const output = renderPrComment(allSafeNoFindings, { introducedPaths: new Set() });
+    expect(output.length).toBeGreaterThan(0);
+    expect(output).toContain("No findings were produced -- every classified statement is SAFE.");
+  });
+
+  it("escapes hostile content in a rationale, a rule id, and a path without breaking the comment's structure", () => {
+    const hostile = analyzedFile({
+      path: "apps/recipe-app/drizzle/0005_<script>|hostile`.sql",
+      verdict: "BLOCKED",
+      findings: [
+        finding({
+          verdict: "BLOCKED",
+          ruleIds: ["ban-`drop`-table|pipe"],
+          rationales: [
+            "A rationale with a backtick `, a pipe |, an angle bracket <tag>, and a ```triple-fence``` sequence.",
+          ],
+        }),
+      ],
+    });
+    const output = renderPrComment([hostile], { introducedPaths: new Set([hostile.path]) });
+
+    expect(output.split("\n")[0]).toBe(PR_COMMENT_MARKER);
+    const introducedCount = output.split("### Introduced by this pull request").length - 1;
+    const preExistingCount = output.split("### Pre-existing (already applied)").length - 1;
+    expect(introducedCount).toBe(1);
+    expect(preExistingCount).toBe(1);
+    // The raw triple-fence sequence must never survive unescaped -- each backtick is escaped
+    // individually, so the literal "```",  never appears in the output.
+    expect(output).not.toContain("```triple-fence```");
+    expect(output).not.toContain("<script>");
+    expect(output).not.toContain("<tag>");
+  });
+});
+
+describe("renderAnalyzerFailureComment", () => {
+  it("never contains the word BLOCKED", () => {
+    const output = renderAnalyzerFailureComment(
+      "The rules file is invalid and the analyzer refused to start.",
+      "RulesFileError: unexpected field \"foo\"",
+    );
+    expect(output).not.toContain("BLOCKED");
+  });
+
+  it("puts the marker on the first line and states this is not a verdict", () => {
+    const output = renderAnalyzerFailureComment("Parse failure.", "Unexpected token at line 3.");
+    expect(output.split("\n")[0]).toBe(PR_COMMENT_MARKER);
+    expect(output).toContain("could not produce a verdict");
+  });
+
+  it("escapes hostile content in the reason and detail strings", () => {
+    const output = renderAnalyzerFailureComment(
+      "Reason with a `backtick` and a | pipe.",
+      "Detail with <angle> brackets and a ```fence```.",
+    );
+    expect(output.split("\n")[0]).toBe(PR_COMMENT_MARKER);
+    expect(output).not.toContain("<angle>");
+    expect(output).not.toContain("```fence```");
   });
 });
