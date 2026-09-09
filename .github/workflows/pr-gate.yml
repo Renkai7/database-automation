@@ -109,6 +109,17 @@ jobs:
   # `migrate` job below to be a structurally separate job from this one -- the migrate step here
   # is test-fixture setup invoked explicitly by this job's own steps, never the CI-06
   # demonstration, and never an application startup hook (D8, docs/decisions.md).
+  #
+  # LIVE FINDING (05-06): this job provisions Postgres via `docker compose` (`pnpm db:up`), NOT a
+  # GitHub Actions `services:` container -- unlike `migrate` below, which never runs `pnpm test`.
+  # `pnpm test` runs `tests/migrate.test.ts` unmodified, which shells out to `pnpm run db:reset`
+  # (scripts/db-reset.ts), and that script itself runs `docker compose down -v` then
+  # `docker compose up -d --wait` to reset the pinned dev database -- confirmed live: with a
+  # `services:` container instead, `docker compose up -d --wait` failed outright because a
+  # `services:` container already held port 127.0.0.1:5432, and `tests/migrate.test.ts` failed
+  # its very first assertion (`resetRun.exitCode` was 1, not 0). Matching `restore-drill.yml`'s
+  # already-proven docker-compose provisioning here lets the unmodified suite run exactly as it
+  # does locally, rather than inventing a second, incompatible database-lifecycle mechanism.
   test:
     name: test
     runs-on: ubuntu-latest
@@ -117,20 +128,6 @@ jobs:
     # burning the repository's Actions minutes silently. 15 minutes is generous over the ~1
     # minute local baseline for the full 531-test suite including the production build.
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: recipe_app
-          POSTGRES_PASSWORD: ci_ephemeral_not_a_secret
-          POSTGRES_DB: recipe_dev
-        ports:
-          - 127.0.0.1:5432:5432
-        options: >-
-          --health-cmd "pg_isready -U recipe_app -d recipe_dev"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     env:
       RECIPE_DEV_DATABASE_URL: postgres://recipe_app:ci_ephemeral_not_a_secret@127.0.0.1:5432/recipe_dev
       RECIPE_DEV_DB_PASSWORD: ci_ephemeral_not_a_secret
@@ -148,6 +145,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Start the local development database (docker compose)
+        run: pnpm db:up
 
       - name: Apply migrations (test-fixture setup, not the CI-06 demonstration -- see the migrate job)
         run: pnpm db:migrate
