@@ -209,13 +209,20 @@ jobs:
   # `GITHUB_TOKEN` cannot be granted repository-administration scope through this declarative
   # block at all, by any value. This job therefore runs with only the workflow-level default
   # (contents: read) -- no elevated permission is requested here, because none is grantable.
-  # check-ruleset-config.ts's own `assertBypassListEmpty` already fails CLOSED (not silently
-  # passes) when `bypass_actors` is absent from the API response, which is exactly what this
-  # token will observe. This is a genuine, unresolved phase-blocking finding for plan 05-08 (the
-  # plan that applies the ruleset and first has a real one to query) -- 05-RESEARCH.md's own open
-  # question #1 pre-committed "absent" as one of three possible outcomes requiring a design change
-  # (most likely a fine-grained PAT or GitHub App token with real admin rights, held as a
-  # repository secret); it is now confirmed live rather than left a research-time guess.
+  #
+  # SPLIT DECISION (docs/decisions.md D30/D31, resolving the phase-blocking finding plan 05-08's
+  # own PR #3 hit live): a required status check that can never succeed under this permission
+  # model blocks every pull request permanently -- confirmed live when `ruleset-config-check`
+  # failed CLOSED on PR #3's own `bypass_actors`-absent response and left the repository
+  # merge-deadlocked. The owner's decision: this job stays REQUIRED, narrowed to assert only what
+  # `contents: read` can genuinely observe (`scripts/ci/check-ruleset-config.ts`'s
+  # `assertEnforcementActive` and `assertRequiredRules` -- enforcement active, and every required
+  # rule type and status-check context present). It no longer asserts `bypass_actors` is empty.
+  # That specific assertion moved to the separate, deliberately NON-required `ruleset-bypass-audit`
+  # job below, which fails loudly and visibly on every pull request without being able to block a
+  # merge. No new credential was added to satisfy this -- see docs/decisions.md D31 for the full
+  # reasoning, tied to 05-CONTEXT.md's domain boundary ("no credentials in CI beyond the default
+  # GITHUB_TOKEN") and D-18's identical rejection of a credential-holding CI automation.
   ruleset-config-check:
     name: ruleset-config-check
     runs-on: ubuntu-latest
@@ -236,8 +243,46 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Assert the live ruleset has an empty bypass list, active enforcement, and every required check
+      - name: Assert the live ruleset has active enforcement and every required rule and status check (narrowed, D30/D31 -- see comment above)
         run: pnpm exec tsx scripts/ci/check-ruleset-config.ts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # D-05 (05-CONTEXT.md), docs/decisions.md D30/D31: the other half of what ruleset-config-check
+  # used to assert alone. Deliberately NOT a required status check -- it is not a member of
+  # .github/rulesets/main-protection.json's required_status_checks list, and
+  # tests/guardrails.test.ts's job/context guardrail asserts that absence explicitly, alongside
+  # asserting this job still exists so the list cannot go stale by silent removal either. It
+  # exists to keep the empty-bypass-list property visibly, continuously checked on every pull
+  # request without being able to permanently deadlock the merge queue the way the merged
+  # assertion did on PR #3 -- a workflow's own GITHUB_TOKEN cannot observe bypass_actors at all
+  # under this repository's permission model (D30, confirmed live). No new credential was added
+  # to make this check pass; it fails loudly and visibly instead, exactly as it did as part of the
+  # required check before the split. Never passes on an absent field:
+  # scripts/ci/check-ruleset-bypass-audit.ts imports and reuses check-ruleset-config.ts's own
+  # assertBypassListEmpty unmodified.
+  ruleset-bypass-audit:
+    name: ruleset-bypass-audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ADVISORY (not required) -- assert bypass_actors is present and empty; fails loudly, never blocks a merge
+        run: pnpm exec tsx scripts/ci/check-ruleset-bypass-audit.ts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

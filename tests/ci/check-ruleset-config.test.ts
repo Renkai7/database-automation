@@ -8,6 +8,7 @@
 // a single mutation, so a failing test names exactly which property was violated, and a future
 // change that makes the passing fixture invalid breaks every test at once rather than silently
 // narrowing coverage.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   assertBypassListEmpty,
@@ -198,6 +199,18 @@ describe("rulesetsMatchingMain", () => {
       0,
     );
   });
+
+  it("LIVE FINDING (05-08): a bare list-endpoint summary with no `conditions` key never matches -- runCheckRulesetConfig must fetch each ruleset's detail before filtering, never filter on the list response alone", () => {
+    // Confirmed live against the real GitHub API: GET /repos/{owner}/{repo}/rulesets (the list
+    // endpoint) omits `conditions` entirely from every entry -- only the per-ruleset GET returns
+    // it. A caller that runs rulesetsMatchingMain directly against list-endpoint summaries (as
+    // this repository's own runCheckRulesetConfig did before this fix) always gets zero matches,
+    // even when a correctly configured ruleset targeting main is live -- reporting "the gate is
+    // absent" for a gate that is actually present and correct.
+    const listEndpointShape = [{ id: 1, name: "main-protection" }] as RulesetSummary[];
+
+    expect(rulesetsMatchingMain(listEndpointShape)).toHaveLength(0);
+  });
 });
 
 describe("a second ruleset targeting main with a non-empty bypass list fails verification", () => {
@@ -230,5 +243,54 @@ describe("a second ruleset targeting main with a non-empty bypass list fails ver
 
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatch(/bypass_actors/);
+  });
+});
+
+describe("D30/D31 split: the bypass-list assertion moved out of the required check", () => {
+  // Source-level composition checks, not a live/mocked run of runCheckRulesetConfig or
+  // runCheckRulesetBypassAudit -- both shell out to `gh api` via execa, and this repository's own
+  // established precedent (this file's header comment) is that the thin adapter's own network
+  // calls are proven live in CI, never mocked here. What IS worth pinning as a regression test is
+  // the composition itself: a future edit that quietly re-adds assertBypassListEmpty to the
+  // required check would silently reintroduce the exact phase-blocking deadlock docs/decisions.md
+  // D30 recorded (a required check that can never succeed under a GITHUB_TOKEN-only permission
+  // model blocks every pull request permanently) -- this test fails loudly instead.
+  it("runCheckRulesetConfig's own function body never references assertBypassListEmpty", () => {
+    const source = readFileSync("scripts/ci/check-ruleset-config.ts", "utf-8");
+    const bodyMatch = source.match(/export async function runCheckRulesetConfig\(\)[\s\S]*?\n\}\n/);
+    expect(bodyMatch, "could not locate runCheckRulesetConfig's function body").not.toBeNull();
+    expect(
+      bodyMatch![0],
+      "D30/D31: runCheckRulesetConfig (the REQUIRED status check) must never call " +
+        "assertBypassListEmpty -- that assertion belongs only to the separate, non-required " +
+        "ruleset-bypass-audit job, because a workflow's own GITHUB_TOKEN cannot observe " +
+        "bypass_actors at all under this repository's permission model",
+    ).not.toContain("assertBypassListEmpty");
+  });
+
+  it("check-ruleset-bypass-audit.ts imports and calls the real, unmodified assertBypassListEmpty -- it never reimplements the check", () => {
+    const source = readFileSync("scripts/ci/check-ruleset-bypass-audit.ts", "utf-8");
+    expect(
+      source,
+      "check-ruleset-bypass-audit.ts must import assertBypassListEmpty from " +
+        "check-ruleset-config.ts rather than reimplementing its fail-closed logic a second time",
+    ).toMatch(
+      /import\s*\{[^}]*assertBypassListEmpty[^}]*\}\s*from\s*["']\.\/check-ruleset-config["']/,
+    );
+
+    const bodyMatch = source.match(
+      /export async function runCheckRulesetBypassAudit\(\)[\s\S]*?\n\}\n/,
+    );
+    expect(bodyMatch, "could not locate runCheckRulesetBypassAudit's function body").not.toBeNull();
+    expect(bodyMatch![0]).toContain("assertBypassListEmpty");
+  });
+
+  it("check-ruleset-bypass-audit.ts's own failure message states this check is advisory and does not block a merge", () => {
+    const source = readFileSync("scripts/ci/check-ruleset-bypass-audit.ts", "utf-8");
+    expect(
+      source.toLowerCase(),
+      "the failure-path message must say this check does not block a merge, so a future reader " +
+        "of a red run in the Actions UI cannot mistake it for a required gate",
+    ).toContain("does not block a merge");
   });
 });
