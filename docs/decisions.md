@@ -1018,3 +1018,45 @@ actual GitHub plan tier remains UNKNOWN and is made not to matter by that same c
 - **Windows-only regressions will surface on the development machine, not in CI**
   (`05-CONTEXT.md` D-12) — GitHub's Windows runners cannot run the Linux containers this pipeline's
   migration tests require, so this asymmetry is accepted, not closed.
+
+---
+
+## D34 — The recipe app is deployed to Coolify from the public repository, not through a GitHub App
+**Status:** ACCEPTED · 2026-09-09
+
+Coolify's "New Application" flow offers a GitHub App source alongside a plain public-repository
+source. This project takes the public-repository source for the staging recipe app.
+
+`Renkai7/database-automation` is public (D33 records that visibility as settled), so the GitHub
+App's primary function — supplying credentials to clone a private repository — has nothing to do
+here. What remains is push-triggered redeploys and commit-status writes, and no Phase 6 plan
+consumes either: plan `06-07` reaches staging through GitHub Actions and the D-01 SSH tunnel, never
+through Coolify's API or a Coolify webhook.
+
+**Why the absence of a consumer is the deciding argument, not merely a neutral fact.** Installing
+the App would create a second automatic path that moves code into the staging environment, running
+beside the governed path this phase exists to build and prove. That is the shape D21 already rules
+out for schema state ("no second ungated schema-state path"); extending the same reasoning to
+application code while Phase 6 is mid-proof is consistent rather than novel. The App would also
+hold contents-read and status-write on the owner's GitHub account for no delivered capability.
+
+**A hard prerequisite that is not yet established either way.** The GitHub App flow requires GitHub
+to reach this Coolify instance over public HTTPS, for both the installation callback and subsequent
+webhooks. Whether such an endpoint exists on this instance is UNKNOWN as of this entry — it is
+precisely what plan `06-01`'s recon items 3, 4 and 5 (`ss -tlnp`, the Hetzner Cloud Firewall's
+inbound rules, and what is open besides port 22) are written to observe. If the answer turns out to
+be that only 22 is reachable, the GitHub App option cannot function at all and this decision is
+forced rather than chosen. It is recorded now as chosen, because the choice was made before the
+observation and should not be retroactively dressed up as a constraint.
+
+**Consequence accepted:** staging deploys of the recipe app are manual acts performed from the
+Coolify UI. Phase 6 deploys this application a handful of times, and `06-08` wants the deploy to be
+a deliberate, observable act in any case.
+
+**Revisit when both hold:** Coolify has a public HTTPS endpoint the owner is content to keep, and
+push-triggered redeploys are actually wanted. Neither is true today.
+
+**This decision does not weaken D8.** Whatever source method is used, the application's start
+command must not run migrations. Auto-deploy would be the specific mechanism by which a push could
+silently migrate staging, which is one more reason the manual path is the right default here — but
+D8 binds regardless of source method, not because of it.
