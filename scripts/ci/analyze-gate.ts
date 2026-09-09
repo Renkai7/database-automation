@@ -118,7 +118,17 @@ async function runAnalyzeGate(): Promise<number> {
   ]);
   const introducedPaths = introducedMigrationPaths(diffResult.stdout);
 
-  const analyzeResult = await execa("pnpm", ["db:analyze:migrations", "--json"], { reject: false });
+  // `pnpm exec tsx ...` invokes the binary directly -- unlike `pnpm db:analyze:migrations`
+  // (`pnpm run <script>`), which prints a "> package@version scriptname" banner to stdout ahead
+  // of the actual output on every platform this was checked against (confirmed live: both this
+  // repo's own Windows dev machine and the real ubuntu-latest runner from this task's own PR
+  // #1). That banner corrupts JSON.parse below -- `pnpm exec` never prints it, matching
+  // scripts/history-suite.ts's own established `execa("pnpm", ["exec", ...])` convention.
+  const analyzeResult = await execa(
+    "pnpm",
+    ["exec", "tsx", "packages/automation/src/cli.ts", "--migrations", "--json"],
+    { reject: false },
+  );
   const analyzerExitCode = analyzeResult.exitCode ?? 1;
   const { exitCode: jobExitCode, reason } = jobExitCodeForAnalyzerExit(analyzerExitCode);
 
