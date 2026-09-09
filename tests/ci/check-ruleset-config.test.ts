@@ -14,6 +14,7 @@ import {
   assertBypassListEmpty,
   assertEnforcementActive,
   assertRequiredRules,
+  extractExpectedContexts,
   rulesetsMatchingMain,
   type RulesetDetail,
   type RulesetSummary,
@@ -160,6 +161,49 @@ describe("assertRequiredRules", () => {
     )!.parameters = { strict_required_status_checks_policy: true, required_status_checks: missingOne };
 
     expect(() => assertRequiredRules(fixture, EXPECTED_CONTEXTS)).toThrow(/migrate/);
+  });
+});
+
+describe("extractExpectedContexts (WR-01, 05-REVIEW.md)", () => {
+  function payloadText(requiredStatusChecks: unknown): string {
+    return JSON.stringify({
+      rules: [
+        { type: "deletion" },
+        {
+          type: "required_status_checks",
+          parameters: {
+            strict_required_status_checks_policy: true,
+            required_status_checks: requiredStatusChecks,
+          },
+        },
+      ],
+    });
+  }
+
+  it("returns the context names in order for a well-formed payload", () => {
+    const text = payloadText([{ context: "analyze" }, { context: "test" }]);
+    expect(extractExpectedContexts(text)).toEqual(["analyze", "test"]);
+  });
+
+  // WR-01: the vacuous-assertion regression this test exists to pin. Before the fix,
+  // loadExpectedContexts had no non-empty guard, so a broken extraction silently produced `[]`,
+  // and assertRequiredRules's per-context `for` loop over an empty list ran zero iterations --
+  // reporting success without having checked a single required status check. This must throw.
+  it("WR-01: throws when the required_status_checks array is empty", () => {
+    const text = payloadText([]);
+    expect(() => extractExpectedContexts(text)).toThrow(/zero expected required-status-/);
+  });
+
+  it("WR-01: throws when the required_status_checks rule is missing entirely (optional-chain resolves to undefined)", () => {
+    const text = JSON.stringify({ rules: [{ type: "deletion" }] });
+    expect(() => extractExpectedContexts(text)).toThrow(/zero expected required-status-/);
+  });
+
+  it("WR-01: throws when the rules array itself does not contain a required_status_checks entry with parameters", () => {
+    const text = JSON.stringify({
+      rules: [{ type: "required_status_checks" }],
+    });
+    expect(() => extractExpectedContexts(text)).toThrow(/zero expected required-status-/);
   });
 });
 
